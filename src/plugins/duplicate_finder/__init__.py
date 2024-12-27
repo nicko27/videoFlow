@@ -1,2 +1,3 @@
-# Expose le plugin
-__all__ = ['Plugin']
+from .plugin import DuplicateFinderPlugin
+
+__all__ = ['DuplicateFinderPlugin']

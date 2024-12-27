@@ -2,21 +2,17 @@ from PyQt6.QtGui import QAction
 from src.core.plugin_interface import PluginInterface
 from src.core.logger import Logger
 
-logger = Logger.get_logger('DuplicateFinder.Plugin')
+logger = Logger.get_logger('CopyManager.Plugin')
 
-class DuplicateFinderPlugin(PluginInterface):
+class CopyManagerPlugin(PluginInterface):
     def __init__(self):
         super().__init__()
-        self.name = "Duplicate Finder"
-        self.description = "Trouve les fichiers en double dans un dossier"
+        self.name = "Copy Manager"
+        self.description = "Copie la structure des dossiers avec ou sans les fichiers"
         self.version = "1.0.0"
         self.window = None
-        logger.debug("Plugin DuplicateFinder initialisé")
+        logger.debug("Plugin CopyManager initialisé")
     
-    def get_name(self) -> str:
-        logger.debug("get_name() appelé")
-        return self.name
-
     def setup(self, main_window):
         """Configure le plugin"""
         self.main_window = main_window
@@ -27,12 +23,12 @@ class DuplicateFinderPlugin(PluginInterface):
         
         # Ajouter au menu Plugins
         self.main_window.plugins_menu.addAction(self.action)
-        logger.debug("Plugin DuplicateFinder configuré")
+        logger.debug("Plugin CopyManager configuré")
     
     def show_window(self):
         """Affiche la fenêtre du plugin"""
         if not self.window:
-            from .window import DuplicateFinderWindow
-            self.window = DuplicateFinderWindow()
+            from .window import CopyManagerWindow
+            self.window = CopyManagerWindow()
         self.window.show()
-        logger.debug("Fenêtre DuplicateFinder affichée")
+        logger.debug("Fenêtre CopyManager affichée")
