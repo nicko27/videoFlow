@@ -189,59 +189,70 @@ class DuplicateComparisonDialog(QDialog):
 
 class DuplicateFinderThread(QThread):
     progress = pyqtSignal(int)
+    file_analyzed = pyqtSignal(str)
     finished = pyqtSignal(dict)
-    file_analyzed = pyqtSignal(str)  # Signal pour indiquer qu'un fichier a été analysé
-
-    def __init__(self, hasher: VideoHasher, files: List[str]):
+    
+    def __init__(self, files_to_analyze, data_manager, hasher):
         super().__init__()
+        self.files_to_analyze = files_to_analyze
+        self.data_manager = data_manager
         self.hasher = hasher
-        self.files = files
-        self.data_manager = DataManager()
-
+        self.total_files = len(files_to_analyze)
+        self.current_progress = 0
+    
     def run(self):
-        try:
-            total_files = len(self.files)
-            duplicates = {}
-            analyzed_files = {}
-
-            # Calculer les hashs pour tous les fichiers
-            for i, file_path in enumerate(self.files):
+        """Analyse les fichiers en arrière-plan"""
+        results = {}
+        analyzed_files = self.data_manager.get_analyzed_files()
+        
+        # Calculer d'abord tous les hashs
+        current_hashes = {}
+        for i, file_path in enumerate(self.files_to_analyze, 1):
+            try:
+                # Calculer l'empreinte du fichier
                 file_hash = self.hasher.compute_video_hash(file_path)
                 if file_hash is not None:
-                    analyzed_files[file_path] = file_hash
-                    self.file_analyzed.emit(file_path)  # Émettre le signal
-                self.progress.emit(int((i + 1) * 50 / total_files))
-
-            # Comparer les hashs entre eux
-            files_list = list(analyzed_files.items())
-            for i, (file1, hash1) in enumerate(files_list):
-                for file2, hash2 in files_list[i + 1:]:
-                    if self.hasher.are_similar(hash1, hash2):
-                        # Ajouter les deux fichiers comme doublons
-                        if file1 not in duplicates:
-                            duplicates[file1] = set()
-                        duplicates[file1].add(file2)  # Ne stocker que dans un sens
-
-                self.progress.emit(50 + int((i + 1) * 50 / len(files_list)))
-
-            # Sauvegarder les fichiers analysés
-            for file_path, file_hash in analyzed_files.items():
-                self.data_manager.add_analyzed_file(file_path, file_hash)
-            self.data_manager.save_data()
-
-            # Convertir les sets en listes pour la sérialisation JSON
-            result_duplicates = {k: list(v) for k, v in duplicates.items()}
-            self.finished.emit(result_duplicates)
-
-        except Exception as e:
-            logger.error(f"Erreur pendant l'analyse: {e}")
-            self.finished.emit({})
+                    current_hashes[file_path] = file_hash
+                    # Stocker l'empreinte
+                    self.data_manager.add_analyzed_file(file_path, file_hash)
+                    # Sauvegarder après chaque fichier
+                    self.data_manager.save_data()
+                
+                # Mettre à jour la progression
+                progress = int((i / self.total_files) * 50)  # Première moitié
+                self.progress.emit(progress)
+                self.file_analyzed.emit(file_path)
+            
+            except Exception as e:
+                logger.error(f"Erreur lors de l'analyse de {file_path}: {e}")
+        
+        # Ensuite, comparer tous les hashs entre eux
+        all_files = {**current_hashes, **analyzed_files}  # Fusionner les hashs actuels et existants
+        total_comparisons = len(all_files) * (len(all_files) - 1) // 2
+        comparison_count = 0
+        
+        for file1, hash1 in all_files.items():
+            for file2, hash2 in all_files.items():
+                if file1 < file2:  # Évite les comparaisons en double
+                    comparison_count += 1
+                    if not self.data_manager.is_pair_ignored(file1, file2):
+                        if self.hasher.are_similar(hash1, hash2):
+                            if file1 not in results:
+                                results[file1] = []
+                            results[file1].append(file2)
+            
+            # Mettre à jour la progression pour la deuxième moitié
+            progress = 50 + int((comparison_count / total_comparisons) * 50)
+            self.progress.emit(progress)
+        
+        self.finished.emit(results)
 
 class DuplicateFinderWindow(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Recherche de doublons")
-        self.setMinimumWidth(800)
+        self.setMinimumWidth(1200)
+        self.setMinimumHeight(600)
         self.data_manager = DataManager()
         
         # Initialiser avec le niveau de précision élevé (3)
@@ -251,119 +262,200 @@ class DuplicateFinderWindow(QDialog):
         self.load_analyzed_files()
 
     def init_ui(self):
+        """Initialise l'interface utilisateur"""
         layout = QVBoxLayout()
-
-        # Boutons du haut
-        top_buttons = QHBoxLayout()
         
+        # Groupe de boutons
+        button_group = QHBoxLayout()
+        
+        # Bouton pour ajouter des fichiers
         self.add_files_button = QPushButton("Ajouter des fichiers")
         self.add_files_button.clicked.connect(self.select_files)
-        top_buttons.addWidget(self.add_files_button)
-
+        button_group.addWidget(self.add_files_button)
+        
+        # Bouton pour ajouter un dossier
         self.add_folder_button = QPushButton("Ajouter un dossier")
         self.add_folder_button.clicked.connect(self.select_folder)
-        top_buttons.addWidget(self.add_folder_button)
-
-        # Niveau de précision
-        precision_layout = QHBoxLayout()
-        precision_label = QLabel("Niveau de précision:")
-        self.precision_combo = QComboBox()
-        self.precision_combo.addItems(["Faible", "Moyen", "Élevé"])
-        self.precision_combo.setCurrentText("Élevé")
-        self.precision_combo.currentTextChanged.connect(self.change_precision)
-        precision_layout.addWidget(precision_label)
-        precision_layout.addWidget(self.precision_combo)
-        top_buttons.addLayout(precision_layout)
-
+        button_group.addWidget(self.add_folder_button)
+        
+        # Bouton pour lancer l'analyse
         self.analyze_button = QPushButton("Analyser")
         self.analyze_button.clicked.connect(self.start_analysis)
-        top_buttons.addWidget(self.analyze_button)
-
+        button_group.addWidget(self.analyze_button)
+        
+        # Bouton pour effacer les empreintes
         self.clear_button = QPushButton("Effacer les empreintes")
         self.clear_button.clicked.connect(self.clear_data)
-        top_buttons.addWidget(self.clear_button)
-
+        button_group.addWidget(self.clear_button)
+        
+        # Bouton pour supprimer la sélection
+        self.remove_button = QPushButton("Supprimer la sélection")
+        self.remove_button.clicked.connect(self.remove_selected)
+        button_group.addWidget(self.remove_button)
+        
+        # Bouton pour fermer la fenêtre
         self.close_button = QPushButton("Fermer")
         self.close_button.clicked.connect(self.close)
-        top_buttons.addWidget(self.close_button)
-
-        layout.addLayout(top_buttons)
-
+        button_group.addWidget(self.close_button)
+        
+        # Niveau de précision
+        precision_layout = QHBoxLayout()
+        precision_label = QLabel("Précision:")
+        self.precision_slider = QSlider(Qt.Orientation.Horizontal)
+        self.precision_slider.setMinimum(1)
+        self.precision_slider.setMaximum(3)
+        self.precision_slider.setValue(3)
+        self.precision_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.precision_slider.setTickInterval(1)
+        self.precision_slider.valueChanged.connect(self.update_precision)
+        precision_layout.addWidget(precision_label)
+        precision_layout.addWidget(self.precision_slider)
+        
+        # Barre de progression
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        
         # Table des fichiers
         self.files_table = QTableWidget()
         self.files_table.setColumnCount(2)
         self.files_table.setHorizontalHeaderLabels(["Fichier", "État"])
         self.files_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.files_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        self.files_table.setSortingEnabled(True)  # Activer le tri
-        self.files_table.horizontalHeader().setSortIndicator(0, Qt.SortOrder.AscendingOrder)  # Tri par défaut
-        layout.addWidget(self.files_table)
-
-        # Barre de progression
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
+        self.files_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.files_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.files_table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
+        
+        # Ajouter les widgets au layout principal
+        layout.addLayout(button_group)
+        layout.addLayout(precision_layout)
         layout.addWidget(self.progress_bar)
-
+        layout.addWidget(self.files_table)
+        
         self.setLayout(layout)
-        self.thread = None
 
-    def show_analyzed_files(self):
-        """Affiche uniquement la liste des fichiers analysés"""
-        self.files_table.setSortingEnabled(False)  # Désactiver le tri pendant la mise à jour
+    def update_progress(self, value):
+        """Met à jour la barre de progression"""
+        self.progress_bar.setValue(value)
+
+    def start_analysis(self):
+        """Lance l'analyse et affiche la fenêtre de gestion des doublons"""
+        files_to_analyze = []
         
-        # Sauvegarder les fichiers actuellement en attente
-        pending_files = []
         for i in range(self.files_table.rowCount()):
-            file_item = self.files_table.item(i, 0)
             status_item = self.files_table.item(i, 1)
-            if file_item and status_item and status_item.text() == "En attente":
-                pending_files.append(file_item.text())
-        
-        self.files_table.setRowCount(0)
-        
-        # Ajouter d'abord les fichiers analysés
-        analyzed_files = self.data_manager.get_analyzed_files()
-        sorted_files = sorted(analyzed_files.items(), key=lambda x: x[0].lower())
-        
-        current_row = 0
-        for file_path, _ in sorted_files:
-            # Vérifier si le fichier existe toujours
-            file_exists = os.path.exists(file_path)
+            file_item = self.files_table.item(i, 0)
             
-            # Fichier
-            file_item = QTableWidgetItem(file_path)
-            if not file_exists:
-                file_item.setForeground(QColor(255, 0, 0))
-                self.data_manager.analyzed_files.pop(file_path, None)
-            self.files_table.insertRow(current_row)
-            self.files_table.setItem(current_row, 0, file_item)
-            
-            # État
-            status = "Introuvable" if not file_exists else "Analysé"
-            status_item = QTableWidgetItem(status)
-            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            if not file_exists:
-                status_item.setForeground(QColor(255, 0, 0))
-            self.files_table.setItem(current_row, 1, status_item)
-            current_row += 1
+            if status_item and file_item and status_item.text() == "En attente":
+                files_to_analyze.append(file_item.text())
         
-        # Ajouter ensuite les fichiers en attente
-        for file_path in sorted(pending_files, key=str.lower):
-            self.files_table.insertRow(current_row)
-            
-            # Fichier
-            file_item = QTableWidgetItem(file_path)
-            self.files_table.setItem(current_row, 0, file_item)
-            
-            # État
-            status_item = QTableWidgetItem("En attente")
-            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.files_table.setItem(current_row, 1, status_item)
-            current_row += 1
+        if not files_to_analyze:
+            QMessageBox.information(self, "Information", 
+                                  "Aucun nouveau fichier à analyser.")
+            return
+
+        self.progress_bar.setVisible(True)
+        self.add_files_button.setEnabled(False)
+        self.add_folder_button.setEnabled(False)
+        self.analyze_button.setEnabled(False)
         
-        # Sauvegarder les changements si des fichiers ont été supprimés
+        self.thread = DuplicateFinderThread(files_to_analyze, self.data_manager, self.hasher)
+        self.thread.progress.connect(self.update_progress)
+        self.thread.file_analyzed.connect(self.update_file_status)
+        self.thread.finished.connect(self.analysis_finished)
+        self.thread.start()
+
+    def update_file_status(self, file_path: str):
+        """Met à jour le statut d'un fichier dans la table"""
+        for i in range(self.files_table.rowCount()):
+            if self.files_table.item(i, 0).text() == file_path:
+                status_item = QTableWidgetItem("Analysé")
+                status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.files_table.setItem(i, 1, status_item)
+                break
+
+    def analysis_finished(self, results: Dict[str, List[str]]):
+        """Appelé quand l'analyse est terminée"""
+        # Réactiver les boutons
+        self.progress_bar.setVisible(False)
+        self.add_files_button.setEnabled(True)
+        self.add_folder_button.setEnabled(True)
+        self.analyze_button.setEnabled(True)
+
+        # Afficher la fenêtre de gestion des doublons
+        if results:
+            self.show_duplicates_manager(results)
+        else:
+            QMessageBox.information(self, "Analyse terminée", 
+                                  "Aucun doublon n'a été trouvé.")
+
+    def show_duplicates_manager(self, duplicates):
+        """Affiche la fenêtre de gestion des doublons"""
+        # Créer une liste de paires uniques de doublons
+        shown_pairs = set()
+        for file1, duplicate_files in duplicates.items():
+            for file2 in duplicate_files:
+                # Créer une paire triée pour éviter les doublons
+                pair = tuple(sorted([file1, file2]))
+                if pair not in shown_pairs and not self.data_manager.is_pair_ignored(pair[0], pair[1]):
+                    shown_pairs.add(pair)
+                    dialog = DuplicateComparisonDialog(pair[0], pair[1], 
+                                                     self.data_manager, self)
+                    dialog.exec()
+        
+        # Sauvegarder les changements
         self.data_manager.save_data()
-        self.files_table.setSortingEnabled(True)  # Réactiver le tri
+
+    def update_precision(self, level_text: str):
+        """Change le niveau de précision de l'analyse"""
+        level_map = {
+            "Faible": 1,
+            "Moyen": 2,
+            "Élevé": 3
+        }
+        level = level_map.get(level_text, 3)  # Par défaut niveau élevé
+        self.hasher = VideoHasher(precision_level=level)
+
+    def delete_duplicate(self, file_path: str):
+        """Déplace un fichier dupliqué vers la corbeille"""
+        try:
+            send2trash(file_path)  # Utiliser send2trash au lieu de os.remove
+            # Supprimer le fichier de la base de données
+            self.data_manager.analyzed_files.pop(file_path, None)
+            self.data_manager.save_data()
+            # Mettre à jour l'affichage
+            self.show_analyzed_files()
+        except Exception as e:
+            logger.error(f"Erreur lors de la suppression de {file_path}: {e}")
+            QMessageBox.warning(self, "Erreur", 
+                              f"Impossible de déplacer le fichier vers la corbeille : {str(e)}")
+
+    def clear_data(self):
+        """Efface toutes les empreintes"""
+        reply = QMessageBox.question(
+            self,
+            "Confirmation",
+            "Êtes-vous sûr de vouloir effacer toutes les empreintes ?\nCette action effacera aussi la liste des doublons ignorés.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.data_manager.clear_data()
+            
+            # Mettre à jour le statut des fichiers à "En attente"
+            for i in range(self.files_table.rowCount()):
+                status_item = self.files_table.item(i, 1)
+                if status_item and status_item.text() == "Analysé":
+                    status_item = QTableWidgetItem("En attente")
+                    status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    self.files_table.setItem(i, 1, status_item)
+            
+            logger.info("Toutes les empreintes ont été effacées")
+            QMessageBox.information(self, "Succès", "Toutes les empreintes ont été effacées.")
+
+    def load_analyzed_files(self):
+        """Charge les fichiers analysés sans afficher les doublons"""
+        self.show_analyzed_files()
 
     def select_folder(self):
         """Ouvre une boîte de dialogue pour sélectionner un dossier"""
@@ -446,118 +538,81 @@ class DuplicateFinderWindow(QDialog):
             
             self.files_table.setSortingEnabled(True)  # Réactiver le tri
 
-    def start_analysis(self):
-        """Lance l'analyse et affiche la fenêtre de gestion des doublons"""
-        files_to_analyze = []
-        
-        for i in range(self.files_table.rowCount()):
-            status_item = self.files_table.item(i, 1)
-            file_item = self.files_table.item(i, 0)
-            
-            if status_item and file_item and status_item.text() == "En attente":
-                files_to_analyze.append(file_item.text())
-        
-        if not files_to_analyze:
-            QMessageBox.information(self, "Information", 
-                                  "Aucun nouveau fichier à analyser.")
+    def remove_selected(self):
+        """Supprime les fichiers sélectionnés de la liste"""
+        selected_rows = sorted([item.row() for item in self.files_table.selectedItems()], reverse=True)
+        if not selected_rows:
             return
-
-        self.progress_bar.setVisible(True)
-        self.add_files_button.setEnabled(False)
-        self.add_folder_button.setEnabled(False)
-        self.analyze_button.setEnabled(False)
         
-        self.thread = DuplicateFinderThread(self.hasher, files_to_analyze)
-        self.thread.progress.connect(self.update_progress)
-        self.thread.finished.connect(self.analysis_finished)
-        self.thread.file_analyzed.connect(self.update_file_status)  # Connecter le nouveau signal
-        self.thread.start()
-
-    def update_progress(self, value):
-        """Met à jour la barre de progression"""
-        self.progress_bar.setValue(value)
-
-    def update_file_status(self, file_path: str):
-        """Met à jour le statut d'un fichier dans la table"""
-        for i in range(self.files_table.rowCount()):
-            if self.files_table.item(i, 0).text() == file_path:
-                status_item = QTableWidgetItem("Analysé")
-                status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.files_table.setItem(i, 1, status_item)
-                break
-
-    def analysis_finished(self, results: Dict[str, List[str]]):
-        """Appelé quand l'analyse est terminée"""
-        # Réactiver les boutons
-        self.progress_bar.setVisible(False)
-        self.add_files_button.setEnabled(True)
-        self.add_folder_button.setEnabled(True)
-        self.analyze_button.setEnabled(True)
-
-        # Afficher la fenêtre de gestion des doublons
-        if results:
-            self.show_duplicates_manager(results)
-        else:
-            QMessageBox.information(self, "Analyse terminée", 
-                                  "Aucun doublon n'a été trouvé.")
-
-    def show_duplicates_manager(self, duplicates):
-        """Affiche la fenêtre de gestion des doublons"""
-        # Créer une liste de paires uniques de doublons
-        shown_pairs = set()
-        for file1, duplicate_files in duplicates.items():
-            for file2 in duplicate_files:
-                # Créer une paire triée pour éviter les doublons
-                pair = tuple(sorted([file1, file2]))
-                if pair not in shown_pairs and not self.data_manager.is_pair_ignored(pair[0], pair[1]):
-                    shown_pairs.add(pair)
-                    dialog = DuplicateComparisonDialog(pair[0], pair[1], 
-                                                     self.data_manager, self)
-                    dialog.exec()
-        
-        # Sauvegarder les changements
-        self.data_manager.save_data()
-
-    def change_precision(self, level_text: str):
-        """Change le niveau de précision de l'analyse"""
-        level_map = {
-            "Faible": 1,
-            "Moyen": 2,
-            "Élevé": 3
-        }
-        level = level_map.get(level_text, 3)  # Par défaut niveau élevé
-        self.hasher = VideoHasher(precision_level=level)
-
-    def delete_duplicate(self, file_path: str):
-        """Déplace un fichier dupliqué vers la corbeille"""
-        try:
-            send2trash(file_path)  # Utiliser send2trash au lieu de os.remove
-            # Supprimer le fichier de la base de données
-            self.data_manager.analyzed_files.pop(file_path, None)
-            self.data_manager.save_data()
-            # Mettre à jour l'affichage
-            self.show_analyzed_files()
-        except Exception as e:
-            logger.error(f"Erreur lors de la suppression de {file_path}: {e}")
-            QMessageBox.warning(self, "Erreur", 
-                              f"Impossible de déplacer le fichier vers la corbeille : {str(e)}")
-
-    def clear_data(self):
-        """Efface toutes les données analysées"""
         reply = QMessageBox.question(
             self,
             "Confirmation",
-            "Êtes-vous sûr de vouloir effacer toutes les empreintes ?\nCette action effacera aussi la liste des doublons ignorés.",
+            f"Êtes-vous sûr de vouloir supprimer {len(set(selected_rows))} fichier(s) de la liste ?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            self.data_manager.clear_data()
-            self.files_table.setRowCount(0)  # Vider la table
-            logger.info("Toutes les empreintes ont été effacées")
-            QMessageBox.information(self, "Succès", "Toutes les empreintes ont été effacées.")
+            # Supprimer les lignes sélectionnées
+            for row in selected_rows:
+                self.files_table.removeRow(row)
+            
+            logger.info(f"{len(set(selected_rows))} fichier(s) supprimé(s) de la liste")
 
-    def load_analyzed_files(self):
-        """Charge les fichiers analysés sans afficher les doublons"""
-        self.show_analyzed_files()
+    def show_analyzed_files(self):
+        """Affiche uniquement la liste des fichiers analysés"""
+        self.files_table.setSortingEnabled(False)  # Désactiver le tri pendant la mise à jour
+        
+        # Sauvegarder les fichiers actuellement en attente
+        pending_files = []
+        for i in range(self.files_table.rowCount()):
+            file_item = self.files_table.item(i, 0)
+            status_item = self.files_table.item(i, 1)
+            if file_item and status_item and status_item.text() == "En attente":
+                pending_files.append(file_item.text())
+        
+        self.files_table.setRowCount(0)
+        
+        # Ajouter d'abord les fichiers analysés
+        analyzed_files = self.data_manager.get_analyzed_files()
+        sorted_files = sorted(analyzed_files.items(), key=lambda x: x[0].lower())
+        
+        current_row = 0
+        for file_path, _ in sorted_files:
+            # Vérifier si le fichier existe toujours
+            file_exists = os.path.exists(file_path)
+            
+            # Fichier
+            file_item = QTableWidgetItem(file_path)
+            if not file_exists:
+                file_item.setForeground(QColor(255, 0, 0))
+                self.data_manager.analyzed_files.pop(file_path, None)
+            self.files_table.insertRow(current_row)
+            self.files_table.setItem(current_row, 0, file_item)
+            
+            # État
+            status = "Introuvable" if not file_exists else "Analysé"
+            status_item = QTableWidgetItem(status)
+            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            if not file_exists:
+                status_item.setForeground(QColor(255, 0, 0))
+            self.files_table.setItem(current_row, 1, status_item)
+            current_row += 1
+        
+        # Ajouter ensuite les fichiers en attente
+        for file_path in sorted(pending_files, key=str.lower):
+            self.files_table.insertRow(current_row)
+            
+            # Fichier
+            file_item = QTableWidgetItem(file_path)
+            self.files_table.setItem(current_row, 0, file_item)
+            
+            # État
+            status_item = QTableWidgetItem("En attente")
+            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.files_table.setItem(current_row, 1, status_item)
+            current_row += 1
+        
+        # Sauvegarder les changements si des fichiers ont été supprimés
+        self.data_manager.save_data()
+        self.files_table.setSortingEnabled(True)  # Réactiver le tri

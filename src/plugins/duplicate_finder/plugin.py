@@ -1,71 +1,38 @@
-from PyQt6.QtWidgets import QPushButton
-from PyQt6.QtGui import QIcon, QColor
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtGui import QAction
 from src.core.plugin_interface import PluginInterface
 from src.core.logger import Logger
-import os
 
 logger = Logger.get_logger('DuplicateFinder.Plugin')
 
-class Plugin(PluginInterface):
+class DuplicateFinderPlugin(PluginInterface):
     def __init__(self):
-        logger.debug("Initialisation du plugin DuplicateFinder")
-        super().__init__()  # Appel du constructeur de la classe parente
+        super().__init__()
+        self.name = "Duplicate Finder"
+        self.description = "Trouve les fichiers en double dans un dossier"
+        self.version = "1.0.0"
         self.window = None
-
+        logger.debug("Plugin DuplicateFinder initialisé")
+    
     def get_name(self) -> str:
         logger.debug("get_name() appelé")
-        return "Duplicate Finder"
+        return self.name
 
-    def get_button(self) -> QPushButton:
-        logger.debug("Création du bouton DuplicateFinder")
-        button = QPushButton()
+    def setup(self, main_window):
+        """Configure le plugin"""
+        self.main_window = main_window
         
-        # Définition de l'icône
-        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 
-                                'resources', 'icons', 'duplicate_finder.svg')
-        logger.debug(f"Chemin de l'icône: {icon_path}")
+        # Créer l'action dans le menu
+        self.action = QAction(self.name, self.main_window)
+        self.action.triggered.connect(self.show_window)
         
-        if os.path.exists(icon_path):
-            icon = QIcon(icon_path)
-            button.setIcon(icon)
-            button.setIconSize(QSize(32, 32))
-            logger.debug("Icône ajoutée au bouton")
-        else:
-            logger.warning(f"Icône non trouvée: {icon_path}")
-        
-        # Texte du bouton
-        button.setText("Recherche\nDoublons")
-        
-        # Style du bouton
-        button.setStyleSheet("""
-            QPushButton {
-                background-color: #FF6B6B;
-                color: white;
-                border: none;
-                border-radius: 10px;
-                padding: 20px;
-                font-size: 14px;
-                font-weight: bold;
-                text-align: center;
-            }
-            QPushButton:hover {
-                background-color: #FF8787;
-            }
-            QPushButton:pressed {
-                background-color: #FA5252;
-            }
-        """)
-        
-        # Connexion du clic
-        button.clicked.connect(self.show_window)
-        logger.debug("Bouton DuplicateFinder créé et configuré")
-        return button
-
+        # Ajouter au menu Plugins
+        self.main_window.plugins_menu.addAction(self.action)
+        logger.debug("Plugin DuplicateFinder configuré")
+    
     def show_window(self):
-        logger.debug("Ouverture de la fenêtre DuplicateFinder")
+        """Affiche la fenêtre du plugin"""
         if not self.window:
-            # Import ici pour éviter l'importation circulaire
-            from src.plugins.duplicate_finder.window import DuplicateFinderWindow
+            from .window import DuplicateFinderWindow
             self.window = DuplicateFinderWindow()
         self.window.show()
+        logger.debug("Fenêtre DuplicateFinder affichée")
