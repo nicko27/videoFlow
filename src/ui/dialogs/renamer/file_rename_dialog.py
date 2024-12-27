@@ -1,65 +1,41 @@
 """
-Fenêtre principale de renommage de fichiers
+Fenêtre de renommage de fichiers simplifiée
 """
 
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QSplitter,
-    QPushButton, QLabel, QListWidget, QWidget,
-    QMessageBox, QFileDialog, QTabWidget, QStyle,
-    QListWidgetItem, QFrame, QProgressDialog
+    QDialog, QVBoxLayout, QHBoxLayout,
+    QPushButton, QLabel, QTableWidget,
+    QMessageBox, QFileDialog, QTableWidgetItem,
+    QLineEdit, QFrame, QProgressDialog
 )
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QIcon, QColor, QPalette
+from PyQt6.QtGui import QIcon
 
 import os
 import shutil
 from pathlib import Path
-
-from .regex_editor_dialog import RegexEditorDialog
-from .pattern_manager_dialog import PatternManagerDialog
-from .rename_preview_dialog import RenamePreviewDialog
+import re
 
 class FileRenameDialog(QDialog):
-    """Fenêtre principale pour le renommage de fichiers"""
+    """Fenêtre simplifiée pour le renommage de fichiers"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
-        self.selected_files = []
-        self.current_pattern = None
-        self.rename_operations = []
+        self.files = []  # Liste des fichiers [(chemin, nom_original, nouveau_nom)]
 
     def setup_ui(self):
         """Configuration de l'interface utilisateur"""
         self.setWindowTitle("Renommer les fichiers")
-        self.resize(1200, 800)
-        self.setMinimumSize(1000, 600)
-
-        # Style global
+        self.resize(800, 600)
         self.setStyleSheet("""
             QDialog {
                 background-color: #f5f5f5;
             }
-            QSplitter::handle {
-                background-color: #e0e0e0;
-            }
-            QListWidget {
+            QFrame {
                 background-color: white;
                 border: 1px solid #e0e0e0;
                 border-radius: 5px;
-                padding: 5px;
-            }
-            QListWidget::item {
-                padding: 8px;
-                margin: 2px;
-                border-radius: 4px;
-            }
-            QListWidget::item:hover {
-                background-color: #f0f0f0;
-            }
-            QListWidget::item:selected {
-                background-color: #e3f2fd;
-                color: #1976d2;
             }
             QPushButton {
                 padding: 8px 16px;
@@ -75,120 +51,77 @@ class FileRenameDialog(QDialog):
             QPushButton:pressed {
                 background-color: #1565c0;
             }
-            QPushButton:disabled {
-                background-color: #bdbdbd;
+            QLineEdit {
+                padding: 8px;
+                border: 1px solid #e0e0e0;
+                border-radius: 4px;
+                background-color: white;
             }
-            QTabWidget::pane {
+            QLineEdit:focus {
+                border-color: #2196f3;
+            }
+            QTableWidget {
                 border: 1px solid #e0e0e0;
                 border-radius: 5px;
-                background-color: white;
+                gridline-color: #f5f5f5;
             }
-            QTabBar::tab {
-                padding: 8px 16px;
-                margin-right: 4px;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
+            QHeaderView::section {
                 background-color: #f5f5f5;
-            }
-            QTabBar::tab:selected {
-                background-color: white;
-                border: 1px solid #e0e0e0;
-                border-bottom: none;
-            }
-            QTabBar::tab:hover:!selected {
-                background-color: #e0e0e0;
-            }
-            QLabel {
-                color: #424242;
+                padding: 8px;
+                border: none;
+                border-right: 1px solid #e0e0e0;
+                font-weight: bold;
             }
         """)
 
-        # Layout principal
-        main_layout = QVBoxLayout(self)
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(20, 20, 20, 20)
+        layout = QVBoxLayout(self)
+        layout.setSpacing(20)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # Boutons d'ajout de fichiers
+        buttons_frame = QFrame()
+        buttons_layout = QHBoxLayout(buttons_frame)
         
-        # Splitter horizontal principal
-        main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        
-        # Partie gauche : Liste des fichiers
-        files_widget = QWidget()
-        files_layout = QVBoxLayout(files_widget)
-        files_layout.setSpacing(10)
-        
-        # En-tête avec titre et boutons
-        files_header = QWidget()
-        files_header.setStyleSheet("""
-            QWidget {
-                background-color: white;
-                border: 1px solid #e0e0e0;
-                border-radius: 5px;
-            }
-        """)
-        header_layout = QVBoxLayout(files_header)
-        
-        title_layout = QHBoxLayout()
-        files_label = QLabel("Fichiers sélectionnés")
-        files_label.setStyleSheet("font-size: 16px; font-weight: bold; border: none;")
-        title_layout.addWidget(files_label)
-        
-        buttons_layout = QHBoxLayout()
         add_files_btn = QPushButton("Ajouter des fichiers")
-        add_files_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
         add_files_btn.clicked.connect(self.add_files)
-        
         add_folder_btn = QPushButton("Ajouter un dossier")
-        add_folder_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
         add_folder_btn.clicked.connect(self.add_folder)
         
         buttons_layout.addWidget(add_files_btn)
         buttons_layout.addWidget(add_folder_btn)
+        buttons_layout.addStretch()
+
+        # Expression de renommage
+        pattern_frame = QFrame()
+        pattern_layout = QVBoxLayout(pattern_frame)
         
-        header_layout.addLayout(title_layout)
-        header_layout.addLayout(buttons_layout)
+        pattern_label = QLabel("Expression de renommage :")
+        self.pattern_input = QLineEdit()
+        self.pattern_input.setPlaceholderText("Exemple : episode_{n} → episode_01, episode_02, ...")
+        self.pattern_input.textChanged.connect(self.update_preview)
         
-        # Liste des fichiers
-        self.files_list = QListWidget()
-        self.files_list.setAlternatingRowColors(True)
+        pattern_help = QLabel("Utilisez {n} pour la numérotation automatique")
+        pattern_help.setStyleSheet("color: #666;")
         
-        files_layout.addWidget(files_header)
-        files_layout.addWidget(self.files_list)
-        
-        # Partie droite : Onglets
-        tabs_widget = QTabWidget()
-        
-        # Onglet 1 : Éditeur Regex
-        self.regex_editor = RegexEditorDialog()
-        tabs_widget.addTab(self.regex_editor, "Éditeur d'expressions")
-        
-        # Onglet 2 : Gestionnaire de patterns
-        self.pattern_manager = PatternManagerDialog()
-        tabs_widget.addTab(self.pattern_manager, "Patterns sauvegardés")
-        
-        # Onglet 3 : Prévisualisation
-        self.preview = RenamePreviewDialog()
-        tabs_widget.addTab(self.preview, "Prévisualisation")
-        
-        # Ajout des widgets au splitter
-        main_splitter.addWidget(files_widget)
-        main_splitter.addWidget(tabs_widget)
-        main_splitter.setStretchFactor(0, 1)
-        main_splitter.setStretchFactor(1, 2)
-        
-        # Boutons d'action dans un cadre
+        pattern_layout.addWidget(pattern_label)
+        pattern_layout.addWidget(self.pattern_input)
+        pattern_layout.addWidget(pattern_help)
+
+        # Tableau de prévisualisation
+        self.files_table = QTableWidget()
+        self.files_table.setColumnCount(2)
+        self.files_table.setHorizontalHeaderLabels(["Nom actuel", "Nouveau nom"])
+        self.files_table.horizontalHeader().setStretchLastSection(True)
+        self.files_table.setAlternatingRowColors(True)
+        self.files_table.setShowGrid(False)
+
+        # Boutons d'action
         actions_frame = QFrame()
-        actions_frame.setStyleSheet("""
-            QFrame {
-                background-color: white;
-                border: 1px solid #e0e0e0;
-                border-radius: 5px;
-            }
-        """)
         actions_layout = QHBoxLayout(actions_frame)
-        actions_layout.setContentsMargins(20, 10, 20, 10)
         
         self.rename_btn = QPushButton("Renommer")
         self.rename_btn.setEnabled(False)
+        self.rename_btn.clicked.connect(self.rename_files)
         self.rename_btn.setStyleSheet("""
             QPushButton {
                 background-color: #4caf50;
@@ -197,13 +130,10 @@ class FileRenameDialog(QDialog):
             QPushButton:hover {
                 background-color: #43a047;
             }
-            QPushButton:pressed {
-                background-color: #388e3c;
-            }
         """)
-        self.rename_btn.clicked.connect(self.rename_files)
         
         cancel_btn = QPushButton("Fermer")
+        cancel_btn.clicked.connect(self.close)
         cancel_btn.setStyleSheet("""
             QPushButton {
                 background-color: #f44336;
@@ -212,27 +142,20 @@ class FileRenameDialog(QDialog):
             QPushButton:hover {
                 background-color: #e53935;
             }
-            QPushButton:pressed {
-                background-color: #d32f2f;
-            }
         """)
-        cancel_btn.clicked.connect(self.close)
         
         actions_layout.addStretch()
         actions_layout.addWidget(self.rename_btn)
         actions_layout.addWidget(cancel_btn)
-        
+
         # Assemblage final
-        main_layout.addWidget(main_splitter)
-        main_layout.addWidget(actions_frame)
-        
-        # Connexions des signaux
-        self.regex_editor.pattern_changed.connect(self.on_pattern_changed)
-        self.pattern_manager.pattern_selected.connect(self.regex_editor.set_pattern)
-        self.files_list.itemSelectionChanged.connect(self.update_preview)
+        layout.addWidget(buttons_frame)
+        layout.addWidget(pattern_frame)
+        layout.addWidget(self.files_table)
+        layout.addWidget(actions_frame)
 
     def add_files(self):
-        """Ajouter des fichiers via une boîte de dialogue"""
+        """Ajouter des fichiers"""
         files, _ = QFileDialog.getOpenFileNames(
             self,
             "Sélectionner des fichiers vidéo",
@@ -240,17 +163,10 @@ class FileRenameDialog(QDialog):
             "Vidéos (*.mp4 *.avi *.mkv *.mov);;Tous les fichiers (*.*)"
         )
         if files:
-            self.selected_files = files
-            self.files_list.clear()
-            for file in files:
-                item = QListWidgetItem(os.path.basename(file))
-                item.setToolTip(file)
-                self.files_list.addItem(item)
-            self.update_rename_button()
-            self.update_preview()
+            self.add_files_to_list(files)
 
     def add_folder(self):
-        """Ajouter tous les fichiers d'un dossier"""
+        """Ajouter un dossier"""
         folder = QFileDialog.getExistingDirectory(
             self,
             "Sélectionner un dossier",
@@ -258,19 +174,11 @@ class FileRenameDialog(QDialog):
             QFileDialog.Option.ShowDirsOnly
         )
         if folder:
-            video_files = []
+            files = []
             for ext in ['*.mp4', '*.avi', '*.mkv', '*.mov']:
-                video_files.extend(Path(folder).rglob(ext))
-            
-            if video_files:
-                self.selected_files = [str(f) for f in video_files]
-                self.files_list.clear()
-                for file in self.selected_files:
-                    item = QListWidgetItem(os.path.basename(file))
-                    item.setToolTip(file)
-                    self.files_list.addItem(item)
-                self.update_rename_button()
-                self.update_preview()
+                files.extend([str(f) for f in Path(folder).rglob(ext)])
+            if files:
+                self.add_files_to_list(files)
             else:
                 QMessageBox.information(
                     self,
@@ -278,133 +186,123 @@ class FileRenameDialog(QDialog):
                     "Aucun fichier vidéo trouvé dans le dossier sélectionné."
                 )
 
-    def validate_rename_operations(self):
-        """Valider les opérations de renommage"""
-        if not self.selected_files or not self.current_pattern:
-            return False
-            
-        regex = self.current_pattern['regex']
-        replace = self.current_pattern['replace']
+    def add_files_to_list(self, files):
+        """Ajouter des fichiers à la liste"""
+        self.files = [(f, os.path.basename(f), "") for f in sorted(files)]
+        self.update_preview()
+        self.rename_btn.setEnabled(bool(self.files))
+
+    def update_preview(self):
+        """Mettre à jour la prévisualisation des nouveaux noms"""
+        pattern = self.pattern_input.text()
         
-        # Réinitialiser les opérations
-        self.rename_operations = []
-        new_names = set()
-        errors = []
+        # Mise à jour du tableau
+        self.files_table.setRowCount(len(self.files))
         
-        for file_path in self.selected_files:
-            old_name = os.path.basename(file_path)
-            directory = os.path.dirname(file_path)
+        for i, (path, old_name, _) in enumerate(self.files):
+            # Nom original
+            old_item = QTableWidgetItem(old_name)
+            old_item.setToolTip(path)
+            self.files_table.setItem(i, 0, old_item)
             
-            try:
-                # Application du pattern
-                new_name = regex.sub(replace, old_name)
-                new_path = os.path.join(directory, new_name)
-                
-                # Vérifications
-                if new_name in new_names:
-                    errors.append(f"Doublon détecté : {new_name}")
-                elif new_name == old_name:
-                    continue  # Ignorer les fichiers inchangés
-                elif os.path.exists(new_path) and new_path != file_path:
-                    errors.append(f"Le fichier existe déjà : {new_name}")
-                else:
-                    new_names.add(new_name)
-                    self.rename_operations.append((file_path, new_path))
+            # Nouveau nom
+            if pattern:
+                try:
+                    # Remplacer {n} par le numéro formaté
+                    new_name = pattern.replace('{n}', f'{i+1:02d}')
                     
-            except Exception as e:
-                errors.append(f"Erreur pour {old_name}: {str(e)}")
-        
-        if errors:
-            error_msg = "Impossible de renommer les fichiers :\n\n" + "\n".join(errors)
-            QMessageBox.warning(self, "Erreurs de validation", error_msg)
-            return False
+                    # Garder l'extension d'origine
+                    _, ext = os.path.splitext(old_name)
+                    if not new_name.endswith(ext):
+                        new_name += ext
+                        
+                    # Vérifier les doublons
+                    if any(f[2] == new_name for f in self.files[:i]):
+                        new_item = QTableWidgetItem("⚠️ Doublon")
+                        new_item.setForeground(Qt.GlobalColor.red)
+                    else:
+                        new_item = QTableWidgetItem(new_name)
+                        new_item.setForeground(Qt.GlobalColor.blue)
+                    
+                    self.files[i] = (path, old_name, new_name)
+                    
+                except Exception as e:
+                    new_item = QTableWidgetItem("⚠️ Erreur")
+                    new_item.setForeground(Qt.GlobalColor.red)
+                    self.files[i] = (path, old_name, "")
+            else:
+                new_item = QTableWidgetItem(old_name)
+                self.files[i] = (path, old_name, "")
             
-        return bool(self.rename_operations)
+            self.files_table.setItem(i, 1, new_item)
+        
+        # Ajuster les colonnes
+        self.files_table.resizeColumnsToContents()
+        
+        # Activer/désactiver le bouton de renommage
+        valid_renames = bool(pattern) and all(f[2] and not f[2].startswith('⚠️') for f in self.files)
+        self.rename_btn.setEnabled(valid_renames)
 
     def rename_files(self):
-        """Renommer les fichiers sélectionnés"""
-        if not self.validate_rename_operations():
-            return
-        
+        """Renommer les fichiers"""
         # Confirmation
-        msg = (f"Voulez-vous renommer {len(self.rename_operations)} fichier(s) ?\n\n"
-               "Cette opération ne peut pas être annulée.")
         reply = QMessageBox.question(
             self,
             "Confirmation",
-            msg,
+            f"Voulez-vous renommer {len(self.files)} fichier(s) ?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No
         )
         
         if reply != QMessageBox.StandardButton.Yes:
             return
-        
-        # Création de la boîte de dialogue de progression
+            
+        # Barre de progression
         progress = QProgressDialog(
             "Renommage des fichiers...",
             "Annuler",
             0,
-            len(self.rename_operations),
+            len(self.files),
             self
         )
         progress.setWindowModality(Qt.WindowModality.WindowModal)
-        progress.setWindowTitle("Progression")
         
-        # Renommage des fichiers
+        # Renommage
         errors = []
-        renamed_count = 0
+        renamed = 0
         
-        for i, (old_path, new_path) in enumerate(self.rename_operations):
+        for i, (old_path, _, new_name) in enumerate(self.files):
             if progress.wasCanceled():
                 break
                 
             progress.setValue(i)
-            try:
-                # Créer le dossier de destination si nécessaire
-                os.makedirs(os.path.dirname(new_path), exist_ok=True)
-                
-                # Renommer le fichier
-                shutil.move(old_path, new_path)
-                renamed_count += 1
-                
-            except Exception as e:
-                errors.append(f"Erreur lors du renommage de {old_path}: {str(e)}")
-        
-        progress.setValue(len(self.rename_operations))
-        
-        # Afficher le résultat
-        if errors:
-            error_msg = "Erreurs lors du renommage :\n\n" + "\n".join(errors)
-            QMessageBox.warning(self, "Erreurs de renommage", error_msg)
-        
-        if renamed_count > 0:
-            success_msg = f"{renamed_count} fichier(s) renommé(s) avec succès."
-            if errors:
-                success_msg += f"\n{len(errors)} erreur(s) rencontrée(s)."
-            QMessageBox.information(self, "Renommage terminé", success_msg)
             
-            # Mettre à jour l'interface
-            self.files_list.clear()
-            self.selected_files = []
-            self.rename_operations = []
-            self.update_rename_button()
-            self.update_preview()
-
-    def on_pattern_changed(self, pattern):
-        """Appelé quand le pattern regex change"""
-        self.current_pattern = pattern
-        self.update_preview()
-        self.update_rename_button()
-
-    def update_preview(self):
-        """Mettre à jour la prévisualisation"""
-        if self.current_pattern and self.selected_files:
-            # TODO: Mettre à jour la prévisualisation avec le pattern actuel
-            self.preview.update_preview(self.selected_files, self.current_pattern)
-
-    def update_rename_button(self):
-        """Activer/désactiver le bouton de renommage"""
-        self.rename_btn.setEnabled(
-            bool(self.selected_files) and bool(self.current_pattern)
-        )
+            try:
+                new_path = os.path.join(os.path.dirname(old_path), new_name)
+                shutil.move(old_path, new_path)
+                renamed += 1
+            except Exception as e:
+                errors.append(f"Erreur pour {old_path}: {str(e)}")
+        
+        progress.setValue(len(self.files))
+        
+        # Rapport
+        if errors:
+            QMessageBox.warning(
+                self,
+                "Erreurs",
+                "Erreurs lors du renommage :\n\n" + "\n".join(errors)
+            )
+        
+        if renamed > 0:
+            QMessageBox.information(
+                self,
+                "Terminé",
+                f"{renamed} fichier(s) renommé(s) avec succès."
+            )
+            
+            # Réinitialiser
+            self.files = []
+            self.files_table.setRowCount(0)
+            self.pattern_input.clear()
+            self.rename_btn.setEnabled(False)
