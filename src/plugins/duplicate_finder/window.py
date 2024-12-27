@@ -310,24 +310,33 @@ class DuplicateFinderWindow(QDialog):
     def show_analyzed_files(self):
         """Affiche uniquement la liste des fichiers analysés"""
         self.files_table.setSortingEnabled(False)  # Désactiver le tri pendant la mise à jour
+        
+        # Sauvegarder les fichiers actuellement en attente
+        pending_files = []
+        for i in range(self.files_table.rowCount()):
+            file_item = self.files_table.item(i, 0)
+            status_item = self.files_table.item(i, 1)
+            if file_item and status_item and status_item.text() == "En attente":
+                pending_files.append(file_item.text())
+        
         self.files_table.setRowCount(0)
         
+        # Ajouter d'abord les fichiers analysés
         analyzed_files = self.data_manager.get_analyzed_files()
-        sorted_files = sorted(analyzed_files.items(), key=lambda x: x[0].lower())  # Tri insensible à la casse
+        sorted_files = sorted(analyzed_files.items(), key=lambda x: x[0].lower())
         
-        self.files_table.setRowCount(len(sorted_files))
-        for i, (file_path, _) in enumerate(sorted_files):
+        current_row = 0
+        for file_path, _ in sorted_files:
             # Vérifier si le fichier existe toujours
             file_exists = os.path.exists(file_path)
             
             # Fichier
             file_item = QTableWidgetItem(file_path)
             if not file_exists:
-                # Marquer en rouge les fichiers qui n'existent plus
                 file_item.setForeground(QColor(255, 0, 0))
-                # Supprimer de la base de données
                 self.data_manager.analyzed_files.pop(file_path, None)
-            self.files_table.setItem(i, 0, file_item)
+            self.files_table.insertRow(current_row)
+            self.files_table.setItem(current_row, 0, file_item)
             
             # État
             status = "Introuvable" if not file_exists else "Analysé"
@@ -335,7 +344,22 @@ class DuplicateFinderWindow(QDialog):
             status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             if not file_exists:
                 status_item.setForeground(QColor(255, 0, 0))
-            self.files_table.setItem(i, 1, status_item)
+            self.files_table.setItem(current_row, 1, status_item)
+            current_row += 1
+        
+        # Ajouter ensuite les fichiers en attente
+        for file_path in sorted(pending_files, key=str.lower):
+            self.files_table.insertRow(current_row)
+            
+            # Fichier
+            file_item = QTableWidgetItem(file_path)
+            self.files_table.setItem(current_row, 0, file_item)
+            
+            # État
+            status_item = QTableWidgetItem("En attente")
+            status_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.files_table.setItem(current_row, 1, status_item)
+            current_row += 1
         
         # Sauvegarder les changements si des fichiers ont été supprimés
         self.data_manager.save_data()
@@ -464,19 +488,18 @@ class DuplicateFinderWindow(QDialog):
 
     def analysis_finished(self, results: Dict[str, List[str]]):
         """Appelé quand l'analyse est terminée"""
+        # Réactiver les boutons
+        self.progress_bar.setVisible(False)
+        self.add_files_button.setEnabled(True)
+        self.add_folder_button.setEnabled(True)
+        self.analyze_button.setEnabled(True)
+
         # Afficher la fenêtre de gestion des doublons
         if results:
             self.show_duplicates_manager(results)
         else:
             QMessageBox.information(self, "Analyse terminée", 
                                   "Aucun doublon n'a été trouvé.")
-        
-        # Mettre à jour l'affichage
-        self.show_analyzed_files()
-        self.progress_bar.setVisible(False)
-        self.add_files_button.setEnabled(True)
-        self.add_folder_button.setEnabled(True)
-        self.analyze_button.setEnabled(True)
 
     def show_duplicates_manager(self, duplicates):
         """Affiche la fenêtre de gestion des doublons"""
