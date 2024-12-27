@@ -1,0 +1,24 @@
+2024-12-27 14:36:47,415 - VideoFlow - INFO - logger.py:68 - Logger initialisé
+2024-12-27 14:36:47,415 - VideoFlow.Main - INFO - main.py:15 - Démarrage de l'application
+2024-12-27 14:36:47,493 - VideoFlow.VideoFlow.MainWindow - DEBUG - main_window.py:16 - Initialisation de l'interface utilisateur
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - INFO - plugin_manager.py:18 - PluginManager initialisé avec le dossier: /Users/nico/Documents/videoFlow/src/plugins
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:19 - Le dossier existe: True
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:22 - Contenu du dossier plugins:
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:31 -   - Fichier: __init__.py
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:26 -   - Dossier: tree_manager
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:27 -     Contenu:
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:26 -   - Dossier: duplicate_finder
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:27 -     Contenu:
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:29 -       - window.py
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:29 -       - video_hasher.py
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:29 -       - __init__.py
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:29 -       - plugin.py
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:29 -       - data_manager.py
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:26 -   - Dossier: video_merger
+2024-12-27 14:36:47,494 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:27 -     Contenu:
+2024-12-27 14:36:47,495 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:26 -   - Dossier: regex_renamer
+2024-12-27 14:36:47,495 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:27 -     Contenu:
+2024-12-27 14:36:47,495 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:130 - Retourne 0 plugins
+2024-12-27 14:36:47,495 - VideoFlow.VideoFlow.MainWindow - DEBUG - main_window.py:44 - Dimensions de la fenêtre: 450x140
+2024-12-27 14:36:47,495 - VideoFlow.VideoFlow.MainWindow - INFO - main_window.py:50 - Interface utilisateur initialisée
+2024-12-27 14:36:47,520 - VideoFlow.Main - INFO - main.py:20 - Fenêtre principale affichée

@@ -1,0 +1,49 @@
+2024-12-27 14:07:35,546 - VideoFlow - INFO - logger.py:68 - Logger initialisé
+2024-12-27 14:07:35,546 - VideoFlow.Main - INFO - main.py:9 - Démarrage de l'application
+2024-12-27 14:07:35,627 - VideoFlow.MainWindow - INFO - main_window.py:11 - Initialisation de la fenêtre principale
+2024-12-27 14:07:35,627 - VideoFlow.PluginManager - INFO - plugin_manager.py:15 - PluginManager initialisé avec le dossier: /Users/nico/Documents/videoFlow/src/plugins
+2024-12-27 14:07:35,628 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:16 - Le dossier existe: True
+2024-12-27 14:07:35,628 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:17 - Contenu du dossier plugins: ['__init__.py', 'tree_manager', 'duplicate_finder', 'video_merger', 'regex_renamer']
+2024-12-27 14:07:35,628 - VideoFlow.MainWindow - DEBUG - main_window.py:16 - Initialisation de l'interface utilisateur
+2024-12-27 14:07:35,628 - VideoFlow.MainWindow - DEBUG - main_window.py:26 - Chargement des plugins
+2024-12-27 14:07:35,628 - VideoFlow.PluginManager - INFO - plugin_manager.py:21 - Début du chargement des plugins
+2024-12-27 14:07:35,628 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:31 - Dossiers de plugins trouvés: ['tree_manager', 'duplicate_finder', 'video_merger', 'regex_renamer']
+2024-12-27 14:07:35,628 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:38 - Vérification du dossier tree_manager:
+2024-12-27 14:07:35,628 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:39 -   - plugin.py existe: False
+2024-12-27 14:07:35,628 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:40 -   - __init__.py existe: False
+2024-12-27 14:07:35,629 - VideoFlow.PluginManager - WARNING - plugin_manager.py:46 - Fichiers manquants dans: /Users/nico/Documents/videoFlow/src/plugins/tree_manager
+2024-12-27 14:07:35,629 - VideoFlow.PluginManager - WARNING - plugin_manager.py:48 -   - plugin.py manquant
+2024-12-27 14:07:35,629 - VideoFlow.PluginManager - WARNING - plugin_manager.py:50 -   - __init__.py manquant
+2024-12-27 14:07:35,629 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:38 - Vérification du dossier duplicate_finder:
+2024-12-27 14:07:35,629 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:39 -   - plugin.py existe: True
+2024-12-27 14:07:35,629 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:40 -   - __init__.py existe: True
+2024-12-27 14:07:35,629 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:43 - Tentative de chargement du plugin depuis: /Users/nico/Documents/videoFlow/src/plugins/duplicate_finder/plugin.py
+2024-12-27 14:07:35,629 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:66 - Chargement du plugin depuis: /Users/nico/Documents/videoFlow/src/plugins/duplicate_finder/plugin.py
+2024-12-27 14:07:35,629 - VideoFlow.PluginManager - ERROR - plugin_manager.py:98 - Erreur lors du chargement du plugin /Users/nico/Documents/videoFlow/src/plugins/duplicate_finder/plugin.py: attempted relative import with no known parent package
+Traceback (most recent call last):
+  File "/Users/nico/Documents/videoFlow/src/core/plugin_manager.py", line 75, in _load_plugin
+    spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 850, in exec_module
+  File "<frozen importlib._bootstrap>", line 228, in _call_with_frames_removed
+  File "/Users/nico/Documents/videoFlow/src/plugins/duplicate_finder/plugin.py", line 4, in <module>
+    from ...core.plugin_interface import PluginInterface
+ImportError: attempted relative import with no known parent package
+2024-12-27 14:07:35,630 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:38 - Vérification du dossier video_merger:
+2024-12-27 14:07:35,630 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:39 -   - plugin.py existe: False
+2024-12-27 14:07:35,630 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:40 -   - __init__.py existe: False
+2024-12-27 14:07:35,630 - VideoFlow.PluginManager - WARNING - plugin_manager.py:46 - Fichiers manquants dans: /Users/nico/Documents/videoFlow/src/plugins/video_merger
+2024-12-27 14:07:35,631 - VideoFlow.PluginManager - WARNING - plugin_manager.py:48 -   - plugin.py manquant
+2024-12-27 14:07:35,631 - VideoFlow.PluginManager - WARNING - plugin_manager.py:50 -   - __init__.py manquant
+2024-12-27 14:07:35,631 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:38 - Vérification du dossier regex_renamer:
+2024-12-27 14:07:35,631 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:39 -   - plugin.py existe: False
+2024-12-27 14:07:35,631 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:40 -   - __init__.py existe: False
+2024-12-27 14:07:35,631 - VideoFlow.PluginManager - WARNING - plugin_manager.py:46 - Fichiers manquants dans: /Users/nico/Documents/videoFlow/src/plugins/regex_renamer
+2024-12-27 14:07:35,631 - VideoFlow.PluginManager - WARNING - plugin_manager.py:48 -   - plugin.py manquant
+2024-12-27 14:07:35,631 - VideoFlow.PluginManager - WARNING - plugin_manager.py:50 -   - __init__.py manquant
+2024-12-27 14:07:35,631 - VideoFlow.PluginManager - INFO - plugin_manager.py:52 - Plugins chargés: []
+2024-12-27 14:07:35,631 - VideoFlow.PluginManager - DEBUG - plugin_manager.py:102 - Retourne 0 plugins
+2024-12-27 14:07:35,631 - VideoFlow.MainWindow - INFO - main_window.py:29 - Nombre de plugins chargés: 0
+2024-12-27 14:07:35,631 - VideoFlow.MainWindow - DEBUG - main_window.py:36 - Disposition: 0 lignes x 2 colonnes pour 0 plugins
+2024-12-27 14:07:35,631 - VideoFlow.MainWindow - DEBUG - main_window.py:58 - Dimensions de la fenêtre: 450x30
+2024-12-27 14:07:35,631 - VideoFlow.MainWindow - INFO - main_window.py:62 - Interface utilisateur initialisée
+2024-12-27 14:07:35,655 - VideoFlow.Main - INFO - main.py:14 - Fenêtre principale affichée
