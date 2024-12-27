@@ -1,0 +1,12 @@
+[
+    {
+        "find": "(",
+        "replace": "",
+        "is_regex": true
+    },
+    {
+        "find": ")",
+        "replace": "",
+        "is_regex": true
+    }
+]

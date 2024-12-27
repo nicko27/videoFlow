@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt, QSize
 from PyQt6.QtGui import QIcon, QKeySequence, QShortcut, QColor
 
 from .main_menu_bar import MainMenuBar
+from src.ui.dialogs.renamer.file_rename_dialog import FileRenameDialog
 
 class MainWindow(QMainWindow):
     """Fenêtre principale de VideoFlow"""
@@ -34,10 +35,12 @@ class MainWindow(QMainWindow):
         ]
         
         for key, slot in shortcuts:
-            QShortcut(key, self).activated.connect(slot)
+            shortcut = QShortcut(key, self)
+            shortcut.activated.connect(slot)
 
     def setup_ui(self):
         """Configuration de l'interface utilisateur"""
+        
         # Configuration de la fenêtre
         self.resize(800, 600)
         self.setMinimumSize(600, 400)
@@ -74,6 +77,7 @@ class MainWindow(QMainWindow):
                 min-width: 200px;
                 min-height: 100px;
                 border: none;
+                text-align: center;
                 border-radius: 15px;
                 background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 {light_color}, stop:1 {bg_color});
@@ -200,7 +204,6 @@ class MainWindow(QMainWindow):
 
     def on_rename_files(self):
         """Ouvrir la fenêtre de renommage de fichiers"""
-        from src.ui.dialogs.renamer.file_rename_dialog import FileRenameDialog
         dialog = FileRenameDialog(self)
         dialog.exec()
 
