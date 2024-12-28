@@ -13,8 +13,12 @@ Application de bureau pour la gestion et l'organisation de fichiers vidéo, avec
 - Chaque plugin est représenté par :
   - Un grand bouton coloré (200x150 pixels minimum)
   - Une icône Unicode représentative (48pt)
-    - Copy Manager : ⎘ (U+2398, symbole de copie)
-    - Duplicate Finder : ⚲ (U+26B2, symbole de loupe)
+    - Copy Manager : 📋 (U+1F4CB, presse-papiers)
+    - Duplicate Finder : 🔍 (U+1F50D, loupe)
+    - Video Adder : 🎬 (U+1F3AC, clap de cinéma)
+    - Video Converter : 🔄 (U+1F504, flèches de conversion)
+    - Regex Renamer : ✏️ (U+270F, crayon)
+    - Video Editor : ✂️ (U+2702, ciseaux)
     - Icône par défaut : ◈ (U+25C8, losange)
   - Le nom du plugin en gras (12pt)
   - Une courte description (10pt)
@@ -49,11 +53,16 @@ videoFlow/
 │       │   ├── video_hasher.py # Analyse des vidéos
 │       │   └── data_manager.py # Gestion des données
 │       │
-│       └── copy_manager/     # Plugin de copie de structure
+│       ├── copy_manager/     # Plugin de copie de structure
+│       │   ├── __init__.py   # Initialisation du plugin
+│       │   ├── plugin.py     # Définition du plugin
+│       │   ├── window.py     # Interface utilisateur
+│       │   └── copy_manager.py # Logique de copie
+│       │
+│       └── video_adder/      # Plugin de fusion de vidéos
 │           ├── __init__.py   # Initialisation du plugin
 │           ├── plugin.py     # Définition du plugin
-│           ├── window.py     # Interface utilisateur
-│           └── copy_manager.py # Logique de copie
+│           └── window.py     # Interface utilisateur
 │
 ├── data/                     # Données des plugins
 │   ├── duplicate_finder/     # Données du plugin duplicate_finder
@@ -204,178 +213,153 @@ Plugin pour copier la structure des dossiers avec ou sans les fichiers.
   - Fichier en cours
 - Estimation du temps restant
 
-### Regex Renamer
-- Fonctionnalités :
-  - Gestion des expressions régulières pour le renommage
-  - Prévisualisation en temps réel des modifications
-  - Historique et restauration des noms
-  - Suppression de séquences numériques/alphabétiques
-  - Validation des noms de fichiers
+#### Video Adder
+Plugin pour fusionner plusieurs vidéos en une seule.
 
-- Interface :
-  - Vue en deux colonnes (avant/après)
-  - Coloration des parties modifiées
-  - Mise à jour instantanée des prévisualisations
-  - Barre de progression pour les opérations
-
-- Gestion des Noms Originaux :
-  - Stockage dans un attribut étendu spécifique à VideoFlow
-  - Séparation des métadonnées système et VideoFlow
-  - Restauration possible même après plusieurs modifications
-  - Sauvegarde automatique avant modification
-
-- Numérotation Avancée :
-  - Suppression de séquences à position fixe
-  - Support des séquences numériques et alphabétiques
-  - Configuration de la longueur des séquences
-  - Détection automatique des positions
-
-- Sécurité et Validation :
-  - Vérification des caractères invalides sous macOS
-  - Détection des conflits de noms
-  - Sauvegarde automatique avant modification
-  - Validation des expressions régulières
-
-## Plugin MetaRenamer
-
-### Interface Utilisateur
-- [ ] Tableau des fichiers avec colonnes :
-  - Nom du fichier
-  - Nom dans les métadonnées
-  - Différence détectée (indicateur visuel)
-  - Actions (renommer selon meta)
-- [ ] Options de filtrage :
-  - Afficher uniquement les fichiers avec différences
-  - Filtrage par type de fichier vidéo
-- [ ] Boutons d'action :
-  - " Ajouter Fichiers"
-  - " Ajouter Dossier"
-  - " Synchroniser Tout"
-  - " Synchroniser Sélection"
-
-### Fonctionnalités
-- [ ] Lecture des métadonnées :
-  - Support des formats vidéo courants
-  - Extraction du titre depuis les métadonnées
-  - Gestion des erreurs de lecture
-- [ ] Comparaison intelligente :
-  - Détection des différences mineures
-  - Prise en compte des extensions
-  - Normalisation des noms pour comparaison
-- [ ] Prévisualisation en temps réel :
-  - Mise en évidence des différences
-  - Aperçu du nouveau nom
-- [ ] Renommage sélectif ou global
-- [ ] Sauvegarde des préférences utilisateur
-
-### Améliorations Techniques
-- [ ] Cache des métadonnées pour performance
-- [ ] Gestion robuste des erreurs de lecture
-- [ ] Interface responsive
-- [ ] Logging détaillé des opérations
-
-## Plugin RegexRenamer
-
-### Interface Utilisateur
-- [x] Tableau des patterns avec colonnes :
-  - "Utiliser" (case à cocher)
-  - "Chercher" (pattern regex)
-  - "Remplacer par" (texte de remplacement)
-  - "Respecter Maj/Min" (case à cocher)
-  - "Position" (options : mot complet, début, fin)
-  - Actions (suppression)
-- [x] Tableau des fichiers avec :
-  - Nom original
-  - Nouveau nom (prévisualisé en vert si modifié)
-  - Tri par modification et ordre alphabétique
-  - Infobulle détaillée pour les noms modifiés
-- [x] Options de filtrage :
-  - Case à cocher pour inclure les fichiers cachés
-  - Filtrage automatique par type de fichier
-  - Filtres d'extension dynamiques
-- [x] Boutons d'action :
-  - " Ajouter Fichiers"
-  - " Ajouter Dossier"
-  - " Nouveau Pattern"
-  - " Renommer Tout"
-  - " Renommer Sélection"
-
-### Fonctionnalités
-- [x] Gestion des patterns :
-  - Sauvegarde/chargement des patterns personnalisés
-  - Préservation de l'état actif/inactif des patterns
-  - Patterns prédéfinis triés par impact
-  - Application répétée des patterns jusqu'à stabilisation
-  - Options de position (mot complet, début, fin)
-  - Suppression fiable des patterns
-- [x] Gestion des fichiers :
-  - Exclusion des fichiers temporaires (.part, .crdownload, etc.)
-  - Préservation des extensions lors du renommage
-  - Préservation des tags macOS lors du renommage
-  - Support des fichiers cachés (optionnel)
-  - Tri intelligent des fichiers (modifiés/non-modifiés)
-- [x] Prévisualisation en temps réel :
-  - Mise à jour instantanée lors des modifications de patterns
-  - Coloration des noms modifiés
-  - Infobulles détaillées montrant les changements
-- [x] Renommage sélectif ou global
-- [x] Interface responsive et intuitive
-
-### Patterns Prédéfinis
-1. Suppression du texte entre parenthèses
-2. Suppression des espaces
-3. Suppression des chiffres
-4. Suppression des hashtags
-5. Suppression des numéros au début
-6. Remplacement des points (sauf extension)
-7. Remplacement des espaces par underscores
-8. Remplacement des underscores par espaces
-
-### Améliorations Techniques
-- [x] Sauvegarde des patterns dans ~/.regex_renamer_patterns.json
-- [x] Tri des patterns par impact pour optimiser le renommage
-- [x] Protection contre les boucles infinies
-- [x] Gestion robuste des erreurs
-- [x] Interface responsive
-- [x] Gestion intelligente des tooltips
-- [x] Tri personnalisé des fichiers
-
-## Gestion des Tags macOS
-- Utilisation de la bibliothèque `osxmetadata` pour une gestion complète des métadonnées :
-  - Tags macOS (étiquettes)
-  - Commentaires Finder
-  - Étiquettes de couleur
-  - Dates personnalisées (ajout, dernière utilisation)
-  - Métadonnées Spotlight (auteurs, mots-clés, titre, copyright)
-
-### Copy Manager
-- Fonctionnalités :
-  - Copie de structure de dossiers
-  - Copie optionnelle des fichiers
-  - Préservation des métadonnées macOS
-  - Exclusion des fichiers cachés par défaut
-  - Gestion des conflits de noms (renommage automatique)
-- Persistance :
-  - Sauvegarde des chemins source et destination
-  - Restauration automatique au démarrage
-- Interface :
-  - Sélection des dossiers source et destination
-  - Options configurables :
-    - Copier les fichiers (activé par défaut)
-    - Préserver les métadonnées (activé par défaut)
-    - Inclure les fichiers cachés (désactivé par défaut)
+##### Interface Utilisateur
+- Fenêtre principale :
+  - Sélection des vidéos à fusionner
+  - Sélection du dossier de sortie
+  - Options de fusion :
+    - Format de sortie (mp4, mov, mkv, etc.)
+    - Codec vidéo (h264, h265, etc.)
+    - Qualité vidéo (CRF)
+    - Codec audio (aac, mp3, etc.)
+    - Bitrate audio
+    - Résolution
+    - FPS
   - Barre de progression
   - Journal des opérations
 
+##### Modes de Fusion
+- Fusion rapide avec FFmpeg si les vidéos sont compatibles
+- Repli sur MoviePy pour les vidéos incompatibles
+- Préservation de la qualité originale si possible
+- Suppression sécurisée des fichiers originaux (optionnel)
+- Suggestion intelligente du nom de fichier final
+
+##### Gestion des Fichiers
+- États des fichiers :
+  - En attente : pas encore fusionné
+  - Fusionné : fichier créé
+  - Erreur : erreur lors de la fusion
+- Actions :
+  - Supprimer de la liste : retire les fichiers sélectionnés
+  - Ignorer un fichier : mémorisé entre les sessions
+
+##### Analyse Vidéo
+- Lecture des métadonnées vidéo
+- Détection de la compatibilité des vidéos
+- Sélection du codec vidéo et audio approprié
+
+##### Persistance des Données
+- Stockage JSON :
+  - Chemins des fichiers
+  - Métadonnées vidéo
+  - Paires de fichiers ignorées
+- Gestion automatique :
+  - Nettoyage des fichiers manquants
+  - Sauvegarde après chaque modification
+  - Conservation entre les sessions
+  - Vérification de l'intégrité des données
+
+#### Video Editor
+Plugin pour éditer et découper des vidéos.
+
+##### Interface Utilisateur
+- Fenêtre principale :
+  - Timeline avec aperçu des frames
+  - Contrôles de lecture (play, pause, stop)
+  - Marqueurs de début et fin
+  - Boutons d'action :
+    - "✂️ Découper"
+    - "🗑️ Supprimer Segment"
+    - "💾 Sauvegarder"
+    - "❌ Fermer"
+  - Options d'édition :
+    - Découpe précise (frame par frame)
+    - Suppression de segments
+    - Réorganisation des segments
+  - Prévisualisation en temps réel
+  - Barre de progression
+  - Journal des opérations
+
+##### Fonctionnalités
+- Édition de base :
+  - Découpe de segments
+  - Suppression de parties
+  - Réorganisation des segments
+  - Préservation de la qualité originale
+- Édition avancée :
+  - Navigation frame par frame
+  - Détection automatique des scènes
+  - Marqueurs personnalisés
+  - Points de repère temporels
+- Prévisualisation :
+  - Aperçu en temps réel
+  - Miniatures des frames clés
+  - Forme d'onde audio
+  - Zoom sur la timeline
+
+##### Gestion des Fichiers
+- États des fichiers :
+  - Original : fichier non modifié
+  - Édité : modifications en cours
+  - Sauvegardé : modifications appliquées
+- Actions :
+  - Sauvegarde automatique
+  - Restauration de version
+  - Historique des modifications
+  - Export des segments
+
+##### Analyse Vidéo
+- Lecture des métadonnées
+- Détection des scènes
+- Analyse des frames clés
+- Extraction de la forme d'onde audio
+
+##### Persistance des Données
+- Stockage JSON :
+  - Points de découpe
+  - Segments supprimés
+  - Marqueurs personnalisés
+  - Historique des modifications
+- Gestion automatique :
+  - Sauvegarde périodique
+  - Restauration de session
+  - Backup avant modification
+  - Journal des opérations
+
+### Fonctionnalités des Plugins
+
+### Copy Manager
+- Copie de structure de dossiers
+- Copie optionnelle des fichiers
+- Préservation des métadonnées macOS
+- Exclusion des fichiers cachés par défaut
+
 ### Duplicate Finder
-- Fonctionnalités :
-  - Recherche de vidéos en double
-  - Comparaison par hash
-  - Gestion des résultats
-- Interface :
-  - Sélection du dossier à analyser
-  - Liste des doublons trouvés
-  - Actions possibles sur les doublons
+- Détection de vidéos similaires ou identiques
+- Comparaison par hash perceptuel
+- Affichage des résultats en groupes
+- Prévisualisation des vidéos
+- Suppression sécurisée des doublons
+
+### Video Adder
+- Fusion de plusieurs vidéos en une seule
+- Fusion rapide avec FFmpeg si les vidéos sont compatibles
+- Repli sur MoviePy pour les vidéos incompatibles
+- Préservation de la qualité originale si possible
+- Suppression sécurisée des fichiers originaux (optionnel)
+- Suggestion intelligente du nom de fichier final
+
+### Video Editor
+- Édition et découpage de vidéos
+- Découpe précise (frame par frame)
+- Suppression de segments
+- Réorganisation des segments
+- Préservation de la qualité originale
+- Prévisualisation en temps réel
 
 ## Dépendances
 - PyQt6 : Interface graphique
@@ -387,6 +371,8 @@ Plugin pour copier la structure des dossiers avec ou sans les fichiers.
 - Pillow : Traitement d'images
 - numpy : Calculs numériques
 - regex : Gestion des expressions régulières
+- ffmpeg-python : Conversion vidéo
+- moviepy : Traitement vidéo
 
 ## Installation et Lancement
 ```bash

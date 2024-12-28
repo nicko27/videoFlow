@@ -316,29 +316,39 @@ class RegexRenamerWindow(QMainWindow):
 
     def init_ui(self):
         """Initialise l'interface utilisateur."""
+        # Créer le widget central
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
         
         # Boutons du haut
         top_buttons = QHBoxLayout()
+        
+        # Boutons de gauche
         add_files_btn = QPushButton("📁 Ajouter Fichiers")
         add_files_btn.clicked.connect(self.add_files)
         add_folder_btn = QPushButton("📂 Ajouter Dossier")
         add_folder_btn.clicked.connect(self.add_folder)
         add_pattern_btn = QPushButton("➕ Nouveau Pattern")
         add_pattern_btn.clicked.connect(self.add_pattern)
-        rename_btn = QPushButton("✨ Renommer Tout")
-        rename_btn.clicked.connect(lambda: self.rename_files(False))
-        rename_selected_btn = QPushButton("✨ Renommer Sélection")
-        rename_selected_btn.clicked.connect(lambda: self.rename_files(True))
         
         top_buttons.addWidget(add_files_btn)
         top_buttons.addWidget(add_folder_btn)
         top_buttons.addWidget(add_pattern_btn)
         top_buttons.addStretch()
+        
+        # Boutons de droite
+        rename_selected_btn = QPushButton("✨ Renommer Sélection")
+        rename_selected_btn.clicked.connect(lambda: self.rename_files(True))
+        rename_btn = QPushButton("✨ Renommer Tout")
+        rename_btn.clicked.connect(lambda: self.rename_files(False))
+        close_btn = QPushButton("❌ Fermer")
+        close_btn.clicked.connect(self.close)
+        
         top_buttons.addWidget(rename_selected_btn)
         top_buttons.addWidget(rename_btn)
+        top_buttons.addWidget(close_btn)
+        
         layout.addLayout(top_buttons)
         
         # Tableau des patterns (partie haute)

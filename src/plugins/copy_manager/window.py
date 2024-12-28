@@ -38,7 +38,7 @@ class CopyManagerWindow(QDialog):
         self.source_label = QLabel("Dossier source : Non sélectionné")
         if self.source_path:
             self.source_label.setText(f"Dossier source : {self.source_path}")
-        self.source_button = QPushButton("Sélectionner source")
+        self.source_button = QPushButton("📁 Sélectionner source")
         self.source_button.clicked.connect(self.select_source)
         source_layout.addWidget(self.source_label)
         source_layout.addWidget(self.source_button)
@@ -47,7 +47,7 @@ class CopyManagerWindow(QDialog):
         self.dest_label = QLabel("Dossier destination : Non sélectionné")
         if self.dest_path:
             self.dest_label.setText(f"Dossier destination : {self.dest_path}")
-        self.dest_button = QPushButton("Sélectionner destination")
+        self.dest_button = QPushButton("📁 Sélectionner destination")
         self.dest_button.clicked.connect(self.select_dest)
         dest_layout.addWidget(self.dest_label)
         dest_layout.addWidget(self.dest_button)
@@ -73,15 +73,24 @@ class CopyManagerWindow(QDialog):
         options_layout.addWidget(self.include_hidden_cb)
         
         # Boutons d'action
-        button_layout = QHBoxLayout()
-        self.copy_button = QPushButton("Copier")
-        self.copy_button.clicked.connect(self.start_copy)
-        # Correction ici : conversion explicite en booléen
-        self.copy_button.setEnabled(bool(self.source_path is not None and self.dest_path is not None))
-        self.close_button = QPushButton("Fermer")
-        self.close_button.clicked.connect(self.close)
-        button_layout.addWidget(self.copy_button)
-        button_layout.addWidget(self.close_button)
+        buttons_layout = QHBoxLayout()
+        
+
+        
+        buttons_layout.addStretch()
+        
+        self.copy_btn = QPushButton("✨ Copier")
+        self.copy_btn.clicked.connect(self.start_copy)
+        buttons_layout.addWidget(self.copy_btn)
+        
+        self.stop_btn = QPushButton("⏹️ Arrêter")
+        self.stop_btn.clicked.connect(self.stop_copy)
+        self.stop_btn.setEnabled(False)
+        buttons_layout.addWidget(self.stop_btn)
+        
+        self.close_btn = QPushButton("❌ Fermer")
+        self.close_btn.clicked.connect(self.close)
+        buttons_layout.addWidget(self.close_btn)
         
         # Barre de progression
         self.progress_bar = QProgressBar()
@@ -95,9 +104,9 @@ class CopyManagerWindow(QDialog):
         layout.addLayout(source_layout)
         layout.addLayout(dest_layout)
         layout.addLayout(options_layout)
+        layout.addLayout(buttons_layout)
         layout.addWidget(self.progress_bar)
         layout.addWidget(self.log_text)
-        layout.addLayout(button_layout)
         
         self.setLayout(layout)
     
@@ -144,7 +153,7 @@ class CopyManagerWindow(QDialog):
     
     def update_copy_button(self):
         """Active le bouton copier si les deux dossiers sont sélectionnés"""
-        self.copy_button.setEnabled(bool(self.source_path is not None and self.dest_path is not None))
+        self.copy_btn.setEnabled(bool(self.source_path is not None and self.dest_path is not None))
     
     def log_message(self, message):
         """Ajoute un message au journal"""
@@ -158,7 +167,7 @@ class CopyManagerWindow(QDialog):
         
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        self.copy_button.setEnabled(False)
+        self.copy_btn.setEnabled(False)
         
         # Créer et démarrer le thread de copie
         self.copy_thread = CopyThread(
@@ -179,9 +188,18 @@ class CopyManagerWindow(QDialog):
     
     def copy_finished(self):
         """Appelé quand la copie est terminée"""
-        self.copy_button.setEnabled(True)
+        self.copy_btn.setEnabled(True)
         self.log_message("Copie terminée")
         QMessageBox.information(self, "Terminé", "La copie est terminée")
+
+    def add_files(self):
+        pass
+
+    def add_folder(self):
+        pass
+
+    def stop_copy(self):
+        pass
 
 class CopyThread(QThread):
     progress = pyqtSignal(int)
