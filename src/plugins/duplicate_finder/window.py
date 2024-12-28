@@ -116,23 +116,23 @@ class DuplicateComparisonDialog(QDialog):
         # Boutons d'action
         buttons_layout = QHBoxLayout()
         
-        keep1_btn = QPushButton("Garder Fichier 1")
+        keep1_btn = QPushButton("📁 Garder Fichier 1")
         keep1_btn.clicked.connect(lambda: self.make_choice('keep1'))
         buttons_layout.addWidget(keep1_btn)
         
-        keep2_btn = QPushButton("Garder Fichier 2")
+        keep2_btn = QPushButton("📁 Garder Fichier 2")
         keep2_btn.clicked.connect(lambda: self.make_choice('keep2'))
         buttons_layout.addWidget(keep2_btn)
         
-        keep_both_btn = QPushButton("Garder les Deux")
+        keep_both_btn = QPushButton("📁 Garder les Deux")
         keep_both_btn.clicked.connect(lambda: self.make_choice('keep_both'))
         buttons_layout.addWidget(keep_both_btn)
         
-        ignore_temp_btn = QPushButton("Ignorer Temporairement")
+        ignore_temp_btn = QPushButton("⏳ Ignorer Temporairement")
         ignore_temp_btn.clicked.connect(lambda: self.make_choice('ignore_temp'))
         buttons_layout.addWidget(ignore_temp_btn)
         
-        ignore_perm_btn = QPushButton("Ignorer Définitivement")
+        ignore_perm_btn = QPushButton("🚫 Ignorer Définitivement")
         ignore_perm_btn.clicked.connect(lambda: self.make_choice('ignore_perm'))
         buttons_layout.addWidget(ignore_perm_btn)
         
@@ -269,32 +269,32 @@ class DuplicateFinderWindow(QDialog):
         button_group = QHBoxLayout()
         
         # Bouton pour ajouter des fichiers
-        self.add_files_button = QPushButton("Ajouter des fichiers")
+        self.add_files_button = QPushButton("📁 Ajouter Fichiers")
         self.add_files_button.clicked.connect(self.select_files)
         button_group.addWidget(self.add_files_button)
         
         # Bouton pour ajouter un dossier
-        self.add_folder_button = QPushButton("Ajouter un dossier")
+        self.add_folder_button = QPushButton("📂 Ajouter Dossier")
         self.add_folder_button.clicked.connect(self.select_folder)
         button_group.addWidget(self.add_folder_button)
         
         # Bouton pour lancer l'analyse
-        self.analyze_button = QPushButton("Analyser")
+        self.analyze_button = QPushButton("🔍 Scanner")
         self.analyze_button.clicked.connect(self.start_analysis)
         button_group.addWidget(self.analyze_button)
         
         # Bouton pour effacer les empreintes
-        self.clear_button = QPushButton("Effacer les empreintes")
+        self.clear_button = QPushButton("🧹 Effacer les empreintes")
         self.clear_button.clicked.connect(self.clear_data)
         button_group.addWidget(self.clear_button)
         
         # Bouton pour supprimer la sélection
-        self.remove_button = QPushButton("Supprimer la sélection")
+        self.remove_button = QPushButton("🗑️ Supprimer la sélection")
         self.remove_button.clicked.connect(self.remove_selected)
         button_group.addWidget(self.remove_button)
         
         # Bouton pour fermer la fenêtre
-        self.close_button = QPushButton("Fermer")
+        self.close_button = QPushButton("❌ Fermer")
         self.close_button.clicked.connect(self.close)
         button_group.addWidget(self.close_button)
         

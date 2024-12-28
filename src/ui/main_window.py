@@ -11,8 +11,12 @@ logger = Logger.get_logger('MainWindow')
 class PluginButton(QPushButton):
     # Dictionnaire des icônes Unicode pour chaque plugin
     ICONS = {
-        "Copy Manager": "⎘",      # Symbole de copie
-        "Duplicate Finder": "⚲",  # Symbole de loupe
+        "Copy Manager": "📋",      # Presse-papiers
+        "Duplicate Finder": "🔍",  # Loupe
+        "Video Adder": "🎬",      # Clap de cinéma
+        "Video Converter": "🔄",   # Flèches de conversion
+        "Regex Renamer": "✏️",     # Crayon
+        "Video Editor": "✂️",      # Ciseaux
     }
     
     def __init__(self, name, description, color, parent=None):
@@ -151,7 +155,7 @@ class MainWindow(QMainWindow):
         # Créer les boutons
         row = 0
         col = 0
-        max_cols = 3
+        max_cols = 2
         
         for plugin in plugins:
             # Créer le bouton
