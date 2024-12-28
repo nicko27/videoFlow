@@ -381,3 +381,93 @@ pip install -r requirements.txt
 
 # Lancement
 python main.py
+
+```
+# VideoFlow - Spécifications du Projet
+
+## Description Générale
+Application de gestion et d'édition de vidéos avec une interface graphique PyQt6.
+
+## Fonctionnalités
+
+### 1. Interface Principale
+- [x] Fenêtre principale avec menu et barre d'outils
+- [x] Système de plugins modulaire
+- [x] Gestion des préférences utilisateur
+- [x] Interface responsive et moderne
+
+### 2. Gestion des Fichiers
+- [x] Explorateur de fichiers intégré
+- [x] Prévisualisation des vidéos
+- [x] Gestion des formats vidéo courants
+- [x] Détection automatique des doublons
+
+### 3. Plugins
+
+#### 3.1 Video Editor
+- [x] Prévisualisation vidéo en temps réel
+- [x] Timeline interactive avec marqueurs
+- [x] Découpage de segments vidéo
+  - [x] Marqueurs de début et fin
+  - [x] Prévisualisation des points de découpe
+  - [x] Export rapide avec ffmpeg
+  - [x] Tableau de gestion des segments
+- [x] Forme d'onde audio
+- [ ] Filtres vidéo basiques
+- [ ] Ajustements audio
+
+#### 3.2 Video Converter
+- [x] Conversion entre formats vidéo
+- [x] Préréglages de conversion
+- [x] Options de compression
+- [x] Conversion par lots
+
+#### 3.3 Regex Renamer
+- [x] Renommage par expressions régulières
+- [x] Prévisualisation des changements
+- [x] Renommage par lots
+- [x] Modèles de renommage
+
+#### 3.4 Duplicate Finder
+- [x] Détection des doublons vidéo
+- [x] Comparaison par hash
+- [x] Prévisualisation des doublons
+- [x] Suppression assistée
+
+### 4. Performance
+- [x] Chargement asynchrone des vidéos
+- [x] Mise en cache des prévisualisations
+- [x] Optimisation des opérations lourdes
+- [x] Utilisation efficace de la mémoire
+
+### 5. Interface Utilisateur
+- [x] Design moderne et intuitif
+- [x] Thème sombre
+- [x] Icônes et indicateurs visuels clairs
+- [x] Retours visuels des opérations
+
+### 6. Sécurité et Stabilité
+- [x] Gestion des erreurs robuste
+- [x] Sauvegarde automatique des préférences
+- [x] Validation des entrées utilisateur
+- [x] Logs détaillés des opérations
+
+## Dépendances Principales
+- PyQt6 : Interface graphique
+- OpenCV (cv2) : Traitement vidéo
+- FFmpeg : Conversion et découpage vidéo
+- MoviePy : Édition vidéo avancée
+- NumPy : Traitement numérique
+
+## Configuration Requise
+- Python 3.8+
+- FFmpeg installé sur le système
+- Qt 6.0+
+- 4GB RAM minimum
+- Espace disque selon les vidéos traitées
+
+## Notes de Développement
+- Architecture modulaire avec système de plugins
+- Code documenté et testé
+- Gestion des versions avec Git
+- Logs détaillés pour le débogage
