@@ -30,6 +30,7 @@ class DuplicateComparisonDialog(QDialog):
         self.file1 = file1
         self.file2 = file2
         self.similarity = similarity
+        self.parent = parent  # Garde une référence à la fenêtre principale
         
         # Ouvre les vidéos
         self.cap1 = cv2.VideoCapture(file1)
@@ -156,6 +157,7 @@ class DuplicateComparisonDialog(QDialog):
         
         # Boutons d'action en bas
         button_layout = QHBoxLayout()
+        
         self.keep_left_btn = QPushButton("⭐ Garder gauche")
         self.keep_right_btn = QPushButton("⭐ Garder droite")
         self.ignore_temp_btn = QPushButton("🤔 Ignorer")
@@ -224,7 +226,15 @@ class DuplicateComparisonDialog(QDialog):
         # Libère les ressources vidéo
         self.cap1.release()
         self.cap2.release()
-        super().closeEvent(event)
+
+        # Arrête les comparaisons en cours si c'est une fenêtre principale
+        if isinstance(self.parent, DuplicateFinderWindow) and self.parent.worker and self.parent.worker.isRunning():
+            self.parent.stop_analysis(show_confirmation=False)
+            logger.info("Analyse arrêtée suite à la fermeture de la fenêtre de comparaison")
+
+        # Ferme la fenêtre sans accepter le dialogue
+        event.accept()
+        self.reject()  # Rejette le dialogue pour arrêter les comparaisons
 
     def make_choice(self, choice):
         """Gère le choix de l'utilisateur
@@ -232,6 +242,11 @@ class DuplicateComparisonDialog(QDialog):
         Args:
             choice (str): Le choix fait par l'utilisateur
         """
+        # Arrête les comparaisons en cours si c'est une fenêtre principale
+        if isinstance(self.parent, DuplicateFinderWindow) and self.parent.worker and self.parent.worker.isRunning():
+            self.parent.stop_analysis(show_confirmation=False)
+            logger.info("Analyse arrêtée suite au choix de l'utilisateur")
+
         self.result = choice
         self.close()
 
@@ -409,15 +424,24 @@ class DuplicateFinderWindow(QMainWindow):
     def load_existing_hashes(self):
         """Charge les hashs existants dans le tableau"""
         try:
-            # Parcourt tous les fichiers dans le cache
-            for file_path in self.video_hasher.hashes.get(self.hash_method.value, {}):
-                if os.path.exists(file_path):  # Vérifie que le fichier existe toujours
-                    if file_path not in self.files:  # Évite les doublons
+            # Récupère tous les fichiers du cache
+            if self.hash_method.value in self.video_hasher.hashes:
+                cached_files = list(self.video_hasher.hashes[self.hash_method.value].keys())
+                
+                # Ajoute chaque fichier qui existe encore au tableau
+                for file_path in cached_files:
+                    if os.path.exists(file_path):
                         row = self.file_list.rowCount()
                         self.file_list.insertRow(row)
                         self.file_list.setItem(row, 0, QTableWidgetItem(file_path))
                         self.file_list.setItem(row, 1, QTableWidgetItem("✅ Analysé"))
                         self.files.append(file_path)
+                
+                # Active le bouton d'analyse s'il y a assez de fichiers
+                self.analyze_btn.setEnabled(len(self.files) > 1)
+                
+                logger.info(f"{len(self.files)} fichiers chargés depuis le cache")
+            
         except Exception as e:
             logger.error(f"Erreur lors du chargement des hashs existants: {str(e)}")
 
@@ -481,11 +505,54 @@ class DuplicateFinderWindow(QMainWindow):
             self.worker.error.connect(self.handle_error)
             self.worker.file_processed.connect(self.update_file_status)
             
-            # Démarre l'analyse
+            # Démarre le worker
             self.worker.start()
+            logger.info("Démarrage de l'analyse des fichiers")
         else:
-            # Si tous les hashs existent déjà, lance directement la comparaison
-            self.compare_all_files()
+            # Si tous les fichiers sont déjà hashés, lance directement la comparaison
+            self.analysis_finished()
+
+    def analysis_finished(self):
+        """Appelé quand l'analyse est terminée"""
+        # Met à jour les statuts
+        for file_path in self.files:
+            if self.video_hasher.has_hash(file_path):
+                self.update_file_status(file_path, True)
+            else:
+                self.update_file_status(file_path, False)
+
+        # Lance la comparaison des fichiers
+        self.compare_all_files()
+
+    def enable_controls(self):
+        """Réactive les contrôles de l'interface"""
+        self.analyze_btn.setEnabled(True)
+        self.add_files_btn.setEnabled(True)
+        self.add_folder_btn.setEnabled(True)
+        self.threshold_spin.setEnabled(True)
+        self.duration_spin.setEnabled(True)
+        self.clear_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+
+    def stop_analysis(self, show_confirmation=True):
+        """Arrête l'analyse en cours"""
+        if self.worker and self.worker.isRunning():
+            if show_confirmation:
+                reply = QMessageBox.question(
+                    self,
+                    "Confirmation",
+                    "Voulez-vous vraiment arrêter l'analyse ?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                
+                if reply == QMessageBox.StandardButton.Yes:
+                    self.worker.stop()
+                    self.worker.wait()
+                    self.analysis_finished()
+            else:
+                self.worker.stop()
+                self.worker.wait()
+                self.analysis_finished()
 
     def compare_all_files(self):
         """Compare tous les fichiers entre eux"""
@@ -506,7 +573,17 @@ class DuplicateFinderWindow(QMainWindow):
         # Compare chaque paire de fichiers
         current_comparison = 0
         for i, file1 in enumerate(self.files):
+            # Vérifie si on doit arrêter
+            if self.worker and self.worker._stop:
+                logger.info("Arrêt des comparaisons demandé")
+                break
+
             for file2 in self.files[i+1:]:
+                # Vérifie si on doit arrêter
+                if self.worker and self.worker._stop:
+                    logger.info("Arrêt des comparaisons demandé")
+                    break
+
                 # Vérifie si la paire n'est pas ignorée
                 if frozenset([file1, file2]) not in self.ignored_pairs:
                     # Compare les hashs
@@ -535,100 +612,17 @@ class DuplicateFinderWindow(QMainWindow):
                 
                 self.compare_progress.setValue(current_comparison)
 
-        # Trie les doublons par similarité décroissante
-        self.potential_duplicates.sort(key=lambda x: x[2], reverse=True)
-        
-        # Lance la comparaison du premier doublon
-        self.compare_next_duplicate()
-
-    def analysis_finished(self):
-        """Appelé quand l'analyse est terminée"""
-        # Met à jour les statuts
-        for file_path in self.files:
-            if self.video_hasher.has_hash(file_path):
-                self.update_file_status(file_path, True)
-            else:
-                self.update_file_status(file_path, False)
-
-        # Lance la comparaison des fichiers
-        self.compare_all_files()
-
-    def enable_controls(self):
-        """Réactive les contrôles de l'interface"""
-        self.analyze_btn.setEnabled(True)
-        self.add_files_btn.setEnabled(True)
-        self.add_folder_btn.setEnabled(True)
-        self.threshold_spin.setEnabled(True)
-        self.duration_spin.setEnabled(True)
-        self.clear_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-
-    def stop_analysis(self):
-        """Arrête l'analyse en cours"""
-        if self.worker and self.worker.isRunning():
-            reply = QMessageBox.question(
-                self,
-                "Confirmation",
-                "Voulez-vous vraiment arrêter l'analyse ?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
+        # Si on n'a pas été arrêté
+        if not (self.worker and self.worker._stop):
+            # Trie les doublons par similarité décroissante
+            self.potential_duplicates.sort(key=lambda x: x[2], reverse=True)
             
-            if reply == QMessageBox.StandardButton.Yes:
-                self.worker.stop()
-                self.worker.wait()
-                self.analysis_finished()
-
-    def compare_next_duplicate(self):
-        """Compare le prochain doublon potentiel"""
-        if not self.potential_duplicates:
-            # Plus de doublons à comparer
-            QMessageBox.information(
-                self,
-                "Analyse terminée",
-                "L'analyse des doublons est terminée"
-            )
+            # Lance la comparaison du premier doublon
+            self.compare_next_duplicate()
+        else:
+            # Réactive les contrôles
             self.enable_controls()
-            return
-
-        # Récupère le prochain doublon à comparer
-        file1, file2, similarity = self.potential_duplicates[0]
-        
-        # Crée et affiche la fenêtre de comparaison
-        dialog = DuplicateComparisonDialog(file1, file2, similarity, self)
-        result = dialog.exec()
-        
-        if result == QDialog.DialogCode.Accepted:
-            # Traite le résultat de la comparaison
-            if dialog.result == "keep_left":
-                try:
-                    os.remove(file2)
-                    self.update_file_status(file2, False)
-                except Exception as e:
-                    QMessageBox.critical(
-                        self,
-                        "Erreur",
-                        f"Impossible de supprimer le fichier : {e}"
-                    )
-            elif dialog.result == "keep_right":
-                try:
-                    os.remove(file1)
-                    self.update_file_status(file1, False)
-                except Exception as e:
-                    QMessageBox.critical(
-                        self,
-                        "Erreur",
-                        f"Impossible de supprimer le fichier : {e}"
-                    )
-            elif dialog.result == "ignore_perm":
-                # Ajoute la paire à la liste des paires ignorées
-                self.ignored_pairs.add(frozenset([file1, file2]))
-                self.save_ignored_pairs()
-
-        # Supprime le doublon traité de la liste
-        self.potential_duplicates.pop(0)
-        
-        # Passe au doublon suivant
-        self.compare_next_duplicate()
+            logger.info("Comparaisons arrêtées")
 
     def update_progress(self, value):
         """Met à jour la barre de progression"""
@@ -773,6 +767,67 @@ class DuplicateFinderWindow(QMainWindow):
         # Émet le signal de fermeture
         self.closed.emit()
 
+    def compare_next_duplicate(self):
+        """Compare le prochain doublon potentiel"""
+        if not self.potential_duplicates:
+            # Plus de doublons à comparer
+            QMessageBox.information(
+                self,
+                "Analyse terminée",
+                "L'analyse des doublons est terminée"
+            )
+            self.enable_controls()
+            return
+
+        # Récupère le prochain doublon à comparer
+        file1, file2, similarity = self.potential_duplicates[0]
+        
+        # Crée et affiche la fenêtre de comparaison
+        dialog = DuplicateComparisonDialog(file1, file2, similarity, self)
+        result = dialog.exec()
+        
+        if result == QDialog.DialogCode.Accepted:
+            # Traite le résultat de la comparaison
+            if dialog.result == "keep_left":
+                try:
+                    os.remove(file2)
+                    self.update_file_status(file2, False)
+                    logger.info(f"Fichier supprimé : {file2}")
+                except Exception as e:
+                    QMessageBox.critical(
+                        self,
+                        "Erreur",
+                        f"Impossible de supprimer le fichier : {e}"
+                    )
+                    logger.error(f"Erreur lors de la suppression de {file2}: {str(e)}")
+            elif dialog.result == "keep_right":
+                try:
+                    os.remove(file1)
+                    self.update_file_status(file1, False)
+                    logger.info(f"Fichier supprimé : {file1}")
+                except Exception as e:
+                    QMessageBox.critical(
+                        self,
+                        "Erreur",
+                        f"Impossible de supprimer le fichier : {e}"
+                    )
+                    logger.error(f"Erreur lors de la suppression de {file1}: {str(e)}")
+            elif dialog.result == "ignore_perm":
+                # Ajoute la paire à la liste des paires ignorées
+                self.ignored_pairs.add(frozenset([file1, file2]))
+                self.save_ignored_pairs()
+                logger.info(f"Paire ignorée : {file1} - {file2}")
+
+            # Supprime le doublon traité de la liste
+            self.potential_duplicates.pop(0)
+            
+            # Continue avec le prochain doublon
+            self.compare_next_duplicate()
+        else:
+            # Si la fenêtre a été fermée, on arrête les comparaisons
+            logger.info("Comparaisons arrêtées par l'utilisateur")
+            self.enable_controls()
+
 
 class DuplicateFinderWorker(QThread):
     """Worker pour l'analyse des doublons"""
@@ -802,6 +857,7 @@ class DuplicateFinderWorker(QThread):
         
         for file_path in self.files:
             if self._stop:
+                logger.info("Arrêt demandé avant le traitement du fichier")
                 break
                 
             try:
@@ -817,6 +873,11 @@ class DuplicateFinderWorker(QThread):
                 cap.release()
                 
                 # Si on arrive ici, la vidéo est valide
+                # Vérifie si on doit s'arrêter avant de calculer le hash
+                if self._stop:
+                    logger.info("Arrêt demandé avant le calcul du hash")
+                    break
+                    
                 self.video_hasher.compute_video_hash(file_path)
                 # Émet le signal de succès
                 self.file_processed.emit(file_path, True)
