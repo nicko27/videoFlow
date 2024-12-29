@@ -24,15 +24,31 @@ class DataManager:
         :param file_path: Chemin du fichier
         :param file_hash: Hash du fichier
         """
-        # Convertir le hash numpy en liste de booléens pour la sérialisation JSON
-        hash_list = [h.tolist() for h in file_hash]
-        self.analyzed_files[file_path] = hash_list
+        try:
+            if not os.path.exists(file_path):
+                logger.warning(f"Le fichier {file_path} n'existe pas")
+                return
+                
+            # Convertir le hash numpy en liste de booléens pour la sérialisation JSON
+            hash_list = [h.tolist() for h in file_hash]
+            self.analyzed_files[file_path] = hash_list
+            self.save_data()
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de l'ajout du fichier {file_path}: {e}")
 
     def get_analyzed_files(self) -> Dict[str, List[np.ndarray]]:
         """Retourne les fichiers analysés"""
-        # Convertir les listes de booléens en tableaux numpy
-        return {path: [np.array(h) for h in hash_list] 
-                for path, hash_list in self.analyzed_files.items()}
+        try:
+            # Ne retourne que les fichiers qui existent encore
+            return {
+                path: [np.array(h) for h in hash_list] 
+                for path, hash_list in self.analyzed_files.items()
+                if os.path.exists(path)
+            }
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des fichiers analysés: {e}")
+            return {}
 
     def add_ignored_pair(self, file1: str, file2: str) -> None:
         """

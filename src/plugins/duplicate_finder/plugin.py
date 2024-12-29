@@ -1,3 +1,5 @@
+"""Module du plugin de recherche de doublons"""
+
 from PyQt6.QtGui import QAction
 from src.core.plugin_interface import PluginInterface
 from src.core.logger import Logger
@@ -8,15 +10,11 @@ class DuplicateFinderPlugin(PluginInterface):
     def __init__(self):
         super().__init__()
         self.name = "Duplicate Finder"
-        self.description = "Trouve les fichiers en double dans un dossier"
+        self.description = "Trouve les doublons dans vos vidéos"
         self.version = "1.0.0"
         self.window = None
         logger.debug("Plugin DuplicateFinder initialisé")
     
-    def get_name(self) -> str:
-        logger.debug("get_name() appelé")
-        return self.name
-
     def setup(self, main_window):
         """Configure le plugin"""
         self.main_window = main_window
@@ -34,5 +32,12 @@ class DuplicateFinderPlugin(PluginInterface):
         if not self.window:
             from .window import DuplicateFinderWindow
             self.window = DuplicateFinderWindow()
+            # Connecte le signal de fermeture
+            self.window.closed.connect(self.handle_window_closed)
         self.window.show()
         logger.debug("Fenêtre DuplicateFinder affichée")
+        
+    def handle_window_closed(self):
+        """Gère la fermeture de la fenêtre"""
+        self.window = None
+        logger.debug("Fenêtre DuplicateFinder fermée")

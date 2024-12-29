@@ -3,11 +3,12 @@ import json
 import shutil
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                            QFileDialog, QLabel, QProgressBar, QTextEdit,
-                           QCheckBox, QMessageBox)
+                           QCheckBox, QMessageBox, QGroupBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 from src.core.logger import Logger
 from .copy_manager import CopyManager
+from send2trash import send2trash
 
 logger = Logger.get_logger('CopyManager')
 
@@ -53,7 +54,9 @@ class CopyManagerWindow(QDialog):
         dest_layout.addWidget(self.dest_button)
         
         # Options
-        options_layout = QHBoxLayout()
+        options_group = QGroupBox("Options")
+        options_layout = QVBoxLayout()
+        
         self.copy_files_cb = QCheckBox("Copier les fichiers")
         self.copy_files_cb.setChecked(True)  # Coché par défaut
         
@@ -68,14 +71,21 @@ class CopyManagerWindow(QDialog):
             "Inclut les fichiers et dossiers commençant par un point (.)"
         )
         
+        self.delete_after_copy = QCheckBox("Supprimer les fichiers après la copie")
+        self.delete_after_copy.setToolTip("Les fichiers source seront déplacés dans la corbeille après la copie")
+        
         options_layout.addWidget(self.copy_files_cb)
         options_layout.addWidget(self.preserve_metadata_cb)
         options_layout.addWidget(self.include_hidden_cb)
+        options_layout.addWidget(self.delete_after_copy)
+        
+        options_group.setLayout(options_layout)
+        layout.addLayout(source_layout)
+        layout.addLayout(dest_layout)
+        layout.addWidget(options_group)
         
         # Boutons d'action
         buttons_layout = QHBoxLayout()
-        
-
         
         buttons_layout.addStretch()
         
@@ -92,20 +102,16 @@ class CopyManagerWindow(QDialog):
         self.close_btn.clicked.connect(self.close)
         buttons_layout.addWidget(self.close_btn)
         
+        layout.addLayout(buttons_layout)
+        
         # Barre de progression
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
+        layout.addWidget(self.progress_bar)
         
         # Journal des opérations
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
-        
-        # Assembler le layout
-        layout.addLayout(source_layout)
-        layout.addLayout(dest_layout)
-        layout.addLayout(options_layout)
-        layout.addLayout(buttons_layout)
-        layout.addWidget(self.progress_bar)
         layout.addWidget(self.log_text)
         
         self.setLayout(layout)
@@ -160,14 +166,16 @@ class CopyManagerWindow(QDialog):
         self.log_text.append(message)
     
     def start_copy(self):
-        """Démarre la copie"""
+        """Démarre la copie des fichiers"""
         if not self.source_path or not self.dest_path:
             QMessageBox.warning(self, "Erreur", "Veuillez sélectionner les dossiers source et destination")
             return
-        
+            
+        # Désactiver les contrôles pendant la copie
+        self.setEnabled(False)
+        self.stop_btn.setEnabled(True)
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        self.copy_btn.setEnabled(False)
         
         # Créer et démarrer le thread de copie
         self.copy_thread = CopyThread(
@@ -175,12 +183,26 @@ class CopyManagerWindow(QDialog):
             self.dest_path,
             self.copy_files_cb.isChecked(),
             self.preserve_metadata_cb.isChecked(),
-            self.include_hidden_cb.isChecked()
+            self.include_hidden_cb.isChecked(),
+            self.delete_after_copy.isChecked()
         )
+        
+        # Calculer la taille totale
+        total_size = self.copy_thread.copy_manager.calculate_total_size(self.source_path)
+        self.log_message(f"Taille totale à copier : {self.format_size(total_size)}")
+        
         self.copy_thread.progress.connect(self.update_progress)
         self.copy_thread.message.connect(self.log_message)
         self.copy_thread.finished.connect(self.copy_finished)
         self.copy_thread.start()
+    
+    def format_size(self, size):
+        """Formate une taille en bytes en format lisible"""
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024:
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} PB"
     
     def update_progress(self, value):
         """Met à jour la barre de progression"""
@@ -191,6 +213,8 @@ class CopyManagerWindow(QDialog):
         self.copy_btn.setEnabled(True)
         self.log_message("Copie terminée")
         QMessageBox.information(self, "Terminé", "La copie est terminée")
+        self.setEnabled(True)
+        self.stop_btn.setEnabled(False)
 
     def add_files(self):
         pass
@@ -205,13 +229,14 @@ class CopyThread(QThread):
     progress = pyqtSignal(int)
     message = pyqtSignal(str)
     
-    def __init__(self, source, dest, copy_files, preserve_metadata, include_hidden):
+    def __init__(self, source, dest, copy_files, preserve_metadata, include_hidden, delete_after_copy):
         super().__init__()
         self.source = source
         self.dest = dest
         self.copy_files = copy_files
         self.preserve_metadata = preserve_metadata
         self.include_hidden = include_hidden
+        self.delete_after_copy = delete_after_copy
         self.copy_manager = CopyManager()
     
     def run(self):
@@ -255,6 +280,11 @@ class CopyThread(QThread):
                         self.message.emit(f"Copié : {dest_file}")
                         copied_items += 1
                         self.progress.emit(int(copied_items * 100 / total_items))
+                        
+                        # Supprimer le fichier source si demandé
+                        if self.delete_after_copy:
+                            send2trash(src_file)
+                            self.message.emit(f"Supprimé : {src_file}")
         
         except Exception as e:
             self.message.emit(f"Erreur : {str(e)}")

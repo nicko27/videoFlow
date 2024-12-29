@@ -330,6 +330,101 @@ Plugin pour éditer et découper des vidéos.
   - Backup avant modification
   - Journal des opérations
 
+### Plugin DuplicateFinder
+
+### Description
+Le plugin DuplicateFinder permet de détecter les vidéos en double dans une collection en utilisant des empreintes perceptuelles (perceptual hashing).
+
+### Fonctionnalités
+
+#### Interface utilisateur
+- Ajout de fichiers individuels ou de dossiers complets
+- Liste des fichiers avec leur statut (En attente, Traité)
+- Barre de progression pour le calcul des hashs et la comparaison
+- Fenêtre de comparaison côte à côte des doublons potentiels
+- Seuils ajustables pour la similarité et la durée
+
+#### Calcul des empreintes
+- Utilisation de l'algorithme pHash (Perceptual Hash)
+- Échantillonnage intelligent des frames (première, dernière, et frames à intervalles réguliers)
+- Cache des empreintes pour éviter les recalculs
+- Gestion des erreurs de lecture de frames
+
+#### Comparaison des vidéos
+- Comparaison bit à bit des empreintes
+- Calcul de similarité en pourcentage
+- Prise en compte de la durée des vidéos
+- Gestion des paires ignorées
+
+### Architecture
+
+#### Classes principales
+1. `DuplicateFinderWindow`
+   - Fenêtre principale du plugin
+   - Gestion de l'interface utilisateur
+   - Coordination des opérations d'analyse
+
+2. `VideoHasher`
+   - Calcul et stockage des empreintes
+   - Gestion du cache
+   - Comparaison des empreintes
+
+3. `DuplicateComparisonDialog`
+   - Affichage côte à côte des vidéos similaires
+   - Lecture synchronisée
+   - Options de suppression
+
+#### Workflow
+1. L'utilisateur ajoute des fichiers vidéo
+2. Au clic sur "Analyser" :
+   - Calcul des empreintes manquantes
+   - Comparaison de toutes les paires possibles
+   - Affichage des doublons potentiels
+3. Pour chaque doublon :
+   - Comparaison visuelle dans une fenêtre dédiée
+   - Possibilité de supprimer un des fichiers
+   - Option pour ignorer la paire
+
+### Stockage des données
+
+#### Cache des empreintes (video_hashes.json)
+```json
+{
+    "pHash": {
+        "/chemin/vers/video.mp4": {
+            "hash": [...],  // Matrice 3D de booléens
+            "duration": 123.45,  // Durée en secondes
+            "frames": [0, 500, 1000, ...]  // Indices des frames utilisées
+        }
+    }
+}
+```
+
+#### Paires ignorées (ignored_pairs.json)
+```json
+[
+    ["/chemin/vers/video1.mp4", "/chemin/vers/video2.mp4"],
+    ...
+]
+```
+
+### Performances
+- Utilisation de numpy pour les calculs d'empreintes
+- Cache pour éviter les recalculs
+- Traitement asynchrone via QThread
+- Échantillonnage intelligent des frames
+
+### Limitations connues
+- Les vidéos doivent être lisibles par OpenCV
+- La comparaison est sensible aux modifications de format
+- Les différences de durée > 5 minutes sont ignorées par défaut
+
+### Dépendances
+- PyQt6 : Interface graphique
+- OpenCV (cv2) : Lecture et traitement vidéo
+- numpy : Calculs matriciels
+- json : Stockage des données
+
 ### Fonctionnalités des Plugins
 
 ### Copy Manager
@@ -431,8 +526,9 @@ Application de gestion et d'édition de vidéos avec une interface graphique PyQ
 #### 3.4 Duplicate Finder
 - [x] Détection des doublons vidéo
 - [x] Comparaison par hash
-- [x] Prévisualisation des doublons
-- [x] Suppression assistée
+- [x] Affichage des résultats en groupes
+- [x] Prévisualisation des vidéos
+- [x] Suppression sécurisée des doublons
 
 ### 4. Performance
 - [x] Chargement asynchrone des vidéos
