@@ -305,6 +305,18 @@ class DuplicateFinderWindow(QMainWindow):
         
         main_layout.addLayout(controls_layout)
         
+        # Barre de progression pour l'analyse
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setFormat("%p% - %v/%m fichiers")
+        main_layout.addWidget(self.progress_bar)
+        
+        # Barre de progression pour la comparaison
+        self.compare_progress = QProgressBar()
+        self.compare_progress.setVisible(False)
+        self.compare_progress.setFormat("%p% - %v/%m comparaisons")
+        main_layout.addWidget(self.compare_progress)
+        
         # Groupe des fichiers
         files_group = QGroupBox("Fichiers")
         files_layout = QVBoxLayout()
@@ -424,6 +436,14 @@ class DuplicateFinderWindow(QMainWindow):
         self.clear_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
 
+        # Configure et affiche la barre de progression
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setMaximum(len(self.files))
+        
+        # Masque la barre de comparaison
+        self.compare_progress.setVisible(False)
+
         # Récupère les paramètres
         threshold = self.threshold_spin.value()
         duration = self.duration_spin.value() * 60  # Conversion minutes en secondes
@@ -465,18 +485,32 @@ class DuplicateFinderWindow(QMainWindow):
         # Réinitialise la liste des doublons potentiels
         self.potential_duplicates = []
         
-        # Compare tous les fichiers entre eux
-        for i in range(len(self.files)):
-            for j in range(i + 1, len(self.files)):
-                file1 = self.files[i]
-                file2 = self.files[j]
-                
-                # Vérifie si la paire n'est pas déjà ignorée
+        # Configure et affiche la barre de progression pour la comparaison
+        total_comparisons = len(self.files) * (len(self.files) - 1) // 2
+        self.compare_progress.setVisible(True)
+        self.compare_progress.setValue(0)
+        self.compare_progress.setMaximum(total_comparisons)
+        
+        # Compare chaque paire de fichiers
+        current_comparison = 0
+        for i, file1 in enumerate(self.files):
+            for file2 in self.files[i+1:]:
+                # Vérifie si la paire n'est pas ignorée
                 if frozenset([file1, file2]) not in self.ignored_pairs:
                     # Compare les hashs
-                    similarity = self.video_hasher.compare_videos(file1, file2)
-                    if similarity >= self.threshold_spin.value():
+                    similarity = self.video_hasher.compare_files(
+                        file1, 
+                        file2,
+                        self.hash_method.value
+                    )
+                    
+                    # Si la similarité dépasse le seuil, ajoute aux doublons potentiels
+                    if similarity > self.threshold_spin.value() / 100:
                         self.potential_duplicates.append((file1, file2, similarity))
+                
+                # Met à jour la progression
+                current_comparison += 1
+                self.compare_progress.setValue(current_comparison)
 
         # Trie les doublons par similarité décroissante
         self.potential_duplicates.sort(key=lambda x: x[2], reverse=True)
@@ -575,7 +609,7 @@ class DuplicateFinderWindow(QMainWindow):
 
     def update_progress(self, value):
         """Met à jour la barre de progression"""
-        self.file_progress.setValue(value)
+        self.progress_bar.setValue(value)
         
     def handle_error(self, error):
         """Gère les erreurs du worker"""
@@ -618,7 +652,7 @@ class DuplicateFinderWindow(QMainWindow):
                     row = self.file_list.rowCount()
                     self.file_list.insertRow(row)
                     self.file_list.setItem(row, 0, QTableWidgetItem(file_path))
-                    self.file_list.setItem(row, 1, QTableWidgetItem("En attente"))
+                    self.file_list.setItem(row, 1, QTableWidgetItem("❌ Absent"))
                     self.files.append(file_path)
                     
                     # Vérifie si le hash existe déjà
@@ -651,7 +685,7 @@ class DuplicateFinderWindow(QMainWindow):
                             row = self.file_list.rowCount()
                             self.file_list.insertRow(row)
                             self.file_list.setItem(row, 0, QTableWidgetItem(os.path.basename(file_path)))
-                            self.file_list.setItem(row, 1, QTableWidgetItem("En attente"))
+                            self.file_list.setItem(row, 1, QTableWidgetItem("❌ Absent"))
             
             # Active le bouton d'analyse s'il y a assez de fichiers
             self.analyze_btn.setEnabled(len(self.files) > 1)
