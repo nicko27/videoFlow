@@ -433,9 +433,9 @@ class DuplicateFinderWindow(QMainWindow):
         for file_path in self.files:
             if not self.video_hasher.has_hash(file_path):
                 files_to_hash.append(file_path)
-                self.update_file_status(file_path, "En attente")
+                self.update_file_status(file_path, False)  # Tous les fichiers sont à réanalyser
             else:
-                self.update_file_status(file_path, "Hash existant")
+                self.update_file_status(file_path, True)
 
         # Si des fichiers doivent être hashés, lance le worker
         if files_to_hash:
@@ -452,6 +452,7 @@ class DuplicateFinderWindow(QMainWindow):
             self.worker.progress.connect(self.update_progress)
             self.worker.finished.connect(self.analysis_finished)
             self.worker.error.connect(self.handle_error)
+            self.worker.file_processed.connect(self.update_file_status)
             
             # Démarre l'analyse
             self.worker.start()
@@ -488,9 +489,9 @@ class DuplicateFinderWindow(QMainWindow):
         # Met à jour les statuts
         for file_path in self.files:
             if self.video_hasher.has_hash(file_path):
-                self.update_file_status(file_path, "Hash existant")
+                self.update_file_status(file_path, True)
             else:
-                self.update_file_status(file_path, "Erreur")
+                self.update_file_status(file_path, False)
 
         # Lance la comparaison des fichiers
         self.compare_all_files()
@@ -544,7 +545,7 @@ class DuplicateFinderWindow(QMainWindow):
             if dialog.result == "keep_left":
                 try:
                     os.remove(file2)
-                    self.update_file_status(file2, "Supprimé")
+                    self.update_file_status(file2, False)
                 except Exception as e:
                     QMessageBox.critical(
                         self,
@@ -554,7 +555,7 @@ class DuplicateFinderWindow(QMainWindow):
             elif dialog.result == "keep_right":
                 try:
                     os.remove(file1)
-                    self.update_file_status(file1, "Supprimé")
+                    self.update_file_status(file1, False)
                 except Exception as e:
                     QMessageBox.critical(
                         self,
@@ -585,22 +586,14 @@ class DuplicateFinderWindow(QMainWindow):
         )
         self.analysis_finished()
 
-    def update_file_status(self, file_path, status):
-        """Met à jour le statut d'un fichier dans la liste"""
-        for row in range(self.file_list.rowCount()):
-            if self.files[row] == file_path:
-                item = QTableWidgetItem(status)
-                if "Hash existant" in status:
-                    item.setForeground(Qt.GlobalColor.darkGreen)
-                elif "En attente" in status:
-                    item.setForeground(Qt.GlobalColor.darkBlue)
-                elif "Erreur" in status:
-                    item.setForeground(Qt.GlobalColor.darkRed)
-                elif "Traité" in status:
-                    item.setForeground(Qt.GlobalColor.darkGreen)
-                elif "Supprimé" in status:
-                    item.setForeground(Qt.GlobalColor.darkGray)
-                self.file_list.setItem(row, 1, item)
+    def update_file_status(self, file_path, success):
+        """Met à jour le statut d'un fichier"""
+        # Trouve l'index du fichier dans la liste
+        for i in range(self.file_list.rowCount()):
+            if self.file_list.item(i, 0).text() == file_path:
+                # Met à jour le statut
+                status = "✅ Analysé" if success else "❌ Ignoré"
+                self.file_list.item(i, 1).setText(status)
                 break
 
     def clear_list(self):
@@ -630,9 +623,9 @@ class DuplicateFinderWindow(QMainWindow):
                     
                     # Vérifie si le hash existe déjà
                     if self.video_hasher.has_hash(file_path):
-                        self.update_file_status(file_path, "Hash existant ")
+                        self.update_file_status(file_path, True)
                     else:
-                        self.update_file_status(file_path, "En attente ")
+                        self.update_file_status(file_path, False)
             
             # Active le bouton d'analyse s'il y a assez de fichiers
             self.analyze_btn.setEnabled(len(self.files) > 1)
@@ -664,13 +657,26 @@ class DuplicateFinderWindow(QMainWindow):
             self.analyze_btn.setEnabled(len(self.files) > 1)
 
     def clear_cache(self):
-        """Vide le cache des hashes"""
+        """Vide le cache des hashs"""
         try:
+            # Sauvegarde la liste des fichiers
+            files = self.files.copy()
+            
+            # Vide le cache
             self.video_hasher.clear_cache()
-            self.files.clear()
-            self.file_list.setRowCount(0)
-            self.analyze_btn.setEnabled(False)
-            QMessageBox.information(self, "Succès", "Cache vidé avec succès")
+            
+            # Restaure la liste des fichiers
+            self.files = files
+            
+            # Met à jour les statuts
+            for file in self.files:
+                self.update_file_status(file, False)  # Tous les fichiers sont à réanalyser
+            
+            QMessageBox.information(
+                self,
+                "Cache vidé",
+                "Le cache des hashs a été vidé avec succès"
+            )
         except Exception as e:
             QMessageBox.critical(self, "Erreur", f"Impossible de vider le cache : {e}")
 
@@ -700,106 +706,58 @@ class DuplicateFinderWindow(QMainWindow):
 class DuplicateFinderWorker(QThread):
     """Worker pour l'analyse des doublons"""
     progress = pyqtSignal(int)  # progression en pourcentage
-    duplicate_found = pyqtSignal(str, str, float)  # fichier 1, fichier 2, similarité
-    finished = pyqtSignal()  # signal émis quand l'analyse est terminée
-    error = pyqtSignal(str)  # message d'erreur
-
+    finished = pyqtSignal()  # analyse terminée
+    error = pyqtSignal(str)  # erreur pendant l'analyse
+    file_processed = pyqtSignal(str, bool)  # fichier traité (chemin, succès)
+    
     def __init__(self, files, video_hasher, threshold, hash_method, duration):
+        """Initialise le worker"""
         super().__init__()
         self.files = files
         self.video_hasher = video_hasher
         self.threshold = threshold
         self.hash_method = hash_method
         self.duration = duration
-        self.is_running = True
+        self._stop = False
+        
+    def stop(self):
+        """Arrête le worker"""
+        self._stop = True
         
     def run(self):
         """Exécute l'analyse"""
-        try:
-            # Calcule d'abord les hashs manquants
-            total_files = len(self.files)
-            for i, file_path in enumerate(self.files):
-                if not self.is_running:
-                    break
+        total_files = len(self.files)
+        processed_files = 0
+        
+        for file_path in self.files:
+            if self._stop:
+                break
+                
+            try:
+                # Vérifie si la vidéo peut être ouverte
+                cap = cv2.VideoCapture(file_path)
+                if not cap.isOpened():
+                    raise Exception("Impossible d'ouvrir la vidéo")
                     
-                try:
-                    # Calcule le hash si nécessaire
-                    if not self.video_hasher.has_hash(file_path):
-                        self.video_hasher.compute_video_hash(file_path)
-                        
-                    # Met à jour la progression (50% pour le calcul des hashs)
-                    progress = int((i + 1) / total_files * 50)
-                    self.progress.emit(progress)
+                total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                if total_frames <= 0:
+                    raise Exception("Vidéo invalide")
                     
-                except Exception as e:
-                    self.error.emit(f"Erreur lors du calcul du hash de {file_path}: {e}")
-                    continue
-
-            if not self.is_running:
-                return
-
-            # Compare ensuite les fichiers
-            total_comparisons = len(self.files) * (len(self.files) - 1) // 2
-            current = 0
-            duplicates = []
-
-            # Récupère les hashs calculés
-            method_data = self.video_hasher.hashes.get(self.hash_method, {})
-
-            # Compare chaque paire de fichiers
-            for i, file1 in enumerate(self.files):
-                if not self.is_running:
-                    break
-
-                for file2 in self.files[i+1:]:
-                    if not self.is_running:
-                        break
-
-                    # Récupère les données des fichiers
-                    hash_data1 = method_data.get(file1)
-                    hash_data2 = method_data.get(file2)
-
-                    if hash_data1 and hash_data2:
-                        try:
-                            # Convertit les listes en tableaux numpy
-                            hash1 = self.video_hasher.list_to_numpy(hash_data1['hash'])
-                            hash2 = self.video_hasher.list_to_numpy(hash_data2['hash'])
-
-                            # Compare les hashs
-                            is_similar, similarity, warning = self.video_hasher.are_similar(
-                                hash1,
-                                hash2,
-                                hash_data1['duration'],
-                                hash_data2['duration'],
-                                threshold=self.threshold,
-                                ignore_duration=self.duration > 0
-                            )
-
-                            if is_similar:
-                                duplicates.append((file1, file2, similarity))
-                        except Exception as e:
-                            self.error.emit(f"Erreur lors de la comparaison de {file1} et {file2}: {e}")
-                            continue
-
-                    # Met à jour la progression (50% restants pour les comparaisons)
-                    current += 1
-                    progress = 50 + int(current / total_comparisons * 50)
-                    self.progress.emit(progress)
-
-            # Émet les résultats
-            if duplicates:
-                for file1, file2, similarity in duplicates:
-                    self.duplicate_found.emit(file1, file2, similarity)
-
-        except Exception as e:
-            self.error.emit(str(e))
+                cap.release()
+                
+                # Si on arrive ici, la vidéo est valide
+                self.video_hasher.compute_video_hash(file_path)
+                self.file_processed.emit(file_path, True)
+                
+            except Exception as e:
+                # En cas d'erreur, on ignore simplement le fichier
+                self.file_processed.emit(file_path, False)
             
-        finally:
-            self.finished.emit()
-
-    def stop(self):
-        """Arrête l'analyse"""
-        self.is_running = False
+            # Met à jour la progression
+            processed_files += 1
+            self.progress.emit(int(processed_files * 100 / total_files))
+            
+        self.finished.emit()
 
 
 class HashMethod(Enum):
