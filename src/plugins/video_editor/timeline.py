@@ -1,229 +1,197 @@
-"""Widget de frise temporelle pour le plugin Video Editor"""
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QPainter, QColor, QPen
+from src.core.logger import Logger
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QMenu
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QPointF
-from PyQt6.QtGui import QPainter, QColor, QPen, QAction, QLinearGradient, QPolygon
-from .segment_manager import SegmentManager, VideoSegment
+logger = Logger.get_logger('VideoEditor.Timeline')
+
+class Segment:
+    """Représente un segment de la timeline"""
+    def __init__(self, start_frame, end_frame=None):
+        self.start_frame = start_frame
+        self.end_frame = end_frame
 
 class Timeline(QWidget):
-    """Frise temporelle pour la vidéo"""
-    positionChanged = pyqtSignal(int)  # Frame sélectionnée
-    segmentCreated = pyqtSignal(VideoSegment)
-    segmentDeleted = pyqtSignal(int)
-
+    """Widget de timeline pour l'éditeur vidéo"""
+    
+    # Signaux
+    position_changed = pyqtSignal(int)  # Position du curseur changée
+    segment_created = pyqtSignal(object)  # Nouveau segment créé
+    segment_deleted = pyqtSignal(int)  # Segment supprimé (index)
+    
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setup_ui()
-        self.segment_manager = SegmentManager()
+        
+        # Configuration
+        self.setMinimumHeight(50)
+        self.setMouseTracking(True)
+        
+        # État
         self.total_frames = 0
         self.current_frame = 0
-        self.hover_frame = -1
-        self.dragging = False
-        self.setup_context_menu()
+        self.segments = []
+        self.current_segment = None
+        self.markers = {}  # frame -> emoji
+        self._updating = False  # Pour éviter les boucles infinies
         
         # Style
-        self.setMinimumHeight(80)
-        self.setMaximumHeight(80)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMouseTracking(True)  # Pour détecter le survol
+        self.colors = {
+            'background': QColor(40, 40, 40),
+            'timeline': QColor(100, 100, 100),
+            'cursor': QColor(255, 255, 255),
+            'segment': QColor(0, 120, 215, 128),
+            'segment_border': QColor(0, 120, 215),
+            'marker': QColor(255, 255, 255)
+        }
     
-    def setup_ui(self):
-        """Configure l'interface utilisateur"""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        self.setLayout(layout)
-    
-    def setup_context_menu(self):
-        """Configure le menu contextuel"""
-        self.context_menu = QMenu(self)
-        self.delete_action = QAction("Supprimer le segment", self)
-        self.delete_action.triggered.connect(self.delete_selected_segment)
-        self.context_menu.addAction(self.delete_action)
-    
-    def set_duration(self, total_frames):
-        """Définit la durée totale de la vidéo"""
-        self.total_frames = total_frames
+    def set_total_frames(self, frames):
+        """Définit le nombre total de frames"""
+        self.total_frames = frames
         self.update()
     
     def set_current_frame(self, frame):
-        """Définit la frame actuelle"""
-        self.current_frame = min(max(0, frame), self.total_frames)
+        """Définit la frame courante"""
+        if self._updating or not (0 <= frame <= self.total_frames):
+            return
+            
+        try:
+            self._updating = True
+            self.current_frame = frame
+            self.update()
+            self.position_changed.emit(frame)
+        finally:
+            self._updating = False
+    
+    def add_marker(self, frame, emoji):
+        """Ajoute un marqueur à la position spécifiée"""
+        self.markers[frame] = emoji
         self.update()
     
-    def frame_to_x(self, frame):
-        """Convertit un numéro de frame en position X"""
+    def remove_marker(self, frame):
+        """Supprime un marqueur"""
+        if frame in self.markers:
+            del self.markers[frame]
+            self.update()
+    
+    def clear_markers(self):
+        """Supprime tous les marqueurs"""
+        self.markers.clear()
+        self.update()
+    
+    def start_segment(self, frame):
+        """Commence un nouveau segment"""
+        self.current_segment = Segment(frame)
+        self.update()
+    
+    def end_segment(self, frame):
+        """Termine le segment en cours"""
+        if self.current_segment and frame > self.current_segment.start_frame:
+            self.current_segment.end_frame = frame
+            self.segments.append(self.current_segment)
+            segment = self.current_segment
+            self.current_segment = None
+            self.segment_created.emit(segment)
+            self.update()
+            return segment
+        return None
+    
+    def cancel_current_segment(self):
+        """Annule le segment en cours"""
+        self.current_segment = None
+        self.update()
+    
+    def remove_segment(self, index):
+        """Supprime un segment"""
+        if 0 <= index < len(self.segments):
+            self.segments.pop(index)
+            self.segment_deleted.emit(index)
+            self.update()
+    
+    def clear_segments(self):
+        """Supprime tous les segments"""
+        self.segments.clear()
+        self.current_segment = None
+        self.update()
+    
+    def get_segments(self):
+        """Retourne la liste des segments"""
+        return self.segments
+    
+    def mousePressEvent(self, event):
+        """Gestion du clic souris"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Calculer la frame correspondante
+            frame = self._pixel_to_frame(event.position().x())
+            self.set_current_frame(frame)
+    
+    def mouseMoveEvent(self, event):
+        """Gestion du mouvement souris"""
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            frame = self._pixel_to_frame(event.position().x())
+            self.set_current_frame(frame)
+    
+    def _pixel_to_frame(self, x):
+        """Convertit une position en pixels en numéro de frame"""
+        if self.total_frames == 0:
+            return 0
+        return int((x / self.width()) * self.total_frames)
+    
+    def _frame_to_pixel(self, frame):
+        """Convertit un numéro de frame en position en pixels"""
         if self.total_frames == 0:
             return 0
         return int((frame / self.total_frames) * self.width())
     
-    def x_to_frame(self, x):
-        """Convertit une position X en numéro de frame"""
-        if self.width() == 0:
-            return 0
-        return int((x / self.width()) * self.total_frames)
-    
     def paintEvent(self, event):
-        """Dessine la frise"""
-        if self.total_frames == 0:
-            return
-        
+        """Dessine la timeline"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # Fond
-        painter.fillRect(self.rect(), QColor("#1a1a1a"))
+        painter.fillRect(self.rect(), self.colors['background'])
         
-        # Graduations
-        self.draw_graduations(painter)
+        # Timeline
+        y = self.height() // 2
+        painter.setPen(self.colors['timeline'])
+        painter.drawLine(0, y, self.width(), y)
         
         # Segments
-        self.draw_segments(painter)
-        
-        # Position actuelle
-        self.draw_current_position(painter)
-        
-        # Position survolée
-        if self.hover_frame >= 0:
-            self.draw_hover_position(painter)
-    
-    def draw_graduations(self, painter):
-        """Dessine les graduations"""
-        painter.setPen(QPen(QColor("#3d3d3d"), 1))
-        
-        # Graduations principales (minutes)
-        fps = 30  # À adapter selon la vidéo
-        frames_per_minute = fps * 60
-        for frame in range(0, self.total_frames, frames_per_minute):
-            x = self.frame_to_x(frame)
-            painter.drawLine(x, 0, x, self.height())
-        
-        # Graduations secondaires (10 secondes)
-        frames_per_ten_seconds = fps * 10
-        painter.setPen(QPen(QColor("#2d2d2d"), 1))
-        for frame in range(0, self.total_frames, frames_per_ten_seconds):
-            x = self.frame_to_x(frame)
-            painter.drawLine(x, self.height() // 2, x, self.height())
-    
-    def draw_segments(self, painter):
-        """Dessine les segments"""
-        # Segments complets
-        for segment in self.segment_manager.get_all_segments():
-            x1 = self.frame_to_x(segment.start_frame)
-            x2 = self.frame_to_x(segment.end_frame)
-            
-            # Fond du segment
-            gradient = QLinearGradient(x1, 0, x2, 0)
-            color = QColor(segment.color)
-            gradient.setColorAt(0, color)
-            color.setAlpha(100)
-            gradient.setColorAt(1, color)
-            painter.fillRect(x1, 0, x2 - x1, self.height(), gradient)
-            
-            # Bordures
-            painter.setPen(QPen(QColor(segment.color), 2))
-            painter.drawLine(x1, 0, x1, self.height())
-            painter.drawLine(x2, 0, x2, self.height())
+        for segment in self.segments:
+            self._draw_segment(painter, segment)
         
         # Segment en cours
-        current = self.segment_manager.get_current_segment()
-        if current:
-            x1 = self.frame_to_x(current.start_frame)
-            painter.setPen(QPen(QColor(current.color), 2, Qt.PenStyle.DashLine))
-            painter.drawLine(x1, 0, x1, self.height())
-    
-    def draw_current_position(self, painter):
-        """Dessine la position actuelle"""
-        x = self.frame_to_x(self.current_frame)
+        if self.current_segment:
+            self._draw_segment(painter, self.current_segment)
         
-        # Ligne de position
-        painter.setPen(QPen(QColor("#ffffff"), 2))
-        painter.drawLine(x, 0, x, self.height())
+        # Marqueurs
+        for frame, emoji in self.markers.items():
+            x = self._frame_to_pixel(frame)
+            painter.setPen(self.colors['marker'])
+            painter.drawText(x - 10, 15, 20, 20, Qt.AlignmentFlag.AlignCenter, emoji)
         
-        # Marqueur triangulaire
-        painter.setBrush(QColor("#ffffff"))
-        painter.setPen(Qt.PenStyle.NoPen)
-        triangle = QPolygon([
-            QPoint(x - 8, 0),
-            QPoint(x + 8, 0),
-            QPoint(x, 8)
-        ])
-        painter.drawPolygon(triangle)
+        # Curseur
+        cursor_x = self._frame_to_pixel(self.current_frame)
+        painter.setPen(QPen(self.colors['cursor'], 2))
+        painter.drawLine(cursor_x, 0, cursor_x, self.height())
     
-    def draw_hover_position(self, painter):
-        """Dessine la position survolée"""
-        x = self.frame_to_x(self.hover_frame)
-        painter.setPen(QPen(QColor("#666666"), 1, Qt.PenStyle.DashLine))
-        painter.drawLine(x, 0, x, self.height())
-    
-    def mousePressEvent(self, event):
-        """Gère le clic sur la frise"""
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.dragging = True
-            frame = self.x_to_frame(event.pos().x())
-            self.current_frame = min(max(0, frame), self.total_frames)
-            self.positionChanged.emit(self.current_frame)
-            self.update()
-        elif event.button() == Qt.MouseButton.RightButton:
-            # Vérifier si on clique sur un segment
-            frame = self.x_to_frame(event.pos().x())
-            for i, segment in enumerate(self.segment_manager.get_all_segments()):
-                if segment.start_frame <= frame <= segment.end_frame:
-                    self.show_segment_context_menu(i, event.globalPos())
-                    break
-    
-    def mouseMoveEvent(self, event):
-        """Gère le déplacement de la souris"""
-        frame = self.x_to_frame(event.pos().x())
-        self.hover_frame = min(max(0, frame), self.total_frames)
+    def _draw_segment(self, painter, segment):
+        """Dessine un segment"""
+        if not segment or not hasattr(segment, 'start_frame'):
+            return
+            
+        x1 = self._frame_to_pixel(segment.start_frame)
+        x2 = self._frame_to_pixel(segment.end_frame if segment.end_frame is not None else self.current_frame)
         
-        if self.dragging:
-            self.current_frame = self.hover_frame
-            self.positionChanged.emit(self.current_frame)
+        # Rectangle du segment
+        painter.fillRect(
+            x1, 0,
+            x2 - x1, self.height(),
+            self.colors['segment']
+        )
         
-        self.update()
-    
-    def mouseReleaseEvent(self, event):
-        """Gère le relâchement du clic"""
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.dragging = False
-    
-    def show_segment_context_menu(self, segment_index, pos):
-        """Affiche le menu contextuel pour un segment"""
-        self.context_menu.segment_index = segment_index
-        self.context_menu.exec(pos)
-    
-    def delete_selected_segment(self):
-        """Supprime le segment sélectionné"""
-        if hasattr(self.context_menu, 'segment_index'):
-            index = self.context_menu.segment_index
-            self.segment_manager.remove_segment(index)
-            self.update()
-            self.segmentDeleted.emit(index)
-    
-    def start_segment(self, frame):
-        """Commence un nouveau segment"""
-        segment = self.segment_manager.start_segment(frame)
-        self.update()
-        return segment
-    
-    def end_segment(self, frame):
-        """Termine le segment en cours"""
-        segment = self.segment_manager.end_segment(frame)
-        if segment:
-            self.update()
-            self.segmentCreated.emit(segment)
-        return segment
-    
-    def cancel_current_segment(self):
-        """Annule le segment en cours"""
-        self.segment_manager.cancel_current_segment()
-        self.update()
-    
-    def get_segments(self):
-        """Retourne tous les segments"""
-        return self.segment_manager.get_all_segments()
-    
-    def clear_segments(self):
-        """Efface tous les segments"""
-        self.segment_manager.clear()
-        self.update()
+        # Bordure du segment
+        painter.setPen(self.colors['segment_border'])
+        painter.drawRect(
+            x1, 0,
+            x2 - x1, self.height() - 1
+        )

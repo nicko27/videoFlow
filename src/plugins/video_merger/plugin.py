@@ -2,16 +2,16 @@ from PyQt6.QtGui import QAction
 from src.core.plugin_interface import PluginInterface
 from src.core.logger import Logger
 
-logger = Logger.get_logger('VideoAdder.Plugin')
+logger = Logger.get_logger('VideoMerger.Plugin')
 
-class VideoAdderPlugin(PluginInterface):
+class VideoMergerPlugin(PluginInterface):
     def __init__(self):
         super().__init__()
-        self.name = "Video Adder"
+        self.name = "Video Merger"
         self.description = "Fusionne plusieurs vidéos en une seule"
         self.version = "1.0.0"
         self.window = None
-        logger.debug("Plugin VideoAdder initialisé")
+        logger.debug("Plugin VideoMerger initialisé")
     
     def setup(self, main_window):
         """Configure le plugin"""
@@ -23,12 +23,12 @@ class VideoAdderPlugin(PluginInterface):
         
         # Ajouter au menu Plugins
         self.main_window.plugins_menu.addAction(self.action)
-        logger.debug("Plugin VideoAdder configuré")
+        logger.debug("Plugin VideoMerger configuré")
     
     def show_window(self):
         """Affiche la fenêtre du plugin"""
         if not self.window:
-            from .window import VideoAdderWindow
-            self.window = VideoAdderWindow()
+            from .window import VideoMergerWindow
+            self.window = VideoMergerWindow()
         self.window.show()
-        logger.debug("Fenêtre VideoAdder affichée")
+        logger.debug("Fenêtre VideoMerger affichée")

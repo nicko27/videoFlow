@@ -1,24 +1,23 @@
+"""Module de la fenêtre principale de l'éditeur vidéo"""
+
+import os
+import cv2
+import numpy as np
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                            QPushButton, QLabel, QSlider, QFileDialog, QTableWidget,
                            QProgressBar, QTableWidgetItem, QMenu, QInputDialog,
-                           QMessageBox, QApplication)
+                           QMessageBox, QApplication, QGroupBox, QDialog, QTextEdit)
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QImage, QPixmap, QColor, QPainter, QPen
-import cv2
-from moviepy.editor import VideoFileClip
-from .video_analyzer import VideoAnalyzer
-from .data_manager import DataManager
-from .timeline import Timeline
-from .waveform import WaveformWidget
+from PyQt6.QtGui import QImage, QPixmap, QColor
 from src.core.logger import Logger
-import tempfile
-import os
-import numpy as np
-import subprocess
+from .timeline import Timeline, Segment
+from .data_manager import DataManager
 
 logger = Logger.get_logger('VideoEditor.Window')
 
 class VideoEditorWindow(QMainWindow):
+    """Fenêtre principale de l'éditeur vidéo"""
+    
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Éditeur de Vidéos")
@@ -32,8 +31,8 @@ class VideoEditorWindow(QMainWindow):
         self.total_frames = 0
         self.fps = 0
         self.playing = False
-        self.analyzer = None
         self.data_manager = None
+        self._updating_frame = False
         
         # Timer pour la lecture
         self.play_timer = QTimer()
@@ -98,41 +97,38 @@ class VideoEditorWindow(QMainWindow):
         
         # Timeline
         self.timeline = Timeline()
-        self.timeline.positionChanged.connect(self.on_timeline_position_changed)
-        self.timeline.segmentCreated.connect(self.on_segment_created)
-        self.timeline.segmentDeleted.connect(self.on_segment_deleted)
+        self.timeline.position_changed.connect(self.on_timeline_position_changed)
+        self.timeline.segment_created.connect(self.on_segment_created)
+        self.timeline.segment_deleted.connect(self.on_segment_deleted)
         layout.addWidget(self.timeline)
         
         # Contrôles de lecture
         controls_layout = QHBoxLayout()
         
-        self.prev_frame_btn = QPushButton("⏮️")
+        # Temps actuel / total
+        self.time_label = QLabel("00:00 / 00:00")
+        controls_layout.addWidget(self.time_label)
+        
+        # Boutons de navigation
+        self.prev_frame_btn = QPushButton("⏮")
         self.prev_frame_btn.clicked.connect(self.prev_frame)
         self.prev_frame_btn.setEnabled(False)
         controls_layout.addWidget(self.prev_frame_btn)
         
-        self.next_frame_btn = QPushButton("⏭️")
+        self.next_frame_btn = QPushButton("⏭")
         self.next_frame_btn.clicked.connect(self.next_frame)
         self.next_frame_btn.setEnabled(False)
         controls_layout.addWidget(self.next_frame_btn)
         
-        self.time_label = QLabel("00:00 / 00:00")
-        controls_layout.addWidget(self.time_label)
-        
         layout.addLayout(controls_layout)
         
-        # Tableau des segments
+        # Table des segments
         self.segments_table = QTableWidget()
-        self.segments_table.setColumnCount(5)
-        self.segments_table.setHorizontalHeaderLabels(["Statut", "Début", "Fin", "Durée", "Actions"])
+        self.segments_table.setColumnCount(3)
+        self.segments_table.setHorizontalHeaderLabels(["Début", "Fin", "Description"])
         self.segments_table.horizontalHeader().setStretchLastSection(True)
-        self.segments_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.segments_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         layout.addWidget(self.segments_table)
-        
-        # Forme d'onde audio
-        self.waveform_widget = WaveformWidget()
-        layout.addWidget(self.waveform_widget)
         
         logger.debug("Interface VideoEditor initialisée")
     
@@ -142,7 +138,7 @@ class VideoEditorWindow(QMainWindow):
             self,
             "Ouvrir une vidéo",
             "",
-            "Vidéos (*.mp4 *.avi *.mov *.mkv);;Tous les fichiers (*.*)"
+            "Vidéos (*.mp4 *.avi *.mkv *.mov);;Tous les fichiers (*.*)"
         )
         
         if file_path:
@@ -150,151 +146,82 @@ class VideoEditorWindow(QMainWindow):
     
     def open_video(self, file_path):
         """Ouvre une vidéo"""
-        # Fermer la vidéo précédente
-        if self.cap is not None:
-            self.cap.release()
-        
-        # Ouvrir la nouvelle vidéo
-        self.cap = cv2.VideoCapture(file_path)
-        if not self.cap.isOpened():
-            return
-        
-        self.video_path = file_path
-        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
-        self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        
-        # Configurer la timeline
-        self.timeline.set_duration(self.total_frames)
-        
-        # Activer les contrôles
-        self.play_btn.setEnabled(True)
-        self.prev_frame_btn.setEnabled(True)
-        self.next_frame_btn.setEnabled(True)
-        self.start_cut_btn.setEnabled(True)
-        
-        # Extraire la forme d'onde
-        self.extract_waveform()
-        
-        # Afficher la première frame
-        self.show_frame(0)
-        
-        # Charger les segments existants
-        self.load_segments()
-        
-        logger.debug(f"Vidéo ouverte : {file_path}")
+        try:
+            self.video_path = file_path
+            self.cap = cv2.VideoCapture(file_path)
+            self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+            self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            
+            # Configurer la timeline
+            self.timeline.set_total_frames(self.total_frames)
+            
+            # Charger les données existantes
+            self.data_manager = DataManager(file_path)
+            self.load_segments()
+            
+            # Activer les contrôles
+            self.play_btn.setEnabled(True)
+            self.start_cut_btn.setEnabled(True)
+            self.prev_frame_btn.setEnabled(True)
+            self.next_frame_btn.setEnabled(True)
+            
+            # Afficher la première frame
+            self.show_frame(0)
+            
+            logger.debug(f"Vidéo ouverte : {file_path}")
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de l'ouverture de la vidéo : {str(e)}")
+            self.video_path = None
+            self.cap = None
     
-    def extract_waveform(self):
-        """Extrait la forme d'onde audio de la vidéo"""
-        if not self.video_path:
+    def show_frame(self, frame_num):
+        """Affiche une frame spécifique"""
+        if not self.cap or self._updating_frame:
             return
             
         try:
-            logger.debug("Extraction de la forme d'onde audio...")
-            video = VideoFileClip(self.video_path)
+            self._updating_frame = True
             
-            if video.audio is not None:
-                # Extraire l'audio
-                audio = video.audio.to_soundarray()
+            # Lire la frame
+            self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+            ret, frame = self.cap.read()
+            if not ret:
+                return
                 
-                # Si stéréo, convertir en mono
-                if len(audio.shape) > 1:
-                    audio = np.mean(audio, axis=1)
-                
-                # Envoyer à la waveform
-                self.waveform_widget.set_waveform_data(audio)
-                logger.debug("Forme d'onde extraite avec succès")
-            else:
-                logger.warning("Pas de piste audio dans la vidéo")
-            
-            video.close()
-            
-        except Exception as e:
-            logger.error(f"Erreur lors de l'extraction de la forme d'onde : {e}")
-    
-    def update_waveform_position(self, frame):
-        """Met à jour la position dans la forme d'onde"""
-        if self.total_frames > 0:
-            position = frame / self.total_frames
-            self.waveform_widget.set_position(position)
-
-    def detect_scenes(self):
-        """Détecte les changements de scène"""
-        if not self.analyzer:
-            return
-            
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setRange(0, 0)  # Mode indéterminé
-        
-        # Détecter les scènes
-        scenes = self.analyzer.detect_scenes()
-        
-        # Ajouter les scènes comme segments
-        for start_frame, end_frame in scenes:
-            start_time = start_frame / self.fps
-            end_time = end_frame / self.fps
-            self.data_manager.add_segment(
-                start_time,
-                end_time,
-                f"Scène {len(self.data_manager.get_segments()) + 1}"
+            # Convertir en QImage pour l'affichage
+            height, width = frame.shape[:2]
+            bytes_per_line = 3 * width
+            qt_image = QImage(
+                frame.data,
+                width,
+                height,
+                bytes_per_line,
+                QImage.Format.Format_BGR888
             )
-        
-        # Recharger les segments
-        self.load_segments()
-        
-        self.progress_bar.setVisible(False)
-        logger.debug(f"Détection des scènes terminée : {len(scenes)} scènes trouvées")
-    
-    def add_marker(self):
-        """Ajoute un marqueur à la position actuelle"""
-        if not self.data_manager:
-            return
             
-        current_time = self.current_frame / self.fps
-        
-        # Demander le nom du marqueur
-        name, ok = QInputDialog.getText(
-            self,
-            "Ajouter un marqueur",
-            "Nom du marqueur :"
-        )
-        
-        if ok and name:
-            self.data_manager.add_marker(current_time, name)
-            logger.debug(f"Marqueur ajouté : {name} à {self.format_time(current_time)}")
-    
-    def cut_segment(self):
-        """Marque un point de découpe"""
-        if not self.data_manager:
-            return
+            # Redimensionner pour l'affichage
+            scaled_pixmap = QPixmap.fromImage(qt_image).scaled(
+                self.preview.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
             
-        current_time = self.current_frame / self.fps
-        
-        # Si c'est le premier point de découpe
-        if not hasattr(self, 'cut_start_time'):
-            self.cut_start_time = current_time
-            self.cut_btn.setText("✂️ Fin Découpe")
-            logger.debug(f"Début de découpe à {self.format_time(current_time)}")
-        else:
-            # C'est le point de fin
-            if current_time > self.cut_start_time:
-                name, ok = QInputDialog.getText(
-                    self,
-                    "Nommer le segment",
-                    "Nom du segment :"
-                )
-                
-                if ok:
-                    self.data_manager.add_segment(
-                        self.cut_start_time,
-                        current_time,
-                        name or None
-                    )
-                    logger.debug(f"Segment ajouté : {self.format_time(self.cut_start_time)} - {self.format_time(current_time)}")
+            # Afficher l'image
+            self.preview.setPixmap(scaled_pixmap)
             
-            # Réinitialiser
-            delattr(self, 'cut_start_time')
-            self.cut_btn.setText("✂️ Découper")
-            self.load_segments()
+            # Mettre à jour la timeline
+            self.timeline.set_current_frame(frame_num)
+            
+            # Mettre à jour le temps
+            current_time = frame_num / self.fps
+            total_time = self.total_frames / self.fps
+            self.time_label.setText(f"{self.format_time(current_time)} / {self.format_time(total_time)}")
+            
+            self.current_frame = frame_num
+            
+        finally:
+            self._updating_frame = False
     
     def load_segments(self):
         """Charge les segments dans la table"""
@@ -336,7 +263,7 @@ class VideoEditorWindow(QMainWindow):
             delete_btn.clicked.connect(lambda x, s=i: self.delete_segment(s))
             actions_layout.addWidget(delete_btn)
             
-            self.segments_table.setCellWidget(i, 4, actions_widget)
+            self.segments_table.setCellWidget(i, 3, actions_widget)
         
         self.segments_table.resizeColumnsToContents()
     
@@ -455,48 +382,6 @@ class VideoEditorWindow(QMainWindow):
             finally:
                 self.progress_bar.setVisible(False)
     
-    def show_frame(self, frame_num):
-        """Affiche une frame spécifique"""
-        if self.cap is None:
-            return
-        
-        self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
-        ret, frame = self.cap.read()
-        if ret:
-            # Convertir la frame en QPixmap
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w, ch = frame_rgb.shape
-            bytes_per_line = ch * w
-            image = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
-            pixmap = QPixmap.fromImage(image)
-            
-            # Redimensionner pour la prévisualisation
-            scaled_pixmap = pixmap.scaled(
-                self.preview.size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            self.preview.setPixmap(scaled_pixmap)
-            
-            # Mettre à jour la timeline
-            self.timeline.set_current_frame(frame_num)
-            
-            # Mettre à jour la forme d'onde
-            self.update_waveform_position(frame_num)
-            
-            # Mettre à jour le temps
-            current_time = frame_num / self.fps
-            total_time = self.cap.get(cv2.CAP_PROP_FRAME_COUNT) / self.fps
-            self.time_label.setText(
-                f"{self.format_time(current_time)} / {self.format_time(total_time)}"
-            )
-    
-    def format_time(self, seconds):
-        """Formate un temps en secondes en MM:SS"""
-        minutes = int(seconds // 60)
-        seconds = int(seconds % 60)
-        return f"{minutes:02d}:{seconds:02d}"
-    
     def toggle_play(self):
         """Démarre ou arrête la lecture"""
         if self.playing:
@@ -556,7 +441,6 @@ class VideoEditorWindow(QMainWindow):
         self.segments_table.setItem(row, 0, status_item)
         self.segments_table.setItem(row, 1, QTableWidgetItem(self.format_time(start_time)))
         self.segments_table.setItem(row, 2, QTableWidgetItem("--:--"))
-        self.segments_table.setItem(row, 3, QTableWidgetItem("--:--"))
         
         # Désactiver les boutons pendant la découpe
         self.start_cut_btn.setEnabled(False)
@@ -585,7 +469,6 @@ class VideoEditorWindow(QMainWindow):
             status_item.setBackground(QColor("#e8f5e9"))  # Vert très clair
             self.segments_table.setItem(row, 0, status_item)
             self.segments_table.setItem(row, 2, QTableWidgetItem(self.format_time(end_time)))
-            self.segments_table.setItem(row, 3, QTableWidgetItem(self.format_time(duration)))
             
             # Ajouter le bouton de suppression
             actions_widget = QWidget()
@@ -597,7 +480,7 @@ class VideoEditorWindow(QMainWindow):
             delete_btn.clicked.connect(lambda: self.delete_segment(row))
             actions_layout.addWidget(delete_btn)
             
-            self.segments_table.setCellWidget(row, 4, actions_widget)
+            self.segments_table.setCellWidget(row, 3, actions_widget)
             
             # Réactiver les boutons
             self.start_cut_btn.setEnabled(True)
@@ -703,34 +586,15 @@ class VideoEditorWindow(QMainWindow):
         row = self.segments_table.rowCount()
         self.segments_table.insertRow(row)
         
-        # Calculer les timestamps
-        start_time = segment.start_frame / self.fps
-        end_time = segment.end_frame / self.fps
-        duration = end_time - start_time
+        # Convertir les frames en temps
+        start_time = self.format_time(segment.start_frame / self.fps)
+        end_time = self.format_time(segment.end_frame / self.fps) if segment.end_frame else "--:--"
         
-        # Ajouter les informations
-        status_item = QTableWidgetItem("✅ Terminé")
-        status_item.setBackground(QColor("#e8f5e9"))  # Vert très clair
-        self.segments_table.setItem(row, 0, status_item)
-        self.segments_table.setItem(row, 1, QTableWidgetItem(self.format_time(start_time)))
-        self.segments_table.setItem(row, 2, QTableWidgetItem(self.format_time(end_time)))
-        self.segments_table.setItem(row, 3, QTableWidgetItem(self.format_time(duration)))
-        
-        # Bouton de suppression
-        actions_widget = QWidget()
-        actions_layout = QHBoxLayout(actions_widget)
-        actions_layout.setContentsMargins(0, 0, 0, 0)
-        
-        delete_btn = QPushButton("🗑️")
-        delete_btn.setToolTip("Supprimer le segment")
-        delete_btn.clicked.connect(lambda: self.delete_segment(row))
-        actions_layout.addWidget(delete_btn)
-        
-        self.segments_table.setCellWidget(row, 4, actions_widget)
-        
-        # Activer le bouton d'export s'il y a des segments
-        self.export_btn.setEnabled(True)
-
+        # Ajouter les informations dans la table
+        self.segments_table.setItem(row, 0, QTableWidgetItem(start_time))
+        self.segments_table.setItem(row, 1, QTableWidgetItem(end_time))
+        self.segments_table.setItem(row, 2, QTableWidgetItem(f"Segment {row + 1}"))
+    
     def on_segment_deleted(self, index):
         """Appelé quand un segment est supprimé depuis la timeline"""
         # Supprimer la ligne correspondante dans le tableau
@@ -739,3 +603,26 @@ class VideoEditorWindow(QMainWindow):
         # Désactiver le bouton d'export s'il n'y a plus de segments
         if self.segments_table.rowCount() == 0:
             self.export_btn.setEnabled(False)
+
+    def format_time(self, seconds):
+        """Formate un temps en secondes en MM:SS"""
+        minutes = int(seconds // 60)
+        seconds = int(seconds % 60)
+        return f"{minutes:02d}:{seconds:02d}"
+
+    def add_segment_to_table(self, segment):
+        """Ajoute un segment à la table"""
+        if not hasattr(self, 'segments_table'):
+            return
+            
+        row = self.segments_table.rowCount()
+        self.segments_table.insertRow(row)
+        
+        # Convertir les frames en temps
+        start_time = self.format_time(segment.start_frame / self.fps)
+        end_time = self.format_time(segment.end_frame / self.fps) if segment.end_frame else "--:--"
+        
+        # Ajouter les informations dans la table
+        self.segments_table.setItem(row, 0, QTableWidgetItem(start_time))
+        self.segments_table.setItem(row, 1, QTableWidgetItem(end_time))
+        self.segments_table.setItem(row, 2, QTableWidgetItem(f"Segment {row + 1}"))

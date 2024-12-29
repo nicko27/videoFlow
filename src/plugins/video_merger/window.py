@@ -13,9 +13,9 @@ from send2trash import send2trash
 
 from src.core.logger import Logger
 
-logger = Logger.get_logger('VideoAdder.Window')
+logger = Logger.get_logger('VideoMerger.Window')
 
-class VideoAdderWindow(QDialog):
+class VideoMergerWindow(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Fusionneur de vidéos")
