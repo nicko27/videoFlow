@@ -401,7 +401,7 @@ class DuplicateFinderWindow(QMainWindow):
                         row = self.file_list.rowCount()
                         self.file_list.insertRow(row)
                         self.file_list.setItem(row, 0, QTableWidgetItem(file_path))
-                        self.file_list.setItem(row, 1, QTableWidgetItem("Hash existant"))
+                        self.file_list.setItem(row, 1, QTableWidgetItem("✅ Analysé"))
                         self.files.append(file_path)
         except Exception as e:
             logger.error(f"Erreur lors du chargement des hashs existants: {str(e)}")
@@ -592,7 +592,7 @@ class DuplicateFinderWindow(QMainWindow):
         for i in range(self.file_list.rowCount()):
             if self.file_list.item(i, 0).text() == file_path:
                 # Met à jour le statut
-                status = "✅ Analysé" if success else "❌ Ignoré"
+                status = "✅ Analysé" if success else "❌ Absent"
                 self.file_list.item(i, 1).setText(status)
                 break
 
