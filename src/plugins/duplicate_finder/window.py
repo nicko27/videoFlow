@@ -245,10 +245,13 @@ class DuplicateFinderWindow(QMainWindow):
         """Initialise la fenêtre"""
         super().__init__()
         self.files = []
+        self.potential_duplicates = []
+        self.ignored_pairs = set()
         self.worker = None
+        self.start_time = None
+        self.compare_start_time = None
         self.video_hasher = VideoHasher()
         self.hash_method = HashMethod.PHASH
-        self.ignored_pairs = self.load_ignored_pairs()
         
         # Configure l'interface
         self.setup_ui()
@@ -428,6 +431,9 @@ class DuplicateFinderWindow(QMainWindow):
             )
             return
 
+        # Enregistre le temps de début
+        self.start_time = time.time()
+
         # Désactive temporairement les contrôles pendant l'analyse
         self.add_files_btn.setEnabled(False)
         self.add_folder_btn.setEnabled(False)
@@ -440,6 +446,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.progress_bar.setMaximum(len(self.files))
+        self.progress_bar.setFormat("%p% - %v/%m fichiers - Temps restant: --:--")
         
         # Masque la barre de comparaison
         self.compare_progress.setVisible(False)
@@ -453,9 +460,9 @@ class DuplicateFinderWindow(QMainWindow):
         for file_path in self.files:
             if not self.video_hasher.has_hash(file_path):
                 files_to_hash.append(file_path)
-                self.update_file_status(file_path, False)  # Tous les fichiers sont à réanalyser
+                self.update_file_status(file_path, False)  # Marque comme absent
             else:
-                self.update_file_status(file_path, True)
+                self.update_file_status(file_path, True)  # Marque comme déjà analysé
 
         # Si des fichiers doivent être hashés, lance le worker
         if files_to_hash:
@@ -487,9 +494,14 @@ class DuplicateFinderWindow(QMainWindow):
         
         # Configure et affiche la barre de progression pour la comparaison
         total_comparisons = len(self.files) * (len(self.files) - 1) // 2
+        
+        # Enregistre le temps de début pour la comparaison
+        self.compare_start_time = time.time()
+        
         self.compare_progress.setVisible(True)
         self.compare_progress.setValue(0)
         self.compare_progress.setMaximum(total_comparisons)
+        self.compare_progress.setFormat("%p% - %v/%m comparaisons - Temps restant: --:--")
         
         # Compare chaque paire de fichiers
         current_comparison = 0
@@ -498,11 +510,7 @@ class DuplicateFinderWindow(QMainWindow):
                 # Vérifie si la paire n'est pas ignorée
                 if frozenset([file1, file2]) not in self.ignored_pairs:
                     # Compare les hashs
-                    similarity = self.video_hasher.compare_files(
-                        file1, 
-                        file2,
-                        self.hash_method.value
-                    )
+                    similarity = self.video_hasher.compare_videos(file1, file2)
                     
                     # Si la similarité dépasse le seuil, ajoute aux doublons potentiels
                     if similarity > self.threshold_spin.value() / 100:
@@ -510,6 +518,21 @@ class DuplicateFinderWindow(QMainWindow):
                 
                 # Met à jour la progression
                 current_comparison += 1
+                
+                # Met à jour le temps restant pour la comparaison
+                if current_comparison > 0:
+                    elapsed = time.time() - self.compare_start_time
+                    rate = elapsed / current_comparison  # temps par comparaison
+                    remaining = rate * (total_comparisons - current_comparison)
+                    
+                    # Formate le temps restant
+                    minutes = int(remaining // 60)
+                    seconds = int(remaining % 60)
+                    time_str = f"{minutes:02d}:{seconds:02d}"
+                    
+                    # Met à jour le format
+                    self.compare_progress.setFormat(f"%p% - %v/%m comparaisons - Temps restant: {time_str}")
+                
                 self.compare_progress.setValue(current_comparison)
 
         # Trie les doublons par similarité décroissante
@@ -611,6 +634,20 @@ class DuplicateFinderWindow(QMainWindow):
         """Met à jour la barre de progression"""
         self.progress_bar.setValue(value)
         
+        # Calcule le temps restant
+        if self.start_time and value > 0:
+            elapsed = time.time() - self.start_time
+            rate = elapsed / value  # temps par fichier
+            remaining = rate * (self.progress_bar.maximum() - value)
+            
+            # Formate le temps restant
+            minutes = int(remaining // 60)
+            seconds = int(remaining % 60)
+            time_str = f"{minutes:02d}:{seconds:02d}"
+            
+            # Met à jour le format
+            self.progress_bar.setFormat(f"%p% - %v/%m fichiers - Temps restant: {time_str}")
+
     def handle_error(self, error):
         """Gère les erreurs du worker"""
         QMessageBox.critical(
@@ -781,15 +818,17 @@ class DuplicateFinderWorker(QThread):
                 
                 # Si on arrive ici, la vidéo est valide
                 self.video_hasher.compute_video_hash(file_path)
+                # Émet le signal de succès
                 self.file_processed.emit(file_path, True)
                 
             except Exception as e:
-                # En cas d'erreur, on ignore simplement le fichier
+                # En cas d'erreur, émet le signal d'échec
                 self.file_processed.emit(file_path, False)
+                logger.error(f"Erreur lors du traitement de {file_path}: {str(e)}")
             
             # Met à jour la progression
             processed_files += 1
-            self.progress.emit(int(processed_files * 100 / total_files))
+            self.progress.emit(processed_files)
             
         self.finished.emit()
 
