@@ -644,7 +644,7 @@ class DuplicateFinderWindow(QMainWindow):
         for i in range(self.file_list.rowCount()):
             if self.file_list.item(i, 0).text() == file_path:
                 # Met à jour le statut
-                status = "✅ Analysé" if success else "❌ Absent"
+                status = "✅ Analysé" if success else "⏳ En attente"
                 self.file_list.item(i, 1).setText(status)
                 break
 
@@ -848,6 +848,9 @@ class DuplicateFinderWorker(QThread):
                 break
                 
             try:
+                # Met à jour le statut en "En cours"
+                self.file_processed.emit(file_path, False)
+                
                 # Vérifie si la vidéo peut être ouverte
                 cap = cv2.VideoCapture(file_path)
                 if not cap.isOpened():
