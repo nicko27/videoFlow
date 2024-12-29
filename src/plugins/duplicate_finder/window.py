@@ -454,7 +454,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
         self.progress_bar.setMaximum(len(self.files))
-        self.progress_bar.setFormat("%p% - %v/%m fichiers - Temps restant: --:--")
+        self.progress_bar.setFormat("%p% - %v/%m fichiers")
         
         # Masque la barre de comparaison
         self.compare_progress.setVisible(False)
@@ -555,7 +555,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.compare_progress.setVisible(True)
         self.compare_progress.setValue(0)
         self.compare_progress.setMaximum(total_comparisons)
-        self.compare_progress.setFormat("%p% - %v/%m comparaisons - Temps restant: --:--")
+        self.compare_progress.setFormat("%p% - %v/%m comparaisons")
         
         # Compare chaque paire de fichiers
         current_comparison = 0
@@ -594,8 +594,8 @@ class DuplicateFinderWindow(QMainWindow):
                     seconds = int(remaining % 60)
                     time_str = f"{minutes:02d}:{seconds:02d}"
                     
-                    # Met à jour le format
-                    self.compare_progress.setFormat(f"%p% - %v/%m comparaisons - Temps restant: {time_str}")
+                    # Met à jour le label
+                    self.comparison_time_label.setText(f"Temps restant: {time_str}")
                 
                 self.compare_progress.setValue(current_comparison)
 
@@ -626,8 +626,8 @@ class DuplicateFinderWindow(QMainWindow):
             seconds = int(remaining % 60)
             time_str = f"{minutes:02d}:{seconds:02d}"
             
-            # Met à jour le format
-            self.progress_bar.setFormat(f"%p% - %v/%m fichiers - Temps restant: {time_str}")
+            # Met à jour le label
+            self.file_time_label.setText(f"Temps restant: {time_str}")
 
     def handle_error(self, error):
         """Gère les erreurs du worker"""
