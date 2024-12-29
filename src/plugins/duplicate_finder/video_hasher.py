@@ -30,6 +30,7 @@ class VideoHasher:
             "pHash": {},  # Cache pour pHash uniquement
         }
         self.ignored_pairs = set()
+        self.duration = 300  # Durée par défaut : 5 minutes
         self.load_hashes()
         self.load_ignored_pairs()
         
@@ -355,9 +356,17 @@ class VideoHasher:
             logger.error(f"Une des vidéos n'a pas de hash : {video1_path} ou {video2_path}")
             return 0.0
 
-        # Récupère les hashs
+        # Récupère les hashs et les durées
         hash1 = self.hashes[self.method][video1_path]["hash"]
         hash2 = self.hashes[self.method][video2_path]["hash"]
+        duration1 = self.hashes[self.method][video1_path]["duration"]
+        duration2 = self.hashes[self.method][video2_path]["duration"]
+
+        # Vérifie la différence de durée
+        duration_diff = abs(duration1 - duration2)
+        if duration_diff > 300:  # 300 secondes = 5 minutes
+            logger.info(f"Différence de durée trop importante : {duration_diff:.1f}s > 300s")
+            return 0.0
 
         # Compare les hashs frame par frame
         total_bits = 0
