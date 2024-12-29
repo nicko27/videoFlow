@@ -323,32 +323,48 @@ class DuplicateFinderWindow(QMainWindow):
         
         main_layout.addLayout(controls_layout)
         
-        # Barre de progression pour l'analyse
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setFormat("%p% - %v/%m fichiers")
-        main_layout.addWidget(self.progress_bar)
-        
-        # Barre de progression pour la comparaison
-        self.compare_progress = QProgressBar()
-        self.compare_progress.setVisible(False)
-        self.compare_progress.setFormat("%p% - %v/%m comparaisons")
-        main_layout.addWidget(self.compare_progress)
-        
-        # Groupe des fichiers
-        files_group = QGroupBox("Fichiers")
-        files_layout = QVBoxLayout()
-        
-        # Liste des fichiers
+        # Tableau des fichiers
         self.file_list = QTableWidget()
         self.file_list.setColumnCount(2)
         self.file_list.setHorizontalHeaderLabels(["Fichier", "Statut"])
         self.file_list.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.file_list.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        files_layout.addWidget(self.file_list)
+        main_layout.addWidget(self.file_list)
+        
+        # Labels pour les temps restants
+        self.file_time_label = QLabel("Temps restant: --:--")
+        self.comparison_time_label = QLabel("Temps restant: --:--")
+        
+        # Layout pour les barres de progression
+        progress_layout = QVBoxLayout()
+        
+        # Barre de progression pour les fichiers
+        file_progress_layout = QHBoxLayout()
+        file_progress_layout.addWidget(QLabel("Fichiers:"))
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setFormat("%p% - %v/%m fichiers")
+        file_progress_layout.addWidget(self.progress_bar)
+        file_progress_layout.addWidget(self.file_time_label)
+        progress_layout.addLayout(file_progress_layout)
+        
+        # Barre de progression pour les comparaisons
+        comparison_progress_layout = QHBoxLayout()
+        comparison_progress_layout.addWidget(QLabel("Comparaisons:"))
+        self.compare_progress = QProgressBar()
+        self.compare_progress.setVisible(False)
+        self.compare_progress.setFormat("%p% - %v/%m comparaisons")
+        comparison_progress_layout.addWidget(self.compare_progress)
+        comparison_progress_layout.addWidget(self.comparison_time_label)
+        progress_layout.addLayout(comparison_progress_layout)
+        
+        main_layout.addLayout(progress_layout)
+        
+        # Boutons
+        buttons_layout = QHBoxLayout()
         
         # Boutons d'ajout de fichiers
-        buttons_layout = QHBoxLayout()
+        buttons_layout.addWidget(QLabel("Fichiers:"))
         self.add_files_btn = QPushButton("📁 Ajouter des fichiers")
         self.add_folder_btn = QPushButton("📁 Ajouter un dossier")
         self.clear_btn = QPushButton("🧹 Vider la liste")
@@ -358,38 +374,6 @@ class DuplicateFinderWindow(QMainWindow):
         buttons_layout.addWidget(self.add_files_btn)
         buttons_layout.addWidget(self.add_folder_btn)
         buttons_layout.addWidget(self.clear_btn)
-        files_layout.addLayout(buttons_layout)
-        
-        files_group.setLayout(files_layout)
-        main_layout.addWidget(files_group)
-        
-        # Groupe pour la progression
-        progress_group = QGroupBox("Progression")
-        progress_layout = QVBoxLayout()
-        
-        # Barre de progression des fichiers
-        file_progress_layout = QHBoxLayout()
-        file_progress_layout.addWidget(QLabel("Fichiers:"))
-        self.file_progress = QProgressBar()
-        file_progress_layout.addWidget(self.file_progress)
-        self.file_time_label = QLabel("Temps restant: --:--")
-        file_progress_layout.addWidget(self.file_time_label)
-        progress_layout.addLayout(file_progress_layout)
-        
-        # Barre de progression des comparaisons
-        comparison_progress_layout = QHBoxLayout()
-        comparison_progress_layout.addWidget(QLabel("Comparaisons:"))
-        self.comparison_progress = QProgressBar()
-        comparison_progress_layout.addWidget(self.comparison_progress)
-        self.comparison_time_label = QLabel("Temps restant: --:--")
-        comparison_progress_layout.addWidget(self.comparison_time_label)
-        progress_layout.addLayout(comparison_progress_layout)
-        
-        progress_group.setLayout(progress_layout)
-        main_layout.addWidget(progress_group)
-        
-        # Boutons
-        buttons_layout = QHBoxLayout()
         
         # Boutons d'analyse
         analysis_buttons_layout = QHBoxLayout()
@@ -478,6 +462,9 @@ class DuplicateFinderWindow(QMainWindow):
         # Récupère les paramètres
         threshold = self.threshold_spin.value()
         duration = self.duration_spin.value() * 60  # Conversion minutes en secondes
+
+        # Met à jour la durée maximale dans le hasher
+        self.video_hasher.duration = duration
 
         # Identifie les fichiers qui n'ont pas encore de hash
         files_to_hash = []
