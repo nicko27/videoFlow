@@ -2,6 +2,7 @@ import os
 import json
 import cv2
 import numpy as np
+from send2trash import send2trash
 from enum import Enum
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -247,8 +248,11 @@ class DuplicateComparisonDialog(QDialog):
             self.parent.stop_analysis(show_confirmation=False)
             logger.info("Analyse arrêtée suite au choix de l'utilisateur")
 
+        # Mémorise le choix
         self.result = choice
-        self.close()
+        
+        # Accepte le dialogue pour indiquer qu'un choix a été fait
+        self.accept()
 
 
 class DuplicateFinderWindow(QMainWindow):
@@ -777,7 +781,7 @@ class DuplicateFinderWindow(QMainWindow):
             # Traite le résultat de la comparaison
             if dialog.result == "keep_left":
                 try:
-                    os.remove(file2)
+                    send2trash(file2)
                     self.update_file_status(file2, False)
                     logger.info(f"Fichier supprimé : {file2}")
                 except Exception as e:
@@ -789,7 +793,7 @@ class DuplicateFinderWindow(QMainWindow):
                     logger.error(f"Erreur lors de la suppression de {file2}: {str(e)}")
             elif dialog.result == "keep_right":
                 try:
-                    os.remove(file1)
+                    send2trash(file1)
                     self.update_file_status(file1, False)
                     logger.info(f"Fichier supprimé : {file1}")
                 except Exception as e:
