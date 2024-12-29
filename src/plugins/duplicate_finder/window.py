@@ -650,6 +650,8 @@ class DuplicateFinderWindow(QMainWindow):
                 # Met à jour le statut
                 status = "✅ Analysé" if success else "⏳ En attente"
                 self.file_list.item(i, 1).setText(status)
+                self.file_list.viewport().update()
+
                 break
 
     def clear_list(self):
