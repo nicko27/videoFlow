@@ -1,3 +1,54 @@
+
+import threading
+from contextlib import contextmanager
+
+class ThreadSafeWorkerManager:
+    """Gestionnaire sécurisé pour les workers"""
+    
+    def __init__(self):
+        self._workers = {}
+        self._lock = threading.RLock()
+    
+    @contextmanager
+    def get_worker(self, worker_id, worker_class, *args, **kwargs):
+        """Gestionnaire de contexte pour les workers"""
+        worker = None
+        try:
+            with self._lock:
+                worker = worker_class(*args, **kwargs)
+                self._workers[worker_id] = worker
+            yield worker
+        finally:
+            if worker:
+                try:
+                    if hasattr(worker, 'stop'):
+                        worker.stop()
+                    if hasattr(worker, 'wait'):
+                        worker.wait(5000)  # Timeout de 5 secondes
+                    if hasattr(worker, 'deleteLater'):
+                        worker.deleteLater()
+                except Exception as e:
+                    logger.error(f"Erreur nettoyage worker {worker_id}: {e}")
+                finally:
+                    with self._lock:
+                        self._workers.pop(worker_id, None)
+    
+    def cleanup_all(self):
+        """Nettoie tous les workers"""
+        with self._lock:
+            for worker_id, worker in self._workers.items():
+                try:
+                    if hasattr(worker, 'stop'):
+                        worker.stop()
+                    if hasattr(worker, 'wait'):
+                        worker.wait(1000)
+                except Exception as e:
+                    logger.error(f"Erreur nettoyage worker {worker_id}: {e}")
+            self._workers.clear()
+
+# Instance globale du gestionnaire
+worker_manager = ThreadSafeWorkerManager()
+
 """Gestion de la conversion vidéo."""
 
 from PyQt6.QtCore import QThread, pyqtSignal

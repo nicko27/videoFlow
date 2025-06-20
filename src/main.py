@@ -1,22 +1,17 @@
-#!/usr/bin/env python3
+"""
+Ce fichier est obsolète et a été remplacé par /main.py à la racine du projet.
+Veuillez utiliser le fichier main.py à la racine du projet à la place.
+"""
+
+# Ce fichier est conservé pour des raisons de compatibilité
+# mais ne devrait plus être utilisé.
+
 import sys
-from PyQt6.QtWidgets import QApplication
-from src.core.plugin_manager import PluginManager
-from src.core.logger import Logger
+import os
 
-logger = Logger.get_logger('VideoFlow.Main')
+# Redirige vers le main.py à la racine
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+main_path = os.path.join(root_dir, 'main.py')
 
-def main():
-    app = QApplication(sys.argv)
-    app.setStyle('Fusion')  # Style moderne
-    
-    # Initialiser le gestionnaire de plugins
-    plugin_manager = PluginManager()
-    plugin_manager.load_plugins()
-    plugin_manager.configure_plugins()
-    
-    # Lancer l'application
-    sys.exit(app.exec())
-
-if __name__ == '__main__':
-    main()
+print(f"Ce fichier est obsolète. Veuillez utiliser {main_path} à la place.")
+sys.exit(1)

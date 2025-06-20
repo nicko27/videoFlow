@@ -1,3 +1,31 @@
+
+@contextmanager
+def safe_video_capture(video_path, timeout=30):
+    """Gestionnaire de contexte sécurisé pour VideoCapture"""
+    cap = None
+    try:
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise ValueError(f"Impossible d'ouvrir la vidéo: {video_path}")
+        
+        # Vérifier si la vidéo est valide
+        ret, frame = cap.read()
+        if not ret:
+            raise ValueError(f"Impossible de lire la première frame: {video_path}")
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)  # Revenir au début
+        
+        yield cap
+    except Exception as e:
+        logger.error(f"Erreur VideoCapture {video_path}: {e}")
+        raise
+    finally:
+        if cap is not None:
+            try:
+                cap.release()
+            except Exception as e:
+                logger.error(f"Erreur libération VideoCapture: {e}")
+
+
 """Module de la fenêtre principale de l'éditeur vidéo"""
 
 import os
@@ -148,7 +176,7 @@ class VideoEditorWindow(QMainWindow):
         """Ouvre une vidéo"""
         try:
             self.video_path = file_path
-            self.cap = cv2.VideoCapture(file_path)
+            self.# cap = cv2.VideoCapture(file_path)  # Remplacé par safe_video_capture
             self.fps = self.cap.get(cv2.CAP_PROP_FPS)
             self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
             

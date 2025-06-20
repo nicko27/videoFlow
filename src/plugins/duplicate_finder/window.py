@@ -1,3 +1,57 @@
+
+import threading
+from PyQt6.QtCore import QMutex, QMutexLocker
+
+class ThreadSafeAnalyzer:
+    """Analyseur thread-safe pour éviter les race conditions"""
+    
+    def __init__(self):
+        self._mutex = QMutex()
+        self._worker = None
+        self._stopping = False
+    
+    def start_analysis(self, worker):
+        """Démarre l'analyse de manière thread-safe"""
+        with QMutexLocker(self._mutex):
+            if self._worker is not None:
+                return False  # Une analyse est déjà en cours
+            self._worker = worker
+            self._stopping = False
+            return True
+    
+    def stop_analysis(self):
+        """Arrête l'analyse de manière thread-safe"""
+        with QMutexLocker(self._mutex):
+            if self._worker is None:
+                return False
+            
+            self._stopping = True
+            try:
+                if hasattr(self._worker, 'stop'):
+                    self._worker.stop()
+                
+                # Attendre avec timeout
+                if hasattr(self._worker, 'wait'):
+                    if not self._worker.wait(5000):  # 5 secondes
+                        logger.warning("Worker non terminé après timeout")
+                        if hasattr(self._worker, 'terminate'):
+                            self._worker.terminate()
+                            self._worker.wait(2000)
+                
+                return True
+            except Exception as e:
+                logger.error(f"Erreur arrêt analysis: {e}")
+                return False
+            finally:
+                self._worker = None
+                self._stopping = False
+    
+    def is_running(self):
+        """Vérifie si une analyse est en cours"""
+        with QMutexLocker(self._mutex):
+            return self._worker is not None and not self._stopping
+
+
 import os
 import json
 import cv2
@@ -7,9 +61,9 @@ from enum import Enum
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QFileDialog, QTableWidget,
-    QTableWidgetItem, QProgressBar, QComboBox,QHeaderView,
-    QDoubleSpinBox, QDialog, QGroupBox,QCheckBox,QMessageBox,
-    QSlider,QSpinBox, QGridLayout
+    QTableWidgetItem, QProgressBar, QComboBox, QHeaderView,
+    QDoubleSpinBox, QDialog, QGroupBox, QCheckBox, QMessageBox,
+    QSlider, QSpinBox, QGridLayout, QApplication
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
 from PyQt6.QtGui import QPixmap, QImage
@@ -32,20 +86,45 @@ class DuplicateComparisonDialog(QDialog):
         self.file2 = file2
         self.similarity = similarity
         self.parent = parent  # Garde une référence à la fenêtre principale
+        self.cap1 = None
+        self.cap2 = None
         
-        # Ouvre les vidéos
-        self.cap1 = cv2.VideoCapture(file1)
-        self.cap2 = cv2.VideoCapture(file2)
-        
-        # Configure l'interface
-        self.setup_ui()
-        self.update_file_info()
-        
-        # Initialise la position
-        self.total_frames1 = int(self.cap1.get(cv2.CAP_PROP_FRAME_COUNT))
-        self.total_frames2 = int(self.cap2.get(cv2.CAP_PROP_FRAME_COUNT))
-        self.position_slider.setMaximum(100)  # On utilise des pourcentages
-        self.update_position(0)  # Affiche la première frame
+        # Vérifie si les fichiers existent
+        if not os.path.exists(file1) or not os.path.exists(file2):
+            QMessageBox.critical(
+                self,
+                "Erreur",
+                f"Un ou plusieurs fichiers n'existent pas:\n{file1}\n{file2}"
+            )
+            self.reject()
+            return
+            
+        try:
+            # Ouvre les vidéos
+            self.cap1 = cv2.VideoCapture(file1)
+            self.cap2 = cv2.VideoCapture(file2)
+            
+            if not self.cap1.isOpened() or not self.cap2.isOpened():
+                raise Exception("Impossible d'ouvrir une ou plusieurs vidéos")
+                
+            # Configure l'interface
+            self.setup_ui()
+            self.update_file_info()
+            
+            # Initialise la position
+            self.total_frames1 = int(self.cap1.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.total_frames2 = int(self.cap2.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.position_slider.setMaximum(100)  # On utilise des pourcentages
+            self.update_position(0)  # Affiche la première frame
+        except Exception as e:
+            logger.error(f"Erreur lors de l'initialisation du dialogue: {str(e)}")
+            QMessageBox.critical(
+                self,
+                "Erreur",
+                f"Erreur lors de l'ouverture des vidéos: {str(e)}"
+            )
+            self.cleanup_resources()
+            self.reject()
 
     def update_file_info(self):
         """Met à jour les informations des fichiers"""
@@ -222,11 +301,20 @@ class DuplicateComparisonDialog(QDialog):
             scaled_pixmap2 = pixmap2.scaled(target_size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             self.right_video.setPixmap(scaled_pixmap2)
 
+    def cleanup_resources(self):
+        """Libère les ressources vidéo"""
+        if hasattr(self, 'cap1') and self.cap1 is not None:
+            self.cap1.release()
+            self.cap1 = None
+        
+        if hasattr(self, 'cap2') and self.cap2 is not None:
+            self.cap2.release()
+            self.cap2 = None
+            
     def closeEvent(self, event):
         """Gère la fermeture de la fenêtre"""
         # Libère les ressources vidéo
-        self.cap1.release()
-        self.cap2.release()
+        self.cleanup_resources()
 
         # Arrête les comparaisons en cours si c'est une fenêtre principale
         if isinstance(self.parent, DuplicateFinderWindow) and self.parent.worker and self.parent.worker.isRunning():
@@ -275,8 +363,22 @@ class DuplicateFinderWindow(QMainWindow):
         # Configure l'interface
         self.setup_ui()
         
+        # Charge les paires ignorées
+        self.load_ignored_pairs_from_file()
+        
         # Charge les hashs existants
         self.load_existing_hashes()
+        
+    def load_ignored_pairs_from_file(self):
+        """Charge les paires ignorées depuis le fichier"""
+        try:
+            ignored_pairs_list = self.load_ignored_pairs()
+            # Convertit la liste de listes en ensemble de frozensets
+            self.ignored_pairs = {frozenset(pair) for pair in ignored_pairs_list}
+            logger.info(f"{len(self.ignored_pairs)} paires ignorées chargées")
+        except Exception as e:
+            logger.error(f"Erreur lors du chargement des paires ignorées: {str(e)}")
+            self.ignored_pairs = set()
 
     def load_ignored_pairs(self):
         """Charge les paires ignorées depuis le fichier"""
@@ -288,8 +390,14 @@ class DuplicateFinderWindow(QMainWindow):
 
     def save_ignored_pairs(self):
         """Sauvegarde les paires ignorées"""
-        with open("ignored_pairs.json", "w") as f:
-            json.dump(self.ignored_pairs, f, indent=4)
+        try:
+            # Convertit l'ensemble de frozensets en liste de listes pour JSON
+            ignored_pairs_list = [list(pair) for pair in self.ignored_pairs]
+            with open("ignored_pairs.json", "w") as f:
+                json.dump(ignored_pairs_list, f, indent=4)
+            logger.info(f"{len(self.ignored_pairs)} paires ignorées sauvegardées")
+        except Exception as e:
+            logger.error(f"Erreur lors de la sauvegarde des paires ignorées: {str(e)}")
 
     def setup_ui(self):
         """Configure l'interface utilisateur"""
@@ -625,33 +733,68 @@ class DuplicateFinderWindow(QMainWindow):
             rate = elapsed / value  # temps par fichier
             remaining = rate * (self.progress_bar.maximum() - value)
             
-            # Formate le temps restant
-            minutes = int(remaining // 60)
-            seconds = int(remaining % 60)
-            time_str = f"{minutes:02d}:{seconds:02d}"
+            # Formate le temps restant avec heures si nécessaire
+            if remaining > 3600:  # Plus d'une heure
+                hours = int(remaining // 3600)
+                minutes = int((remaining % 3600) // 60)
+                seconds = int(remaining % 60)
+                time_str = f"{hours}h {minutes:02d}m {seconds:02d}s"
+            else:
+                minutes = int(remaining // 60)
+                seconds = int(remaining % 60)
+                time_str = f"{minutes:02d}m {seconds:02d}s"
             
-            # Met à jour le label
-            self.file_time_label.setText(f"Temps restant: {time_str}")
+            # Met à jour le label avec le taux de traitement
+            files_per_minute = 60 * value / elapsed if elapsed > 0 else 0
+            self.file_time_label.setText(f"Temps restant: {time_str} ({files_per_minute:.1f} fichiers/min)")
 
     def handle_error(self, error):
         """Gère les erreurs du worker"""
-        QMessageBox.critical(
-            self,
-            "Erreur",
-            f"Une erreur est survenue pendant l'analyse : {error}"
-        )
+        # Affiche un message d'erreur plus convivial
+        error_msg = str(error)
+        
+        # Détecte les erreurs courantes et propose des solutions
+        if "moov atom not found" in error_msg or "corrompue" in error_msg:
+            QMessageBox.warning(
+                self,
+                "Fichier vidéo corrompu",
+                f"Le fichier semble être corrompu ou incomplet.\n\n"
+                f"Détail: {error_msg}\n\n"
+                f"Suggestion: Vérifiez l'intégrité du fichier ou essayez de le réparer avec un outil comme FFmpeg."
+            )
+        elif "format non supporté" in error_msg:
+            QMessageBox.warning(
+                self,
+                "Format non supporté",
+                f"Le format du fichier n'est pas supporté par OpenCV.\n\n"
+                f"Détail: {error_msg}\n\n"
+                f"Suggestion: Convertissez le fichier dans un format standard comme MP4 (H.264)."
+            )
+        else:
+            QMessageBox.critical(
+                self,
+                "Erreur",
+                f"Une erreur est survenue pendant l'analyse:\n{error_msg}"
+            )
+            
+        # Continue l'analyse avec les fichiers restants
         self.analysis_finished()
 
     def update_file_status(self, file_path, success):
         """Met à jour le statut d'un fichier"""
         # Trouve l'index du fichier dans la liste
         for i in range(self.file_list.rowCount()):
-            if self.file_list.item(i, 0).text() == file_path:
+            item = self.file_list.item(i, 0)
+            # Vérifie si c'est le bon fichier (soit par chemin complet, soit par tooltip)
+            if (item.text() == file_path or 
+                (item.toolTip() and item.toolTip() == file_path)):
                 # Met à jour le statut
                 status = "✅ Analysé" if success else "⏳ En attente"
                 self.file_list.item(i, 1).setText(status)
+                # Force la mise à jour visuelle
                 self.file_list.viewport().update()
-
+                # Traite les événements Qt pour rafraîchir l'interface
+                QApplication.processEvents()
                 break
 
     def clear_list(self):
@@ -708,8 +851,21 @@ class DuplicateFinderWindow(QMainWindow):
                             self.files.append(file_path)
                             row = self.file_list.rowCount()
                             self.file_list.insertRow(row)
-                            self.file_list.setItem(row, 0, QTableWidgetItem(os.path.basename(file_path)))
+                            
+                            # Affiche le chemin relatif pour plus de lisibilité
+                            rel_path = os.path.relpath(file_path, folder)
+                            display_path = f"{os.path.basename(folder)}/{rel_path}"
+                            
+                            # Crée un item avec tooltip pour voir le chemin complet
+                            item = QTableWidgetItem(display_path)
+                            item.setToolTip(file_path)
+                            self.file_list.setItem(row, 0, item)
+                            
                             self.file_list.setItem(row, 1, QTableWidgetItem("❌ Absent"))
+                            
+                            # Vérifie si le hash existe déjà
+                            if self.video_hasher.has_hash(file_path):
+                                self.update_file_status(file_path, True)
             
             # Active le bouton d'analyse s'il y a assez de fichiers
             self.analyze_btn.setEnabled(len(self.files) > 1)
@@ -860,12 +1016,21 @@ class DuplicateFinderWorker(QThread):
                 # Vérifie si la vidéo peut être ouverte
                 cap = cv2.VideoCapture(file_path)
                 if not cap.isOpened():
-                    raise Exception("Impossible d'ouvrir la vidéo")
-                    
+                    raise Exception(f"Impossible d'ouvrir la vidéo: {file_path}")
+                
+                # Vérifie si on peut lire au moins une frame
+                ret, frame = cap.read()
+                if not ret or frame is None:
+                    cap.release()
+                    raise Exception(f"Vidéo corrompue ou format non supporté: {file_path}")
+                
+                # Remet la position à 0 et vérifie le nombre de frames
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
                 if total_frames <= 0:
-                    raise Exception("Vidéo invalide")
-                    
+                    cap.release()
+                    raise Exception(f"Vidéo invalide (0 frames): {file_path}")
+                
                 cap.release()
                 
                 # Si on arrive ici, la vidéo est valide
@@ -874,9 +1039,15 @@ class DuplicateFinderWorker(QThread):
                     logger.info("Arrêt demandé avant le calcul du hash")
                     break
                     
-                self.video_hasher.compute_video_hash(file_path)
-                # Émet le signal de succès
-                self.file_processed.emit(file_path, True)
+                # Calcule le hash et met à jour le statut immédiatement après
+                result = self.video_hasher.compute_video_hash(file_path)
+                if result[0] is not None:
+                    # Émet le signal de succès seulement si le hash a été calculé
+                    self.file_processed.emit(file_path, True)
+                else:
+                    # En cas d'échec du calcul
+                    self.file_processed.emit(file_path, False)
+                    logger.error(f"Échec du calcul de hash pour {file_path}")
                 
             except Exception as e:
                 # En cas d'erreur, émet le signal d'échec

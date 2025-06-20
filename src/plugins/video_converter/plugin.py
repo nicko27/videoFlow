@@ -41,5 +41,13 @@ class VideoConverterPlugin(PluginInterface):
         if not self.window:
             from .window import VideoConverterWindow
             self.window = VideoConverterWindow()
+            # Connecte le signal de fermeture si disponible
+            if hasattr(self.window, 'closed'):
+                self.window.closed.connect(self.handle_window_closed)
         self.window.show()
         logger.debug("Fenêtre VideoConverter affichée")
+        
+    def handle_window_closed(self):
+        """Gère la fermeture de la fenêtre"""
+        self.window = None
+        logger.debug("Fenêtre VideoConverter fermée")

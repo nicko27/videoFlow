@@ -1,3 +1,94 @@
+
+import json
+import tempfile
+import shutil
+from pathlib import Path
+
+class SafeJSONManager:
+    """Gestionnaire JSON sécurisé avec sauvegarde atomique"""
+    
+    @staticmethod
+    def safe_save(data, file_path, backup=True):
+        """Sauvegarde JSON de manière atomique"""
+        file_path = Path(file_path)
+        
+        # Créer un fichier temporaire
+        with tempfile.NamedTemporaryFile(
+            mode='w', 
+            suffix='.json.tmp',
+            dir=file_path.parent,
+            delete=False,
+            encoding='utf-8'
+        ) as tmp_file:
+            try:
+                json.dump(data, tmp_file, indent=4, ensure_ascii=False)
+                tmp_file.flush()
+                os.fsync(tmp_file.fileno())  # Force l'écriture sur disque
+                tmp_path = tmp_file.name
+            except Exception as e:
+                os.unlink(tmp_file.name)
+                raise VideoFlowError(
+                    f"Erreur écriture JSON temporaire: {e}",
+                    ErrorType.FILE_IO,
+                    ErrorSeverity.HIGH
+                )
+        
+        # Sauvegarder l'ancien fichier si demandé
+        if backup and file_path.exists():
+            backup_path = file_path.with_suffix('.json.bak')
+            try:
+                shutil.copy2(file_path, backup_path)
+            except Exception as e:
+                logger.warning(f"Impossible de créer la sauvegarde: {e}")
+        
+        # Remplacer atomiquement
+        try:
+            shutil.move(tmp_path, file_path)
+        except Exception as e:
+            os.unlink(tmp_path)
+            raise VideoFlowError(
+                f"Erreur remplacement atomique: {e}",
+                ErrorType.FILE_IO,
+                ErrorSeverity.HIGH
+            )
+    
+    @staticmethod
+    def safe_load(file_path, default=None):
+        """Charge JSON de manière sécurisée"""
+        file_path = Path(file_path)
+        
+        if not file_path.exists():
+            return default
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except json.JSONDecodeError as e:
+            # Tenter de charger la sauvegarde
+            backup_path = file_path.with_suffix('.json.bak')
+            if backup_path.exists():
+                try:
+                    with open(backup_path, 'r', encoding='utf-8') as f:
+                        logger.warning(f"JSON corrompu, restauration depuis sauvegarde: {file_path}")
+                        return json.load(f)
+                except Exception:
+                    pass
+            
+            raise VideoFlowError(
+                f"Erreur parsing JSON: {e}",
+                ErrorType.FILE_IO,
+                ErrorSeverity.HIGH,
+                {"file_path": str(file_path)}
+            )
+        except Exception as e:
+            raise VideoFlowError(
+                f"Erreur lecture JSON: {e}",
+                ErrorType.FILE_IO,
+                ErrorSeverity.HIGH,
+                {"file_path": str(file_path)}
+            )
+
+
 import os
 import json
 import numpy as np
@@ -79,7 +170,7 @@ class DataManager:
             }
             
             with open(self.data_file, "w") as f:
-                json.dump(data, f, indent=4)
+                SafeJSONManager.safe_save(data, f.name)
             
             logger.info(f"Données sauvegardées dans {self.data_file}")
         
@@ -91,7 +182,7 @@ class DataManager:
         try:
             if os.path.exists(self.data_file):
                 with open(self.data_file, "r") as f:
-                    data = json.load(f)
+                    data = SafeJSONManager.safe_load(f.name)
                 
                 self.analyzed_files = data.get("analyzed_files", {})
                 # Convertir la liste en set de tuples
