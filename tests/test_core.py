@@ -1,5 +1,6 @@
 
 """
+import logging
 Tests pour les modules core
 """
 

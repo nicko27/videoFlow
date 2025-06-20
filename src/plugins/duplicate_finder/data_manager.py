@@ -2,7 +2,6 @@ from src.core.error_handler import VideoFlowError, ErrorType, ErrorSeverity
 from src.core.logger import Logger
 logger = Logger.get_logger(__name__)
 
-
 import json
 import tempfile
 import shutil
@@ -91,7 +90,6 @@ class SafeJSONManager:
                 ErrorSeverity.HIGH,
                 {"file_path": str(file_path)}
             )
-
 
 import os
 import json
