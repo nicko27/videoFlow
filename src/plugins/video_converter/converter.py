@@ -2,6 +2,7 @@
 import threading
 from contextlib import contextmanager
 
+import logging
 class ThreadSafeWorkerManager:
     """Gestionnaire sécurisé pour les workers"""
     

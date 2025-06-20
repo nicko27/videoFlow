@@ -1,3 +1,7 @@
+from src.core.error_handler import VideoFlowError, ErrorType, ErrorSeverity
+from src.core.logger import Logger
+logger = Logger.get_logger(__name__)
+
 
 import json
 import tempfile

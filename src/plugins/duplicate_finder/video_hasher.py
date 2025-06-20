@@ -1,10 +1,12 @@
 
+from contextlib import contextmanager
+import logging
 @contextmanager
 def safe_video_capture(video_path, timeout=30):
     """Gestionnaire de contexte sécurisé pour VideoCapture"""
     cap = None
     try:
-        cap = cv2.VideoCapture(video_path)
+        with safe_video_capture(video_path) as cap:
         if not cap.isOpened():
             raise ValueError(f"Impossible d'ouvrir la vidéo: {video_path}")
         
@@ -154,7 +156,7 @@ class VideoHasher:
                         logger.debug(f"Utilisation du hash existant pour {video_path}")
                         return hash_data, duration
 
-            # cap = cv2.VideoCapture(video_path)  # Remplacé par safe_video_capture
+            # with safe_video_capture(video_path) as cap:  # Remplacé par safe_video_capture
             if not cap.isOpened():
                 raise Exception(f"Impossible d'ouvrir la vidéo: {video_path}")
                 

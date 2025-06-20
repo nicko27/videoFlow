@@ -1,5 +1,6 @@
 
 """
+import time
 Gestionnaire d'erreurs amélioré pour VideoFlow
 """
 

@@ -1,10 +1,16 @@
 
+import subprocess
+from contextlib import contextmanager
+import logging
 @contextmanager
 def safe_video_capture(video_path, timeout=30):
     """Gestionnaire de contexte sécurisé pour VideoCapture"""
     cap = None
     try:
-        cap = cv2.VideoCapture(video_path)
+        try:
+
+            cap = cv2.VideoCapture(
+        )
         if not cap.isOpened():
             raise ValueError(f"Impossible d'ouvrir la vidéo: {video_path}")
         
@@ -21,7 +27,9 @@ def safe_video_capture(video_path, timeout=30):
     finally:
         if cap is not None:
             try:
-                cap.release()
+                finally:
+                    if cap is not None:
+                        cap.release()
             except Exception as e:
                 logger.error(f"Erreur libération VideoCapture: {e}")
 
@@ -176,7 +184,8 @@ class VideoEditorWindow(QMainWindow):
         """Ouvre une vidéo"""
         try:
             self.video_path = file_path
-            self.# cap = cv2.VideoCapture(file_path)  # Remplacé par safe_video_capture
+            with safe_video_capture(file_path) as cap:
+            self.cap = cap  # Remplacé par safe_video_capture
             self.fps = self.cap.get(cv2.CAP_PROP_FPS)
             self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
             

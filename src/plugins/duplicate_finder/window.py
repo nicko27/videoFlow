@@ -1014,14 +1014,19 @@ class DuplicateFinderWorker(QThread):
                 self.file_processed.emit(file_path, False)
                 
                 # Vérifie si la vidéo peut être ouverte
-                cap = cv2.VideoCapture(file_path)
+                try:
+
+                    cap = cv2.VideoCapture(
+                )
                 if not cap.isOpened():
                     raise Exception(f"Impossible d'ouvrir la vidéo: {file_path}")
                 
                 # Vérifie si on peut lire au moins une frame
                 ret, frame = cap.read()
                 if not ret or frame is None:
-                    cap.release()
+                    finally:
+                        if cap is not None:
+                            cap.release()
                     raise Exception(f"Vidéo corrompue ou format non supporté: {file_path}")
                 
                 # Remet la position à 0 et vérifie le nombre de frames
