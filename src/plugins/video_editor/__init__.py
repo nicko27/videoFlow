@@ -1,3 +1,3 @@
-from .plugin import VideoEditorPlugin
+# TODO: Supprimer l'import 'VideoEditorPlugin'
 
 __all__ = ['VideoEditorPlugin']

@@ -1,4 +1,4 @@
-"""Plugin pour convertir les fichiers vidéo avec ffmpeg."""
+"""Plugin pour convertir les fichiers vidéo avec ffmpeg - Version optimisée."""
 
 from PyQt6.QtGui import QAction
 from src.core.plugin_interface import PluginInterface
@@ -7,25 +7,24 @@ from src.core.logger import Logger
 logger = Logger.get_logger('VideoConverter.Plugin')
 
 class VideoConverterPlugin(PluginInterface):
-    """Plugin pour la conversion de fichiers vidéo."""
+    """Plugin pour la conversion de fichiers vidéo - optimisé pour chargement rapide."""
     
     def __init__(self):
-        """Initialise le plugin."""
+        """Initialise le plugin avec chargement minimal."""
         super().__init__()
         self.name = "Video Converter"
         self.description = "Convertit les fichiers vidéo avec ffmpeg"
-        self.version = "1.0.0"
+        self.version = "1.0.1"
         self.window = None
         self.main_window = None
-        logger.debug("Plugin VideoConverter initialisé")
+        # Pas de log debug au chargement pour économiser du temps
     
     def get_name(self) -> str:
         """Retourne le nom du plugin."""
-        logger.debug("get_name() appelé")
         return self.name
     
     def setup(self, main_window):
-        """Configure le plugin et crée l'action dans le menu."""
+        """Configure le plugin avec chargement paresseux."""
         self.main_window = main_window
         
         # Créer l'action dans le menu
@@ -37,9 +36,13 @@ class VideoConverterPlugin(PluginInterface):
         logger.debug("Plugin VideoConverter configuré")
     
     def show_window(self):
-        """Affiche la fenêtre principale du plugin."""
+        """Affiche la fenêtre avec chargement paresseux."""
         if not self.window:
+            # Import paresseux - seulement quand nécessaire
             from .window import VideoConverterWindow
             self.window = VideoConverterWindow()
+        
         self.window.show()
+        self.window.raise_()
+        self.window.activateWindow()
         logger.debug("Fenêtre VideoConverter affichée")

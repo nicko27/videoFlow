@@ -1,393 +1,428 @@
 import cv2
 import numpy as np
 import os
-import json
+import time
 from datetime import datetime
-from src.core.logger import Logger
 from enum import Enum
+from .database_manager import VideoDatabase
+from src.core.logger import Logger
 
 logger = Logger.get_logger('DuplicateFinder.VideoHasher')
 
 class HashMethod(Enum):
     """Méthodes de hachage disponibles"""
     PHASH = "pHash"
-
-class VideoInfo:
-    def __init__(self, hash_array, duration):
-        self.hash_array = hash_array
-        self.duration = duration  # durée en secondes
+    DHASH = "dHash"  # Plus rapide que pHash
+    AHASH = "aHash"  # Le plus rapide
 
 class VideoHasher:
-    """Classe pour calculer et comparer les hashs de vidéos"""
+    """VideoHasher optimisé avec positions absolues et cache mémoire permanent"""
     
     def __init__(self, method=HashMethod.PHASH.value):
-        """Initialise le hasher de vidéos"""
         self.method = method if isinstance(method, str) else method.value
         self.plugin_dir = os.path.dirname(__file__)
-        self.json_file = os.path.join(self.plugin_dir, 'video_hashes.json')
-        self.ignored_pairs_file = os.path.join(self.plugin_dir, 'ignored_pairs.json')
-        self.hashes = {
-            "pHash": {},  # Cache pour pHash uniquement
-        }
-        self.ignored_pairs = set()
-        self.duration = 300  # Durée par défaut : 5 minutes
-        self.load_hashes()
-        self.load_ignored_pairs()
+        self.db = VideoDatabase()
         
-        logger.debug(f"VideoHasher initialisé")
-        if self.hashes:
-            logger.info(f"Empreintes chargées :")
-            for file_path in self.hashes["pHash"]:
-                logger.info(f"  - {os.path.basename(file_path)}")
+        # Cache mémoire PERMANENT pour toute la session
+        self.hash_cache = {}  # file_path -> (hash, duration, mtime)
+        self.comparison_cache = {}  # (file1, file2) -> similarity
+        
+        # Positions ABSOLUES fixes pour cohérence
+        # Frame indices exacts pour toutes les vidéos
+        self.absolute_positions = [
+            30,    # 1 seconde à 30fps
+            150,   # 5 secondes
+            300,   # 10 secondes
+            600,   # 20 secondes
+            900,   # 30 secondes
+            1500,  # 50 secondes
+            2100,  # 70 secondes
+            3000   # 100 secondes
+        ]
+        
+        # Précharge tous les hashs existants en mémoire au démarrage
+        self._preload_cache()
+        
+        logger.debug(f"VideoHasher initialisé avec cache mémoire permanent")
 
-    def load_hashes(self):
-        """Charge les hashs depuis le fichier JSON"""
+    def _preload_cache(self):
+        """Précharge tous les hashs de la DB en mémoire au démarrage"""
         try:
-            if os.path.exists(self.json_file):
-                with open(self.json_file, 'r') as f:
-                    self.hashes = json.load(f)
-                logger.info(f"Hashs chargés depuis {self.json_file}")
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Charge d'abord les hashs
+                cursor.execute('''
+                    SELECT file_path, hash_data, duration, modification_time 
+                    FROM video_files
+                ''')
+                
+                loaded_hashes = 0
+                for row in cursor.fetchall():
+                    file_path, hash_blob, duration, mtime = row
+                    if os.path.exists(file_path):
+                        import pickle
+                        hash_data = pickle.loads(hash_blob)
+                        self.hash_cache[file_path] = {
+                            'hash': hash_data,
+                            'duration': duration,
+                            'mtime': mtime
+                        }
+                        loaded_hashes += 1
+                
+                # Charge ensuite les comparaisons (limite à 50k pour éviter l'overflow mémoire)
+                cursor.execute('''
+                    SELECT v1.file_path, v2.file_path, c.similarity
+                    FROM comparisons c
+                    JOIN video_files v1 ON c.file1_id = v1.id
+                    JOIN video_files v2 ON c.file2_id = v2.id
+                    ORDER BY c.created_at DESC
+                    LIMIT 50000
+                ''')
+                
+                loaded_comparisons = 0
+                for row in cursor.fetchall():
+                    file1, file2, similarity = row
+                    cache_key = tuple(sorted([file1, file2]))
+                    self.comparison_cache[cache_key] = similarity
+                    loaded_comparisons += 1
+                
+                if loaded_hashes > 0 or loaded_comparisons > 0:
+                    logger.info(f"Cache préchargé: {loaded_hashes} hashs, {loaded_comparisons} comparaisons")
+                    
         except Exception as e:
-            logger.error(f"Erreur lors du chargement des hashs: {str(e)}")
-
-    def save_hashes(self):
-        """Sauvegarde les hashs dans un fichier JSON"""
-        try:
-            with open(self.json_file, 'w') as f:
-                json.dump(self.hashes, f, indent=4)
-            logger.debug(f"Hashs sauvegardés dans {self.json_file}")
-        except Exception as e:
-            logger.error(f"Erreur lors de la sauvegarde des hashs : {e}")
-
-    def load_ignored_pairs(self):
-        """Charge les paires ignorées depuis le fichier JSON"""
-        try:
-            if os.path.exists(self.ignored_pairs_file):
-                with open(self.ignored_pairs_file, 'r') as f:
-                    pairs = json.load(f)
-                    # Ne charge que les paires dont les deux fichiers existent encore
-                    self.ignored_pairs = {
-                        tuple(pair) for pair in pairs 
-                        if os.path.exists(pair[0]) and os.path.exists(pair[1])
-                    }
-                logger.debug(f"Paires ignorées chargées depuis {self.ignored_pairs_file}")
-                logger.info(f"{len(self.ignored_pairs)} paires ignorées chargées")
-        except Exception as e:
-            logger.error(f"Erreur lors du chargement des paires ignorées : {e}")
-            self.ignored_pairs = set()
-
-    def save_ignored_pairs(self):
-        """Sauvegarde les paires ignorées dans un fichier JSON"""
-        try:
-            # Sauvegarde uniquement les paires dont les fichiers existent encore
-            pairs = [
-                list(pair) for pair in self.ignored_pairs 
-                if os.path.exists(pair[0]) and os.path.exists(pair[1])
-            ]
-            
-            with open(self.ignored_pairs_file, 'w') as f:
-                json.dump(pairs, f, indent=4)
-            logger.debug(f"Paires ignorées sauvegardées dans {self.ignored_pairs_file}")
-            logger.info(f"{len(pairs)} paires ignorées sauvegardées")
-        except Exception as e:
-            logger.error(f"Erreur lors de la sauvegarde des paires ignorées : {e}")
-
-    def add_ignored_pair(self, file1, file2):
-        """Ajoute une paire de fichiers à ignorer"""
-        # Toujours stocker dans le même ordre pour éviter les doublons
-        pair = tuple(sorted([file1, file2]))
-        self.ignored_pairs.add(pair)
-        self.save_ignored_pairs()
-
-    def is_pair_ignored(self, file1, file2):
-        """Vérifie si une paire de fichiers est ignorée"""
-        pair = tuple(sorted([file1, file2]))
-        return pair in self.ignored_pairs
-
-    def clear_cache(self):
-        """Efface le cache des empreintes"""
-        self.hashes = {
-            "pHash": {}
-        }
-        self.save_hashes()
-        logger.info("Cache effacé")
-
-    def list_to_numpy(self, hash_list):
-        """Convertit une liste de hashes en tableau numpy"""
-        return np.array(hash_list)
-
-    def numpy_to_list(self, hash_array):
-        """Convertit un tableau numpy en liste"""
-        return hash_array.tolist()
+            logger.debug(f"Préchargement cache: {e}")
 
     def compute_frame_hash(self, frame):
-        """Calcule l'empreinte d'une frame selon la méthode choisie"""
+        """Calcule l'empreinte d'une frame - version optimisée"""
         try:
-            if self.method == "pHash":  
-                # Méthode pHash (Perceptual Hash)
-                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # Conversion en gris directement
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            
+            if self.method == "pHash":
                 resized = cv2.resize(gray, (32, 32))
                 dct = cv2.dct(np.float32(resized))
                 dct_low = dct[:8, :8]
                 avg = (dct_low[1:, :].mean() + dct_low[0, 1:].mean()) / 2
                 return dct_low > avg
                 
-            else:
-                raise ValueError(f"Méthode de hash inconnue : {self.method}")
+            elif self.method == "dHash":
+                # Difference Hash - plus rapide
+                resized = cv2.resize(gray, (9, 8))
+                diff = resized[:, 1:] > resized[:, :-1]
+                return diff
+                
+            elif self.method == "aHash":
+                # Average Hash - le plus rapide
+                resized = cv2.resize(gray, (8, 8))
+                avg = resized.mean()
+                return resized > avg
                 
         except Exception as e:
-            logger.error(f"Erreur lors du calcul de l'empreinte d'une frame : {e}")
+            logger.error(f"Erreur calcul hash frame: {e}")
             return None
 
-    def compute_video_hash(self, video_path, sample_interval=500):
-        """Calcule l'empreinte d'une vidéo"""
+    def compute_video_hash_fast(self, video_path):
+        """Version optimisée du calcul de hash avec positions absolues"""
         try:
-            # Vérifie que le fichier existe
-            if not os.path.exists(video_path):
-                raise Exception(f"Le fichier {video_path} n'existe pas")
-                
-            # Vérifie le cache
-            if video_path in self.hashes[self.method]:
-                logger.info(f"Utilisation de l'empreinte en cache pour {os.path.basename(video_path)}")
-                return self.list_to_numpy(self.hashes[self.method][video_path]['hash']), self.hashes[self.method][video_path]['duration']
-
+            # 1. Check cache mémoire (ultra rapide)
+            if video_path in self.hash_cache:
+                cache_entry = self.hash_cache[video_path]
+                current_mtime = os.path.getmtime(video_path)
+                # Vérifie si le fichier a changé
+                if abs(current_mtime - cache_entry['mtime']) < 1:
+                    return cache_entry['hash'], cache_entry['duration']
+            
+            # 2. Calcul du hash nécessaire
+            cv2.setLogLevel(0)
             cap = cv2.VideoCapture(video_path)
+            
             if not cap.isOpened():
-                logger.warning(f"Impossible d'ouvrir la vidéo {video_path}")
                 raise Exception("Impossible d'ouvrir la vidéo")
-
+            
             try:
-                # Récupère les informations de la vidéo
+                # Récupère les infos de base
                 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                fps = int(cap.get(cv2.CAP_PROP_FPS))
+                fps = cap.get(cv2.CAP_PROP_FPS)
                 
+                # Validation rapide
                 if total_frames <= 0:
-                    # Compte manuellement les frames
-                    total_frames = 0
-                    while cap.grab():
-                        total_frames += 1
+                    # Estimation rapide sans parcourir toute la vidéo
+                    count = 0
+                    while count < 500 and cap.grab():  # Max 500 frames
+                        count += 1
+                    total_frames = count * 10  # Estimation
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 
                 if fps <= 0:
-                    fps = 30  # Valeur par défaut
+                    fps = 25.0
                 
                 duration = total_frames / fps
                 
-                # Prend une frame tous les 500 frames jusqu'à 2500
-                frame_indices = [500, 1000, 1500, 2000, 2500]
-                # Ne garde que les indices valides (inférieurs au nombre total de frames)
-                frame_indices = [idx for idx in frame_indices if idx < total_frames]
+                # Filtre les positions selon la longueur de la vidéo
+                valid_positions = [pos for pos in self.absolute_positions if pos < total_frames]
                 
-                # Ajoute toujours la première et la dernière frame
-                if 0 not in frame_indices:
-                    frame_indices.insert(0, 0)
-                if total_frames - 1 not in frame_indices:
-                    frame_indices.append(total_frames - 1)
+                # Minimum 3 positions, maximum 8
+                if len(valid_positions) < 3:
+                    # Pour les très courtes vidéos, positions adaptées
+                    if total_frames < 90:
+                        valid_positions = [0, total_frames // 2, total_frames - 1]
+                    else:
+                        valid_positions = [0, 30, 60, total_frames - 1]
                 
                 hashes = []
-                frames_read = 0
                 
-                for frame_idx in frame_indices:
-                    # Positionne sur la frame exacte
+                for frame_idx in valid_positions:
                     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-                    success = False
+                    ret, frame = cap.read()
                     
-                    # Essaie de lire la frame avec plusieurs tentatives
-                    for _ in range(3):  # 3 tentatives maximum
+                    if ret and frame is not None:
+                        frame_hash = self.compute_frame_hash(frame)
+                        if frame_hash is not None:
+                            hashes.append(frame_hash)
+                    else:
+                        # Si échec, essaie la frame suivante
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx + 1)
                         ret, frame = cap.read()
-                        if ret:
+                        if ret and frame is not None:
                             frame_hash = self.compute_frame_hash(frame)
                             if frame_hash is not None:
                                 hashes.append(frame_hash)
-                                frames_read += 1
-                                success = True
-                                break
-                        # Si échec, essaie de se repositionner
-                        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
-                    
-                    if not success:
-                        logger.warning(f"Impossible de lire la frame {frame_idx} de {video_path}")
                 
-                if frames_read < 3:
-                    raise Exception(f"Pas assez de frames valides ({frames_read} lues)")
+                if len(hashes) < 2:
+                    raise Exception(f"Seulement {len(hashes)} frames lues")
                 
                 final_hash = np.stack(hashes)
                 
-                # Sauvegarde dans le cache
-                self.hashes[self.method][video_path] = {
-                    'hash': self.numpy_to_list(final_hash),
+                # Met à jour TOUS les caches
+                current_mtime = os.path.getmtime(video_path)
+                self.hash_cache[video_path] = {
+                    'hash': final_hash,
                     'duration': duration,
-                    'frames': frame_indices  # Sauvegarde les indices utilisés pour debug
+                    'mtime': current_mtime
                 }
-                self.save_hashes()
                 
-                logger.info(f"Empreinte créée pour {os.path.basename(video_path)} avec {frames_read} frames")
-                logger.debug(f"Indices des frames utilisées : {frame_indices}")
+                # Stocke aussi en DB pour persistance
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                 
+                self.db.store_video_hash(
+                    video_path, 
+                    final_hash, 
+                    duration,
+                    width=width,
+                    height=height,
+                    hash_method=self.method,
+                    frames_indices=valid_positions,
+                    sampling_method="absolute_optimized"
+                )
+                
+                logger.info(f"Hash créé: {os.path.basename(video_path)} ({len(hashes)} frames aux positions {valid_positions[:3]}...)")
                 return final_hash, duration
                 
             finally:
                 cap.release()
-
+                cv2.setLogLevel(1)
+                
         except Exception as e:
-            logger.error(f"Erreur lors du calcul de l'empreinte de {video_path}: {e}")
+            logger.error(f"Erreur hash {os.path.basename(video_path)}: {e}")
+            self.db.mark_file_as_corrupted(video_path, str(e))
             raise
 
-    def has_hash(self, file_path):
-        """Vérifie si un fichier a déjà une empreinte dans le cache"""
-        return file_path in self.hashes[self.method]
+    def compute_video_hash(self, video_path, sample_interval=500):
+        """Méthode principale"""
+        return self.compute_video_hash_fast(video_path)
 
-    def compute_hamming_similarity(self, hash1, hash2):
-        """Calcule la similarité de Hamming entre deux empreintes
+    def compare_videos_cached(self, video1_path: str, video2_path: str) -> float:
+        """Compare deux vidéos avec cache mémoire permanent"""
         
-        La similarité est le nombre de bits identiques divisé par le nombre total de bits.
-        Pour le pHash et dHash, il faut comparer bit à bit.
-        """
-        if self.method == "pHash":  
-            # Convertit en binaire et compare bit à bit
-            bin1 = np.unpackbits(hash1.astype(np.uint8))
-            bin2 = np.unpackbits(hash2.astype(np.uint8))
-            return np.sum(bin1 == bin2) / bin1.size
-        else:
-            # Pour les autres méthodes, compare directement les valeurs
-            return np.sum(hash1 == hash2) / hash1.size
-            
-    def are_similar(self, hash1, hash2, duration1, duration2, threshold=0.85, std_threshold=0.1, ignore_duration=False):
-        """Compare deux empreintes de vidéos
+        # 1. Check cache mémoire de comparaison (instantané)
+        cache_key = tuple(sorted([video1_path, video2_path]))
+        if cache_key in self.comparison_cache:
+            return self.comparison_cache[cache_key]
         
-        Args:
-            hash1: Première empreinte
-            hash2: Deuxième empreinte
-            duration1: Durée de la première vidéo
-            duration2: Durée de la deuxième vidéo
-            threshold: Seuil de similarité (0-1)
-            std_threshold: Seuil d'écart-type (0-1)
-            ignore_duration: Si True, ignore les différences de durée importantes
-            
-        Returns:
-            (bool, float, str): (True si similaires, similarité en %, message d'avertissement)
-        """
+        # 2. Check cache DB (rapide)
+        cached_result = self.db.get_cached_comparison(video1_path, video2_path)
+        if cached_result is not None:
+            # Met en cache mémoire pour la prochaine fois
+            self.comparison_cache[cache_key] = cached_result
+            return cached_result
+        
+        # 3. Comparaison réelle nécessaire
+        start_time = time.time()
+        
         try:
-            if hash1 is None or hash2 is None:
-                return False, 0, "Une des empreintes est invalide"
-                
-            # Compare les durées
-            duration_diff = abs(duration1 - duration2)
-            warning_message = ""
+            # Récupère les hashs (depuis cache mémoire si possible)
+            hash1, duration1 = self.compute_video_hash_fast(video1_path)
+            hash2, duration2 = self.compute_video_hash_fast(video2_path)
             
-            # Si la différence est de plus de 5 minutes et qu'on ne l'ignore pas
-            if duration_diff > 300 and not ignore_duration:  # 300 secondes = 5 minutes
-                return False, 0, f"Les durées diffèrent de {int(duration_diff/60)} minutes"
-            elif duration_diff > 300:
-                warning_message = f"⚠️ Les durées diffèrent de {int(duration_diff/60)} minutes"
-            elif duration_diff > 10:
-                warning_message = f"Les durées diffèrent de {int(duration_diff)} secondes"
-            
-            # Vérifie que les dimensions correspondent
-            if hash1.shape[1:] != hash2.shape[1:]:
-                return False, 0, "Les dimensions des empreintes ne correspondent pas"
-            
-            # Calcule la similarité entre les frames
+            # Comparaison simple mais efficace
             min_frames = min(len(hash1), len(hash2))
-            if min_frames < 3:
-                return False, 0, "Pas assez de frames pour comparer"
+            
+            if min_frames == 0:
+                similarity = 0.0
+            else:
+                # Compare bit à bit
+                total_bits = 0
+                matching_bits = 0
                 
-            similarities = []
-            for i in range(min_frames):
-                similarity = self.compute_hamming_similarity(hash1[i], hash2[i])
-                similarities.append(similarity)
+                for i in range(min_frames):
+                    frame1 = hash1[i]
+                    frame2 = hash2[i]
+                    
+                    # Comparaison optimisée avec numpy
+                    matches = np.sum(frame1 == frame2)
+                    matching_bits += matches
+                    total_bits += frame1.size
+                
+                similarity = (matching_bits / total_bits * 100) if total_bits > 0 else 0
             
-            # Calcule la moyenne et l'écart-type
-            mean_similarity = np.mean(similarities)
-            std_similarity = np.std(similarities)
+            # Met en cache PARTOUT
+            computation_time = time.time() - start_time
             
-            # Les vidéos sont similaires si :
-            # 1. La similarité moyenne est supérieure au seuil
-            # 2. L'écart-type est inférieur au seuil (variation constante)
-            is_similar = mean_similarity >= threshold and std_similarity <= std_threshold
+            # Cache mémoire
+            self.comparison_cache[cache_key] = similarity
             
-            # Convertit la similarité en pourcentage
-            similarity_percent = mean_similarity * 100
+            # Cache DB
+            self.db.store_comparison(
+                video1_path, 
+                video2_path, 
+                similarity,
+                comparison_method="cached_absolute",
+                computation_time=computation_time
+            )
             
-            if is_similar:
-                if warning_message:
-                    logger.warning(f"Similarité : {mean_similarity:.2f}, écart-type : {std_similarity:.2f} - {warning_message}")
-                else:
-                    logger.info(f"Similarité : {mean_similarity:.2f}, écart-type : {std_similarity:.2f}")
-            
-            return is_similar, similarity_percent, warning_message
+            return similarity
             
         except Exception as e:
-            logger.error(f"Erreur lors de la comparaison des empreintes : {e}")
-            return False, 0, str(e)
+            logger.error(f"Erreur comparaison: {e}")
+            # Met en cache l'échec aussi
+            self.comparison_cache[cache_key] = 0.0
+            return 0.0
 
-    def get_video_hash(self, file_path):
-        """Récupère ou calcule l'empreinte d'une vidéo"""
-        try:
-            # Vérifie si l'empreinte existe dans le cache pour la méthode actuelle
-            if file_path in self.hashes[self.method]:
-                logger.debug(f"Empreinte trouvée dans le cache pour {os.path.basename(file_path)}")
-                return self.hashes[self.method][file_path]
-            
-            # Sinon, calcule la nouvelle empreinte
-            hash_data = self.compute_video_hash(file_path)
-            if hash_data:
-                # Sauvegarde dans le cache pour la méthode actuelle
-                self.hashes[self.method][file_path] = hash_data
-                self.save_hashes()
-            return hash_data
-            
-        except Exception as e:
-            logger.error(f"Erreur lors de la récupération de l'empreinte : {e}")
-            return None
+    def compare_videos_optimized(self, video1_path: str, video2_path: str) -> float:
+        """Alias pour la méthode cachée"""
+        return self.compare_videos_cached(video1_path, video2_path)
 
     def compare_videos(self, video1_path: str, video2_path: str) -> float:
-        """Compare deux vidéos et retourne leur pourcentage de similarité
+        """Méthode principale de comparaison"""
+        return self.compare_videos_cached(video1_path, video2_path)
 
-        Args:
-            video1_path (str): Chemin de la première vidéo
-            video2_path (str): Chemin de la deuxième vidéo
+    def get_cache_stats(self):
+        """Retourne les statistiques du cache mémoire"""
+        return {
+            'hash_cache_size': len(self.hash_cache),
+            'comparison_cache_size': len(self.comparison_cache),
+            'total_memory_items': len(self.hash_cache) + len(self.comparison_cache)
+        }
 
-        Returns:
-            float: Pourcentage de similarité entre 0 et 100
-        """
-        # Vérifie que les deux vidéos ont des hashs
-        if not self.has_hash(video1_path) or not self.has_hash(video2_path):
-            logger.error(f"Une des vidéos n'a pas de hash : {video1_path} ou {video2_path}")
-            return 0.0
+    def clear_memory_cache(self):
+        """Vide uniquement le cache mémoire (garde la DB)"""
+        self.hash_cache.clear()
+        self.comparison_cache.clear()
+        logger.info("Cache mémoire vidé")
 
-        # Récupère les hashs et les durées
-        hash1 = self.hashes[self.method][video1_path]["hash"]
-        hash2 = self.hashes[self.method][video2_path]["hash"]
-        duration1 = self.hashes[self.method][video1_path]["duration"]
-        duration2 = self.hashes[self.method][video2_path]["duration"]
+    def clear_cache(self):
+        """Vide tous les caches (mémoire + DB)"""
+        self.clear_memory_cache()
+        return self.db.clear_all_data()
 
-        # Vérifie la différence de durée
-        duration_diff = abs(duration1 - duration2)
-        if duration_diff > 300:  # 300 secondes = 5 minutes
-            logger.info(f"Différence de durée trop importante : {duration_diff:.1f}s > 300s")
-            return 0.0
+    def preload_comparisons_batch(self, file_pairs):
+        """Précharge un batch de comparaisons depuis la DB avec limite"""
+        try:
+            # Limite le préchargement pour éviter l'overflow mémoire
+            max_preload = 5000
+            if len(file_pairs) > max_preload:
+                logger.debug(f"Préchargement limité à {max_preload} paires sur {len(file_pairs)}")
+                file_pairs = file_pairs[:max_preload]
+            
+            loaded = 0
+            for file1, file2 in file_pairs:
+                cache_key = tuple(sorted([file1, file2]))
+                if cache_key not in self.comparison_cache:
+                    result = self.db.get_cached_comparison(file1, file2)
+                    if result is not None:
+                        self.comparison_cache[cache_key] = result
+                        loaded += 1
+            
+            if loaded > 0:
+                logger.debug(f"Préchargé {loaded} comparaisons en mémoire")
+                
+        except Exception as e:
+            logger.error(f"Erreur préchargement comparaisons: {e}")
 
-        # Compare les hashs frame par frame
-        total_bits = 0
-        matching_bits = 0
+    # Méthodes de compatibilité
+    def has_hash(self, file_path):
+        # Check cache mémoire d'abord (instantané)
+        if file_path in self.hash_cache:
+            current_mtime = os.path.getmtime(file_path)
+            cache_mtime = self.hash_cache[file_path]['mtime']
+            if abs(current_mtime - cache_mtime) < 1:
+                return True
+        return not self.db.file_needs_reanalysis(file_path)
+    
+    def is_pair_ignored(self, file1, file2):
+        return self.db.is_pair_ignored(file1, file2)
+    
+    def add_ignored_pair(self, file1, file2):
+        return self.db.add_ignored_pair(file1, file2, reason="user_choice")
+    
+    def get_cached_comparison(self, file1, file2):
+        # Check mémoire d'abord
+        cache_key = tuple(sorted([file1, file2]))
+        if cache_key in self.comparison_cache:
+            return self.comparison_cache[cache_key]
+        return self.db.get_cached_comparison(file1, file2)
+    
+    def get_statistics(self):
+        db_stats = self.db.get_statistics()
+        cache_stats = self.get_cache_stats()
+        return {**db_stats, **cache_stats}
 
-        # Prend le minimum de frames entre les deux vidéos
-        min_frames = min(len(hash1), len(hash2))
-
-        for frame_idx in range(min_frames):
-            frame1 = hash1[frame_idx]
-            frame2 = hash2[frame_idx]
-
-            # Compare chaque bit des frames
-            for i in range(8):
-                for j in range(8):
-                    total_bits += 1
-                    if frame1[i][j] == frame2[i][j]:
-                        matching_bits += 1
-
-        # Calcule le pourcentage de similarité
-        similarity = (matching_bits / total_bits) * 100 if total_bits > 0 else 0
-        logger.debug(f"Similarité entre {video1_path} et {video2_path} : {similarity:.2f}%")
-        
-        return similarity
+    # Optimisations supplémentaires
+    def quick_similarity_test(self, file1, file2):
+        """Test rapide avec une seule frame à position fixe"""
+        try:
+            # Position absolue fixe pour cohérence
+            test_position = 300  # 10 secondes
+            
+            cv2.setLogLevel(0)
+            cap1 = cv2.VideoCapture(file1)
+            cap2 = cv2.VideoCapture(file2)
+            
+            if not cap1.isOpened() or not cap2.isOpened():
+                return -1
+            
+            # Ajuste si nécessaire
+            total1 = int(cap1.get(cv2.CAP_PROP_FRAME_COUNT))
+            total2 = int(cap2.get(cv2.CAP_PROP_FRAME_COUNT))
+            
+            pos1 = min(test_position, total1 - 1) if total1 > 0 else 0
+            pos2 = min(test_position, total2 - 1) if total2 > 0 else 0
+            
+            cap1.set(cv2.CAP_PROP_POS_FRAMES, pos1)
+            cap2.set(cv2.CAP_PROP_POS_FRAMES, pos2)
+            
+            ret1, frame1 = cap1.read()
+            ret2, frame2 = cap2.read()
+            
+            cap1.release()
+            cap2.release()
+            cv2.setLogLevel(1)
+            
+            if not ret1 or not ret2:
+                return -1
+            
+            hash1 = self.compute_frame_hash(frame1)
+            hash2 = self.compute_frame_hash(frame2)
+            
+            if hash1 is None or hash2 is None:
+                return -1
+            
+            # Calcul de similarité
+            similarity = np.sum(hash1 == hash2) / hash1.size * 100
+            
+            return similarity
+            
+        except Exception:
+            return -1

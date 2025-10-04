@@ -1,3 +1,3 @@
-from .plugin import CopyManagerPlugin
+# TODO: Supprimer l'import 'CopyManagerPlugin'
 
 __all__ = ['CopyManagerPlugin']

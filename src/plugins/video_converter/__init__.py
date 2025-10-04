@@ -1,3 +1,3 @@
 """Plugin VideoConverter pour VideoFlow."""
 
-from .plugin import VideoConverterPlugin
+# TODO: Supprimer l'import 'VideoConverterPlugin'
