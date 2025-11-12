@@ -1,5 +1,5 @@
 """
-Widget d'aperçu vidéo optimisé pour la comparaison de doublons
+Widget d'preview vidéo optimisé for the comparison de doublons
 """
 
 import os
@@ -14,7 +14,7 @@ logger = Logger.get_logger('DuplicateFinder.VideoPreview')
 
 
 class VideoPreviewWidget(QWidget):
-    """Widget d'aperçu vidéo simple et efficace"""
+    """Widget d'preview vidéo simple et efficace"""
     
     # Signal émis quand une frame est chargée
     frame_loaded = pyqtSignal(int)
@@ -38,7 +38,7 @@ class VideoPreviewWidget(QWidget):
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(5)
         
-        # Zone d'aperçu principale PLUS GRANDE
+        # Zone d'preview principale PLUS GRANDE
         self.preview_label = QLabel()
         self.preview_label.setMinimumSize(350, 280)  # Plus grand : 350x280 au lieu de 400x300
         self.preview_label.setStyleSheet("""
@@ -49,15 +49,15 @@ class VideoPreviewWidget(QWidget):
             }
         """)
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setText("Chargement...")
+        self.preview_label.setText("Loadsment...")
         layout.addWidget(self.preview_label)
         
-        # Informations compactes PLUS GRANDES
+        # Information compactes PLUS GRANDES
         info_frame = self.create_info_section()
         layout.addWidget(info_frame)
         
     def create_info_section(self):
-        """Crée la section d'informations"""
+        """Crée la section d'information"""
         frame = QFrame()
         frame.setMinimumHeight(65)  # Plus grand pour police 12pt
         frame.setStyleSheet("""
@@ -73,7 +73,7 @@ class VideoPreviewWidget(QWidget):
         layout.setContentsMargins(10, 8, 10, 8)  # Plus d'espace
         layout.setSpacing(4)
         
-        # Nom de fichier - POLICE 12PT MINIMUM
+        # Name de file - POLICE 12PT MINIMUM
         filename = os.path.basename(self.video_path)
         if len(filename) > 60:  # Plus de caractères affichés
             filename = filename[:57] + "..."
@@ -85,7 +85,7 @@ class VideoPreviewWidget(QWidget):
         layout.addWidget(self.filename_label)
         
         # Infos techniques - POLICE 12PT MINIMUM
-        self.info_label = QLabel("Analyse en cours...")
+        self.info_label = QLabel("Analysis in progress...")
         self.info_label.setFont(QFont("Arial", 12))  # 12pt minimum
         self.info_label.setStyleSheet("color: #6C757D;")
         layout.addWidget(self.info_label)
@@ -93,13 +93,13 @@ class VideoPreviewWidget(QWidget):
         return frame
         
     def load_video_info(self):
-        """Charge les informations de la vidéo et affiche une frame à 10%"""
+        """Loads les information de the video et affiche une frame à 10%"""
         try:
-            # Informations fichier
+            # Information file
             file_size = os.path.getsize(self.video_path)
             size_text = self.format_file_size(file_size)
             
-            # Informations vidéo avec OpenCV
+            # Information vidéo with OpenCV
             cv2.setLogLevel(0)
             self.cap = cv2.VideoCapture(self.video_path)
             
@@ -117,15 +117,15 @@ class VideoPreviewWidget(QWidget):
                 self.show_frame(frame_at_10_percent)
                 
             else:
-                self.info_label.setText(f"{size_text} • Erreur lecture")
-                self.preview_label.setText("❌ Impossible d'ouvrir")
+                self.info_label.setText(f"{size_text} • Error lecture")
+                self.preview_label.setText("❌ Cannot open")
                 
             cv2.setLogLevel(1)
             
         except Exception as e:
-            logger.error(f"Erreur chargement {self.video_path}: {e}")
-            self.info_label.setText("Erreur")
-            self.preview_label.setText("❌ Erreur de chargement")
+            logger.error(f"Error chargement {self.video_path}: {e}")
+            self.info_label.setText("Error")
+            self.preview_label.setText("❌ Error de chargement")
     
     def show_frame(self, frame_number):
         """Affiche une frame spécifique"""
@@ -133,28 +133,28 @@ class VideoPreviewWidget(QWidget):
             return
             
         try:
-            # Limite le numéro de frame
+            # Limite the number de frame
             frame_number = max(0, min(frame_number, self.total_frames - 1))
             self.current_frame = frame_number
             
-            # Lit la frame
+            # Lit the frame
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
             ret, frame = self.cap.read()
             
             if ret and frame is not None:
-                # Convertit en QPixmap
+                # Converts en QPixmap
                 pixmap = self.frame_to_pixmap(frame)
                 if pixmap:
                     self.preview_label.setPixmap(pixmap)
                     self.frame_loaded.emit(frame_number)
                 else:
-                    self.preview_label.setText("Erreur conversion")
+                    self.preview_label.setText("Error conversion")
             else:
                 self.preview_label.setText(f"Frame {frame_number} indisponible")
                 
         except Exception as e:
-            logger.error(f"Erreur affichage frame {frame_number}: {e}")
-            self.preview_label.setText("Erreur affichage")
+            logger.error(f"Error affichage frame {frame_number}: {e}")
+            self.preview_label.setText("Error affichage")
     
     def seek_to_position(self, position):
         """Va à une position relative (0.0 à 1.0)"""
@@ -163,7 +163,7 @@ class VideoPreviewWidget(QWidget):
             self.show_frame(frame_number)
     
     def frame_to_pixmap(self, frame):
-        """Convertit une frame OpenCV en QPixmap redimensionné"""
+        """Converts une frame OpenCV en QPixmap redimensionné"""
         try:
             # Redimensionne en gardant les proportions
             label_size = self.preview_label.size()
@@ -173,7 +173,7 @@ class VideoPreviewWidget(QWidget):
             height, width = frame.shape[:2]
             aspect_ratio = width / height
             
-            # Calcule les nouvelles dimensions
+            # Calculates les nouvelles dimensions
             if aspect_ratio > target_width / target_height:
                 new_width = target_width
                 new_height = int(target_width / aspect_ratio)
@@ -184,7 +184,7 @@ class VideoPreviewWidget(QWidget):
             # Redimensionne
             resized_frame = cv2.resize(frame, (new_width, new_height))
             
-            # Convertit BGR vers RGB
+            # Converts BGR vers RGB
             rgb_frame = cv2.cvtColor(resized_frame, cv2.COLOR_BGR2RGB)
             
             # Crée QImage
@@ -195,11 +195,11 @@ class VideoPreviewWidget(QWidget):
             return QPixmap.fromImage(qt_image)
             
         except Exception as e:
-            logger.error(f"Erreur conversion frame: {e}")
+            logger.error(f"Error conversion frame: {e}")
             return None
     
     def format_file_size(self, size_bytes):
-        """Formate la taille de fichier"""
+        """Formate la size de file"""
         if size_bytes < 1024 * 1024:
             return f"{size_bytes / 1024:.0f}KB"
         elif size_bytes < 1024 * 1024 * 1024:
@@ -208,7 +208,7 @@ class VideoPreviewWidget(QWidget):
             return f"{size_bytes / (1024 * 1024 * 1024):.1f}GB"
     
     def format_duration(self, seconds):
-        """Formate la durée"""
+        """Formate la duration"""
         if seconds >= 3600:
             hours = int(seconds // 3600)
             minutes = int((seconds % 3600) // 60)
@@ -219,7 +219,7 @@ class VideoPreviewWidget(QWidget):
             return f"{minutes}:{secs:02d}"
     
     def get_frame_at_percent(self, percent):
-        """Retourne le numéro de frame à un pourcentage donné"""
+        """Returns the number de frame à un pourcentage donné"""
         if self.total_frames > 0:
             return int((percent / 100.0) * (self.total_frames - 1))
         return 0
@@ -231,8 +231,8 @@ class VideoPreviewWidget(QWidget):
                 self.cap.release()
                 self.cap = None
         except Exception as e:
-            logger.error(f"Erreur nettoyage {self.video_path}: {e}")
+            logger.error(f"Error nettoyage {self.video_path}: {e}")
     
     def __del__(self):
-        """Destructeur pour s'assurer du nettoyage"""
+        """Destructeur pour s'asoner du nettoyage"""
         self.cleanup()

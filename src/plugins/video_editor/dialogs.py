@@ -1,4 +1,4 @@
-"""Boîtes de dialogue personnalisées pour le plugin Video Editor"""
+"""Custom dialogs for the plugin Video Editor"""
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                            QLabel, QComboBox, QSpinBox, QCheckBox, QGroupBox,
@@ -7,10 +7,10 @@ from PyQt6.QtCore import Qt
 from .constants import VIDEO_CODECS, AUDIO_CODECS, QUALITY_PRESETS
 
 class ExportDialog(QDialog):
-    """Boîte de dialogue pour l'export de vidéo"""
+    """Dialog for export de vidéo"""
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Exporter la vidéo")
+        self.setWindowTitle("Exporter the video")
         self.setup_ui()
     
     def setup_ui(self):
@@ -26,8 +26,8 @@ class ExportDialog(QDialog):
         preset_group.setLayout(preset_layout)
         layout.addWidget(preset_group)
         
-        # Paramètres vidéo
-        video_group = QGroupBox("Paramètres vidéo")
+        # Settings vidéo
+        video_group = QGroupBox("Settings vidéo")
         video_layout = QFormLayout()
         
         self.video_codec_combo = QComboBox()
@@ -44,8 +44,8 @@ class ExportDialog(QDialog):
         video_group.setLayout(video_layout)
         layout.addWidget(video_group)
         
-        # Paramètres audio
-        audio_group = QGroupBox("Paramètres audio")
+        # Settings audio
+        audio_group = QGroupBox("Settings audio")
         audio_layout = QFormLayout()
         
         self.audio_codec_combo = QComboBox()
@@ -64,10 +64,10 @@ class ExportDialog(QDialog):
         options_group = QGroupBox("Options")
         options_layout = QVBoxLayout()
         
-        self.delete_original_cb = QCheckBox("Supprimer les fichiers originaux")
+        self.delete_original_cb = QCheckBox("Remove les files originaux")
         options_layout.addWidget(self.delete_original_cb)
         
-        self.open_after_cb = QCheckBox("Ouvrir après l'export")
+        self.open_after_cb = QCheckBox("Open après l'export")
         options_layout.addWidget(self.open_after_cb)
         
         options_group.setLayout(options_layout)
@@ -115,7 +115,12 @@ class ExportDialog(QDialog):
                 self.audio_bitrate_combo.setCurrentIndex(audio_bitrate_index)
     
     def get_settings(self):
-        """Retourne les paramètres d'export"""
+        """Get the export settings from the dialog.
+
+        Returns:
+            dict: Export settings including video_codec, crf, audio_codec,
+                audio_bitrate, delete_original, and open_after flags.
+        """
         return {
             'video_codec': self.video_codec_combo.currentData(),
             'crf': self.crf_spin.value(),
@@ -126,8 +131,18 @@ class ExportDialog(QDialog):
         }
 
 class SceneDetectionDialog(QDialog):
-    """Boîte de dialogue pour la détection de scènes"""
+    """Dialog for configuring scene detection parameters.
+
+    Provides UI for setting scene detection sensitivity, minimum scene length,
+    and automatic naming options.
+    """
+
     def __init__(self, parent=None):
+        """Initialize the scene detection dialog.
+
+        Args:
+            parent (QWidget, optional): Parent widget. Defaults to None.
+        """
         super().__init__(parent)
         self.setWindowTitle("Détection de scènes")
         self.setup_ui()
@@ -136,8 +151,8 @@ class SceneDetectionDialog(QDialog):
         """Configure l'interface utilisateur"""
         layout = QVBoxLayout(self)
         
-        # Paramètres
-        params_group = QGroupBox("Paramètres")
+        # Settings
+        params_group = QGroupBox("Settings")
         params_layout = QFormLayout()
         
         self.threshold_spin = QSpinBox()
@@ -179,7 +194,12 @@ class SceneDetectionDialog(QDialog):
         layout.addWidget(buttons)
     
     def get_settings(self):
-        """Retourne les paramètres de détection"""
+        """Get the scene detection settings from the dialog.
+
+        Returns:
+            dict: Detection settings including threshold, min_length,
+                auto_name, and merge_short flags.
+        """
         return {
             'threshold': self.threshold_spin.value(),
             'min_length': self.min_length_spin.value(),

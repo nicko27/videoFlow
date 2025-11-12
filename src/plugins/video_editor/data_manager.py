@@ -14,22 +14,22 @@ class DataManager:
             f"{os.path.splitext(os.path.basename(video_path))[0]}.json"
         )
         
-        # Créer le dossier de données si nécessaire
+        # Créer le folder de données si nécessaire
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
         
-        # Charger ou créer les données
+        # Load ou créer les données
         self.load_data()
     
     def load_data(self):
-        """Charge les données du fichier JSON"""
+        """Loads les données du file JSON"""
         if os.path.exists(self.data_file):
             try:
                 with open(self.data_file, 'r') as f:
                     self.data = json.load(f)
                 logger.debug(f"Données chargées depuis {self.data_file}")
             except Exception as e:
-                logger.error(f"Erreur lors du chargement des données : {str(e)}")
+                logger.error(f"Error loading des données : {str(e)}")
                 self.init_data()
         else:
             self.init_data()
@@ -48,17 +48,17 @@ class DataManager:
         self.save_data()
     
     def save_data(self):
-        """Sauvegarde les données dans le fichier JSON"""
+        """Saves les données in le file JSON"""
         try:
             self.data['last_modified'] = datetime.now().isoformat()
             with open(self.data_file, 'w') as f:
                 json.dump(self.data, f, indent=4)
-            logger.debug(f"Données sauvegardées dans {self.data_file}")
+            logger.debug(f"Données sauvegardées in {self.data_file}")
         except Exception as e:
-            logger.error(f"Erreur lors de la sauvegarde des données : {str(e)}")
+            logger.error(f"Error saving des données : {str(e)}")
     
     def add_segment(self, start_time, end_time, name=None):
-        """Ajoute un segment"""
+        """Adds un segment"""
         segment = {
             'start': start_time,
             'end': end_time,
@@ -70,7 +70,7 @@ class DataManager:
         return segment
     
     def remove_segment(self, index):
-        """Supprime un segment"""
+        """Removes un segment"""
         if 0 <= index < len(self.data['segments']):
             segment = self.data['segments'].pop(index)
             self.save_data()
@@ -86,7 +86,7 @@ class DataManager:
         return None
     
     def add_marker(self, time, name, color=None):
-        """Ajoute un marqueur"""
+        """Adds un marqueur"""
         marker = {
             'time': time,
             'name': name,
@@ -98,7 +98,7 @@ class DataManager:
         return marker
     
     def remove_marker(self, index):
-        """Supprime un marqueur"""
+        """Removes un marqueur"""
         if 0 <= index < len(self.data['markers']):
             marker = self.data['markers'].pop(index)
             self.save_data()
@@ -106,7 +106,7 @@ class DataManager:
         return None
     
     def add_scene(self, start_frame, end_frame):
-        """Ajoute une scène détectée"""
+        """Adds une scène détectée"""
         scene = {
             'start_frame': start_frame,
             'end_frame': end_frame,
@@ -117,7 +117,7 @@ class DataManager:
         return scene
     
     def add_to_history(self, action, details):
-        """Ajoute une action à l'historique"""
+        """Adds une action à l'historique"""
         history_entry = {
             'action': action,
             'details': details,
@@ -133,23 +133,23 @@ class DataManager:
         self.save_data()
     
     def get_segments(self):
-        """Retourne tous les segments"""
+        """Returns tous the segments"""
         return self.data['segments']
     
     def get_markers(self):
-        """Retourne tous les marqueurs"""
+        """Returns tous the markers"""
         return self.data['markers']
     
     def get_scenes(self):
-        """Retourne toutes les scènes"""
+        """Returns toutes les scènes"""
         return self.data['scenes']
     
     def get_history(self):
-        """Retourne l'historique"""
+        """Returns l'historique"""
         return self.data['history']
     
     def get_metadata(self, key=None):
-        """Retourne les métadonnées"""
+        """Returns les métadonnées"""
         if key is None:
             return self.data['metadata']
         return self.data['metadata'].get(key)

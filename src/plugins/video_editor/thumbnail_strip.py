@@ -9,7 +9,7 @@ import numpy as np
 from .segment_manager import SegmentManager, VideoSegment
 
 class ThumbnailWidget(QLabel):
-    """Widget pour afficher une miniature de frame"""
+    """Widget for display a miniature de frame"""
     clicked = pyqtSignal(int, Qt.MouseButton)  # Modifié pour inclure le bouton
     
     def __init__(self, frame_index, parent=None):
@@ -32,14 +32,14 @@ class ThumbnailWidget(QLabel):
         self.segment_color = None
     
     def set_segment_marker(self, is_start=False, is_end=False, color=None):
-        """Définit les marqueurs de segment"""
+        """Sets the markers de segment"""
         self.is_segment_start = is_start
         self.is_segment_end = is_end
         self.segment_color = color
         self.update()
     
     def paintEvent(self, event):
-        """Dessine la miniature avec les marqueurs"""
+        """Draws la miniature with the markers"""
         super().paintEvent(event)
         
         if self.is_segment_start or self.is_segment_end:
@@ -65,11 +65,11 @@ class ThumbnailWidget(QLabel):
                 painter.drawLine(self.width() - 11, self.height(), self.width() - 1, self.height())
     
     def mousePressEvent(self, event):
-        """Gère le clic sur la miniature"""
+        """Gère le clic on la miniature"""
         self.clicked.emit(self.frame_index, event.button())
 
 class ThumbnailLoader(QObject):
-    """Chargeur asynchrone de miniatures"""
+    """Loadon asynchrone de miniatures"""
     thumbnailReady = pyqtSignal(int, QPixmap)
     finished = pyqtSignal()
     progress = pyqtSignal(int)
@@ -81,7 +81,7 @@ class ThumbnailLoader(QObject):
         self.running = True
 
     def load(self):
-        """Charge les miniatures en arrière-plan"""
+        """Loads les miniatures en arrière-plan"""
         cap = cv2.VideoCapture(self.video_path)
         if not cap.isOpened():
             self.finished.emit()
@@ -146,7 +146,7 @@ class ThumbnailStrip(QWidget):
     def setup_context_menu(self):
         """Configure le menu contextuel"""
         self.context_menu = QMenu(self)
-        self.delete_action = QAction("Supprimer le segment", self)
+        self.delete_action = QAction("Remove the segment", self)
         self.delete_action.triggered.connect(self.delete_selected_segment)
         self.context_menu.addAction(self.delete_action)
     
@@ -220,14 +220,14 @@ class ThumbnailStrip(QWidget):
         layout.addWidget(self.progress_bar)
     
     def load_video(self, video_path):
-        """Charge les miniatures depuis une vidéo"""
-        # Arrêter le chargeur précédent si existant
+        """Loads les miniatures depuis une vidéo"""
+        # Stop le chargeur previous si existant
         self.stop_loader()
         
         # Nettoyer les miniatures existantes
         self.clear_thumbnails()
         
-        # Créer et démarrer le nouveau chargeur
+        # Créer et start le nouveau chargeur
         self.loader = ThumbnailLoader(video_path, self.frames_per_thumbnail)
         self.loader_thread = QThread()
         
@@ -250,22 +250,22 @@ class ThumbnailStrip(QWidget):
             self.loader_thread.wait()
     
     def add_thumbnail(self, frame_index, pixmap):
-        """Ajoute une nouvelle miniature"""
+        """Adds une nouvelle miniature"""
         thumb_widget = ThumbnailWidget(frame_index)
         thumb_widget.setPixmap(pixmap)
         thumb_widget.clicked.connect(self.on_thumbnail_clicked)
         
-        # Ajouter au layout dans l'ordre
+        # Add au layout in l'ordre
         self.thumbnails[frame_index] = thumb_widget
         
         # Réorganiser les widgets
         self.reorganize_thumbnails()
         
-        # Mettre à jour les marqueurs de segment
+        # Mettre à jour the markers de segment
         self.update_segment_markers()
     
     def reorganize_thumbnails(self):
-        """Réorganise les miniatures dans l'ordre"""
+        """Réorganise les miniatures in l'ordre"""
         while self.container_layout.count() > 0:
             self.container_layout.takeAt(0)
         
@@ -275,12 +275,12 @@ class ThumbnailStrip(QWidget):
         self.container_layout.addStretch()
     
     def update_segment_markers(self):
-        """Met à jour les marqueurs de segment sur les miniatures"""
-        # Réinitialiser tous les marqueurs
+        """Met à jour the markers de segment on les miniatures"""
+        # Réinitialiser tous the markers
         for thumb in self.thumbnails.values():
             thumb.set_segment_marker()
         
-        # Ajouter les marqueurs pour les segments complets
+        # Add the markers pour the segments complets
         for segment in self.segment_manager.get_all_segments():
             start_thumb = self.get_thumbnail_for_frame(segment.start_frame)
             if start_thumb:
@@ -290,7 +290,7 @@ class ThumbnailStrip(QWidget):
             if end_thumb:
                 end_thumb.set_segment_marker(is_end=True, color=segment.color)
         
-        # Ajouter le marqueur pour le segment en cours
+        # Add the marker pour the segment in progress
         current = self.segment_manager.get_current_segment()
         if current:
             start_thumb = self.get_thumbnail_for_frame(current.start_frame)
@@ -307,20 +307,20 @@ class ThumbnailStrip(QWidget):
         return self.thumbnails.get(thumb_frame)
     
     def on_loading_finished(self):
-        """Appelé quand le chargement est terminé"""
+        """Appelé quand le chargement est completed"""
         self.progress_bar.hide()
         self.loader_thread.quit()
         self.loader_thread.wait()
     
     def clear_thumbnails(self):
-        """Supprime toutes les miniatures"""
+        """Removes toutes les miniatures"""
         for thumb in self.thumbnails.values():
             self.container_layout.removeWidget(thumb)
             thumb.deleteLater()
         self.thumbnails.clear()
         
     def set_current_frame(self, frame_index):
-        """Met à jour la frame sélectionnée"""
+        """Met à jour the frame sélectionnée"""
         self.current_frame = frame_index
         thumb_index = frame_index - (frame_index % self.frames_per_thumbnail)
         
@@ -334,12 +334,12 @@ class ThumbnailStrip(QWidget):
             self.scroll_area.ensureWidgetVisible(thumb)
     
     def on_thumbnail_clicked(self, frame_index, button):
-        """Gère le clic sur une miniature"""
+        """Gère le clic on une miniature"""
         if button == Qt.MouseButton.LeftButton:
             self.frameSelected.emit(frame_index)
             self.set_current_frame(frame_index)
         elif button == Qt.MouseButton.RightButton:
-            # Vérifier si on clique sur un segment existant
+            # Checksr si on clique on un segment existant
             for i, segment in enumerate(self.segment_manager.get_all_segments()):
                 if segment.start_frame <= frame_index <= segment.end_frame:
                     self.show_segment_context_menu(i, QCursor.pos())
@@ -351,7 +351,7 @@ class ThumbnailStrip(QWidget):
         self.context_menu.exec(pos)
     
     def delete_selected_segment(self):
-        """Supprime le segment sélectionné"""
+        """Removes the segment sélectionné"""
         if hasattr(self.context_menu, 'segment_index'):
             index = self.context_menu.segment_index
             self.segment_manager.remove_segment(index)
@@ -365,7 +365,7 @@ class ThumbnailStrip(QWidget):
         return segment
     
     def end_segment(self, frame):
-        """Termine le segment en cours"""
+        """Finishes the segment in progress"""
         segment = self.segment_manager.end_segment(frame)
         if segment:
             self.update_segment_markers()
@@ -373,15 +373,15 @@ class ThumbnailStrip(QWidget):
         return segment
     
     def cancel_current_segment(self):
-        """Annule le segment en cours"""
+        """Cancels the segment in progress"""
         self.segment_manager.cancel_current_segment()
         self.update_segment_markers()
     
     def get_segments(self):
-        """Retourne tous les segments"""
+        """Returns tous the segments"""
         return self.segment_manager.get_all_segments()
     
     def clear_segments(self):
-        """Efface tous les segments"""
+        """Efface tous the segments"""
         self.segment_manager.clear()
         self.update_segment_markers()

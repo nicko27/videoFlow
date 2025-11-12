@@ -1,5 +1,5 @@
 """
-Dialogue de comparaison de doublons - Version interface corrigée
+Dialogue de comparison de doublons - Version interface corrigée
 Corrections: titre réduit, zone du bas optimisée, boutons colorés
 """
 
@@ -24,7 +24,7 @@ logger = Logger.get_logger('DuplicateFinder.ComparisonDialog')
 
 
 class ComparisonDialog(QDialog):
-    """Dialogue de comparaison optimisé - Version interface corrigée"""
+    """Dialogue de comparison optimisé - Version interface corrigée"""
     
     def __init__(self, file1: str, file2: str, similarity: float, parent=None):
         super().__init__(parent)
@@ -33,10 +33,10 @@ class ComparisonDialog(QDialog):
         self.similarity = similarity
         self.result = None
         
-        # Arrange les fichiers intelligemment
+        # Arrange les files intelligemment
         self.arrange_files_by_name()
         
-        self.setWindowTitle(f"Comparaison de doublons - Similarité: {self.similarity:.1f}%")
+        self.setWindowTitle(f"Comparison de doublons - Similarité: {self.similarity:.1f}%")
         
         # OUVRE EN PLEIN ÉCRAN
         self.setWindowState(Qt.WindowState.WindowMaximized)
@@ -48,13 +48,13 @@ class ComparisonDialog(QDialog):
         QTimer.singleShot(500, self.show_initial_position)
         
     def arrange_files_by_name(self):
-        """Place le fichier sans numérotation à gauche"""
+        """Place le file sans numérotation à gauche"""
         try:
             file1_name = os.path.basename(self.file1)
             file2_name = os.path.basename(self.file2)
             
-            # Patterns de numérotation/copie
-            patterns = [r'\(\d+\)', r'_\d+', r' - Copy', r' - Copie', r'Copy of ', r'Copie de ']
+            # Patterns de numérotation/copy
+            patterns = [r'\(\d+\)', r'_\d+', r' - Copy', r' - Copy', r'Copy of ', r'Copy de ']
             
             file1_has_pattern = any(re.search(pattern, file1_name) for pattern in patterns)
             file2_has_pattern = any(re.search(pattern, file2_name) for pattern in patterns)
@@ -68,7 +68,7 @@ class ComparisonDialog(QDialog):
                     self.file1, self.file2 = self.file2, self.file1
                     
         except Exception as e:
-            logger.error(f"Erreur arrangement fichiers: {e}")
+            logger.error(f"Error arrangement files: {e}")
         
     def setup_ui(self):
         """Configure l'interface - VERSION CORRIGÉE"""
@@ -80,7 +80,7 @@ class ComparisonDialog(QDialog):
         similarity_frame = self.create_similarity_indicator()
         layout.addWidget(similarity_frame)
         
-        # Zone de comparaison principale
+        # Zone de comparison principale
         comparison_layout = QHBoxLayout()
         comparison_layout.setSpacing(30)
         
@@ -217,7 +217,7 @@ class ComparisonDialog(QDialog):
         return container, video_widget
         
     def create_navigation_controls(self):
-        """Crée les contrôles de navigation - VERSION CORRIGÉE avec zones temps plus hautes"""
+        """Crée les contrôles de navigation - VERSION CORRIGÉE with zones time plus hautes"""
         frame = QFrame()
         frame.setMaximumHeight(110)  # AUGMENTÉ: 100 → 110 pour plus d'espace
         frame.setStyleSheet("""
@@ -238,7 +238,7 @@ class ComparisonDialog(QDialog):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
         
-        # Slider avec zones de temps CORRIGÉES
+        # Slider with zones de time CORRIGÉES
         slider_layout = QHBoxLayout()
         
         # ZONE TEMPS DÉBUT - HAUTEUR CORRIGÉE
@@ -301,7 +301,7 @@ class ComparisonDialog(QDialog):
         slider_layout.addWidget(self.duration_label)
         layout.addLayout(slider_layout)
         
-        # Boutons de navigation avec hauteur corrigée
+        # Boutons de navigation with hauteur corrigée
         nav_layout = QHBoxLayout()
         nav_layout.setSpacing(12)
         
@@ -334,7 +334,7 @@ class ComparisonDialog(QDialog):
         return frame
         
     def create_action_buttons(self):
-        """Crée les 5 boutons d'action - VERSION CORRIGÉE avec VRAIES couleurs"""
+        """Crée les 5 boutons d'action - VERSION CORRIGÉE with VRAIES couleurs"""
         frame = QFrame()
         frame.setMaximumHeight(120)  # NOUVEAU: Limite la hauteur pour réduire l'espace
         # FOND BLANC AU LIEU DU GRIS DÉGUEULASSE
@@ -475,12 +475,12 @@ class ComparisonDialog(QDialog):
         return frame
         
     def show_initial_position(self):
-        """Affiche les vidéos à 10%"""
+        """Affiche the videos à 10%"""
         try:
             self.seek_to_position(0.1)
             logger.info("Position initiale fixée à 10%")
         except Exception as e:
-            logger.error(f"Erreur position initiale: {e}")
+            logger.error(f"Error position initiale: {e}")
             
     def on_slider_changed(self, value):
         """Gère le changement de slider"""
@@ -498,7 +498,7 @@ class ComparisonDialog(QDialog):
             self.left_video.seek_to_position(position)
             self.right_video.seek_to_position(position)
             
-            # Met à jour l'affichage du temps
+            # Met à jour l'affichage du time
             duration_a = getattr(self.left_video, 'duration', 0)
             duration_b = getattr(self.right_video, 'duration', 0)
             max_duration = max(duration_a, duration_b)
@@ -507,15 +507,15 @@ class ComparisonDialog(QDialog):
             self.update_time_display(current_time, max_duration)
             
         except Exception as e:
-            logger.error(f"Erreur synchronisation: {e}")
+            logger.error(f"Error synchronisation: {e}")
             
     def update_time_display(self, current_seconds, total_seconds):
-        """Met à jour l'affichage du temps"""
+        """Met à jour l'affichage du time"""
         self.time_label.setText(self.format_time(current_seconds))
         self.duration_label.setText(self.format_time(total_seconds))
         
     def format_time(self, seconds):
-        """Formate le temps"""
+        """Formate le time"""
         if seconds >= 3600:
             hours = int(seconds // 3600)
             minutes = int((seconds % 3600) // 60)
@@ -593,5 +593,5 @@ class ComparisonDialog(QDialog):
             self.left_video.cleanup()
             self.right_video.cleanup()
         except Exception as e:
-            logger.error(f"Erreur nettoyage: {e}")
+            logger.error(f"Error nettoyage: {e}")
         super().closeEvent(event)

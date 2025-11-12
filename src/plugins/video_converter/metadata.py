@@ -1,4 +1,4 @@
-"""Gestion des métadonnées optimisée pour VideoConverter plugin."""
+"""Handling des métadonnées optimisée pour VideoConverter plugin."""
 
 import json
 import subprocess
@@ -48,7 +48,7 @@ class ConversionMetadata:
         }
 
 class MetadataManager:
-    """Gestionnaire de métadonnées optimisé pour performance."""
+    """Handlingnaire de métadonnées optimisé pour performance."""
     
     CONVERSION_TAG = "com.videoflow.conversion"
     
@@ -58,12 +58,12 @@ class MetadataManager:
     
     @staticmethod
     def _get_cache_key(file_path: Path) -> str:
-        """Générer une clé de cache pour un fichier."""
+        """Générer une clé de cache pour un file."""
         return str(file_path.resolve())
     
     @staticmethod
     def _is_cache_valid(file_path: Path) -> bool:
-        """Vérifier si le cache est valide pour un fichier."""
+        """Checksr si le cache est valide pour un file."""
         cache_key = MetadataManager._get_cache_key(file_path)
         
         if cache_key not in MetadataManager._metadata_cache:
@@ -78,7 +78,7 @@ class MetadataManager:
     
     @staticmethod
     def _update_cache(file_path: Path, metadata: Optional[ConversionMetadata]):
-        """Mettre à jour le cache pour un fichier."""
+        """Mettre à jour le cache pour un file."""
         cache_key = MetadataManager._get_cache_key(file_path)
         
         try:
@@ -91,11 +91,11 @@ class MetadataManager:
     
     @staticmethod
     def get_metadata(file_path: Path) -> Optional[ConversionMetadata]:
-        """Obtenir les métadonnées de conversion d'un fichier avec cache."""
+        """Obtenir les métadonnées de conversion d'un file with cache."""
         if not file_path.exists():
             return None
         
-        # Vérifier le cache
+        # Checksr le cache
         if MetadataManager._is_cache_valid(file_path):
             cache_key = MetadataManager._get_cache_key(file_path)
             return MetadataManager._metadata_cache.get(cache_key)
@@ -120,7 +120,7 @@ class MetadataManager:
                         meta_dict = json.loads(tags[MetadataManager.CONVERSION_TAG])
                         metadata = ConversionMetadata.from_dict(meta_dict)
                     except (json.JSONDecodeError, KeyError, ValueError) as e:
-                        logger.warning(f"Métadonnées invalides dans {file_path}: {e}")
+                        logger.warning(f"Métadonnées invalides in {file_path}: {e}")
                         metadata = None
                 
                 # Mettre à jour le cache
@@ -132,20 +132,20 @@ class MetadataManager:
             return None
             
         except subprocess.TimeoutExpired:
-            logger.error(f"Timeout lors de la lecture des métadonnées de {file_path}")
+            logger.error(f"Timeout lors of the lecture des métadonnées de {file_path}")
             return None
         except json.JSONDecodeError as e:
-            logger.error(f"JSON invalide dans la sortie ffprobe pour {file_path}: {e}")
+            logger.error(f"JSON invalide in la sortie ffprobe pour {file_path}: {e}")
             return None
         except Exception as e:
-            logger.error(f"Erreur lors de la lecture des métadonnées de {file_path}: {e}")
+            logger.error(f"Error reading des métadonnées de {file_path}: {e}")
             return None
     
     @staticmethod
     def set_metadata(file_path: Path, metadata: ConversionMetadata) -> bool:
-        """Définir les métadonnées de conversion pour un fichier avec gestion cross-device."""
+        """Définir les métadonnées de conversion pour un file with gestion cross-device."""
         if not file_path.exists():
-            logger.error(f"Impossible de définir les métadonnées: fichier inexistant: {file_path}")
+            logger.error(f"Cannot définir les métadonnées: file inexistant: {file_path}")
             return False
         
         temp_path = None
@@ -156,7 +156,7 @@ class MetadataManager:
                 logger.warning(f"Métadonnées trop volumineuses pour {file_path}, ignorées")
                 return False
             
-            # Créer un fichier temporaire dans le même dossier pour éviter cross-device
+            # Créer un file temporaire in le même folder pour éviter cross-device
             parent_dir = file_path.parent
             temp_name = f"metadata_temp_{file_path.stem}_{datetime.now().strftime('%H%M%S')}{file_path.suffix}"
             temp_path = parent_dir / temp_name
@@ -166,15 +166,15 @@ class MetadataManager:
                 '-i', str(file_path),
                 '-c', 'copy',  # Copier sans réencodage
                 '-metadata', f'{MetadataManager.CONVERSION_TAG}={meta_json}',
-                '-y',  # Écraser le fichier de sortie
+                '-y',  # Écraser le file de sortie
                 str(temp_path)
             ]
             
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             if result.returncode == 0:
-                # Vérifier que le fichier temporaire a été créé correctement
+                # Checksr que le file temporaire a été créé correctement
                 if temp_path.exists() and temp_path.stat().st_size > 0:
-                    # Remplacer le fichier original (même device, pas de cross-device link)
+                    # Remplacer le file original (même device, pas de cross-device link)
                     file_path.unlink()
                     temp_path.rename(file_path)
                     
@@ -186,63 +186,63 @@ class MetadataManager:
                     logger.debug(f"Métadonnées mises à jour pour {file_path}")
                     return True
                 else:
-                    logger.error(f"Fichier temporaire vide ou inexistant: {temp_path}")
+                    logger.error(f"File temporaire vide ou inexistant: {temp_path}")
                     return False
             else:
-                logger.error(f"Erreur ffmpeg lors de la mise à jour des métadonnées pour {file_path}: {result.stderr}")
+                logger.error(f"Error ffmpeg lors of the mise à jour des métadonnées pour {file_path}: {result.stderr}")
                 return False
         
         except subprocess.TimeoutExpired:
-            logger.error(f"Timeout lors de la mise à jour des métadonnées pour {file_path}")
+            logger.error(f"Timeout lors of the mise à jour des métadonnées pour {file_path}")
             return False
         except Exception as e:
-            logger.error(f"Erreur lors de la mise à jour des métadonnées pour {file_path}: {e}")
+            logger.error(f"Error lors of the mise à jour des métadonnées pour {file_path}: {e}")
             return False
         finally:
-            # Nettoyer le fichier temporaire
+            # Nettoyer le file temporaire
             if temp_path and temp_path.exists():
                 try:
                     temp_path.unlink()
                 except Exception as e:
-                    logger.warning(f"Impossible de nettoyer le fichier temporaire {temp_path}: {e}")
+                    logger.warning(f"Cannot nettoyer le file temporaire {temp_path}: {e}")
     
     @staticmethod
     def mark_as_converted(input_path: Path, output_path: Path, params: Dict[str, Any]) -> bool:
-        """Marquer un fichier comme converti avec gestion d'erreur robuste."""
+        """Marquer un file comme converti with gestion d'error robuste."""
         try:
             if not input_path.exists():
-                logger.error(f"Fichier d'entrée inexistant: {input_path}")
+                logger.error(f"File d'entrée inexistant: {input_path}")
                 return False
             
-            # Obtenir la taille originale
+            # Obtenir la size originale
             try:
                 original_size = input_path.stat().st_size
             except OSError as e:
-                logger.error(f"Impossible d'obtenir la taille du fichier original: {e}")
+                logger.error(f"Impossible d'obtenir la size du file original: {e}")
                 return False
             
-            # Déterminer quel fichier utiliser pour la taille convertie
+            # Déterminer quel file utiliser for the size convertie
             if output_path.exists():
                 try:
                     new_size = output_path.stat().st_size
                     metadata_target = output_path
                 except OSError as e:
-                    logger.error(f"Impossible d'obtenir la taille du fichier converti: {e}")
+                    logger.error(f"Impossible d'obtenir la size du file converti: {e}")
                     return False
             else:
-                # Le fichier pourrait avoir été remplacé
+                # Le file pourrait avoir été remplacé
                 if input_path.exists():
                     try:
                         new_size = input_path.stat().st_size
                         metadata_target = input_path
                     except OSError as e:
-                        logger.error(f"Impossible d'obtenir la taille après remplacement: {e}")
+                        logger.error(f"Impossible d'obtenir la size après remplacement: {e}")
                         return False
                 else:
-                    logger.error("Aucun fichier de sortie trouvé")
+                    logger.error("Aucun file de sortie found")
                     return False
             
-            # Calculer le ratio de compression
+            # Calculatesr le ratio de compression
             if original_size > 0:
                 ratio = ((original_size - new_size) / original_size) * 100
             else:
@@ -264,17 +264,17 @@ class MetadataManager:
             if success:
                 logger.info(f"Métadonnées définies pour {metadata_target}: {ratio:.1f}% de compression")
             else:
-                logger.warning(f"Échec de la définition des métadonnées pour {metadata_target}, conversion toujours réussie")
+                logger.warning(f"Failed of the définition des métadonnées pour {metadata_target}, conversion toujours réussie")
             
             return success
             
         except Exception as e:
-            logger.error(f"Erreur lors du marquage du fichier comme converti: {e}")
+            logger.error(f"Error during marquage du file comme converti: {e}")
             return False
     
     @staticmethod
     def has_conversion_metadata(file_path: Path) -> bool:
-        """Vérifier si un fichier a des métadonnées de conversion."""
+        """Checksr si un file a des métadonnées de conversion."""
         metadata = MetadataManager.get_metadata(file_path)
         return metadata is not None and metadata.compression_ratio > 0
     
@@ -286,14 +286,14 @@ class MetadataManager:
     
     @staticmethod
     def remove_metadata(file_path: Path) -> bool:
-        """Supprimer les métadonnées de conversion d'un fichier."""
+        """Remove les métadonnées de conversion d'un file."""
         if not file_path.exists():
-            logger.error(f"Fichier inexistant: {file_path}")
+            logger.error(f"File inexistant: {file_path}")
             return False
         
         temp_path = None
         try:
-            # Créer un fichier temporaire sans métadonnées
+            # Créer un file temporaire sans métadonnées
             temp_fd, temp_path_str = tempfile.mkstemp(
                 suffix=file_path.suffix, 
                 prefix=f"remove_meta_{file_path.stem}_"
@@ -307,7 +307,7 @@ class MetadataManager:
                 'ffmpeg',
                 '-i', str(file_path),
                 '-c', 'copy',
-                '-map_metadata', '-1',  # Supprimer toutes les métadonnées
+                '-map_metadata', '-1',  # Remove toutes les métadonnées
                 '-y',
                 str(temp_path)
             ]
@@ -325,21 +325,21 @@ class MetadataManager:
                 logger.debug(f"Métadonnées supprimées de {file_path}")
                 return True
             else:
-                logger.error(f"Échec de la suppression des métadonnées de {file_path}")
+                logger.error(f"Failed of the suppression des métadonnées de {file_path}")
                 return False
                 
         except subprocess.TimeoutExpired:
-            logger.error(f"Timeout lors de la suppression des métadonnées de {file_path}")
+            logger.error(f"Timeout lors of the suppression des métadonnées de {file_path}")
             return False
         except Exception as e:
-            logger.error(f"Erreur lors de la suppression des métadonnées de {file_path}: {e}")
+            logger.error(f"Error lors of the suppression des métadonnées de {file_path}: {e}")
             return False
         finally:
             if temp_path and temp_path.exists():
                 try:
                     temp_path.unlink()
                 except Exception as e:
-                    logger.warning(f"Impossible de nettoyer le fichier temporaire {temp_path}: {e}")
+                    logger.warning(f"Cannot nettoyer le file temporaire {temp_path}: {e}")
     
     @staticmethod
     def clear_cache():
@@ -350,7 +350,7 @@ class MetadataManager:
     
     @staticmethod
     def get_cache_stats() -> Dict[str, int]:
-        """Obtenir les statistiques du cache."""
+        """Obtenir les statistics du cache."""
         return {
             'cached_files': len(MetadataManager._metadata_cache),
             'files_with_metadata': sum(1 for meta in MetadataManager._metadata_cache.values() if meta is not None)

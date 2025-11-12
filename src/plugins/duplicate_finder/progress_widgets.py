@@ -1,5 +1,5 @@
 """
-Widgets de progression modernes - Version avec TEXTE NOIR VISIBLE
+Widgets de progression modernes - Version with TEXTE NOIR VISIBLE
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame, QScrollArea
@@ -8,7 +8,7 @@ from PyQt6.QtGui import QFont, QPalette, QColor
 
 
 class ModernProgressWidget(QWidget):
-    """Widget de progression moderne avec statistiques"""
+    """Widget de progression moderne with statistics"""
     
     def __init__(self, title, parent=None):
         super().__init__(parent)
@@ -22,14 +22,14 @@ class ModernProgressWidget(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(8)
         
-        # En-tête avec titre et statut
+        # En-tête with titre et statut
         header_layout = QHBoxLayout()
         
         self.title_label = QLabel(self.title)
         self.title_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))  # PLUS PETIT
         self.title_label.setStyleSheet("color: black; font-weight: bold;")
         
-        self.status_label = QLabel("En attente...")
+        self.status_label = QLabel("Pending...")
         self.status_label.setFont(QFont("Arial", 10))
         self.status_label.setStyleSheet("color: black; font-weight: bold;")
         
@@ -63,14 +63,14 @@ class ModernProgressWidget(QWidget):
         """)
         layout.addWidget(self.progress_bar)
         
-        # Informations détaillées
+        # Information détaillées
         details_layout = QHBoxLayout()
         
-        self.time_label = QLabel("Temps: --:--")
+        self.time_label = QLabel("Time: --:--")
         self.time_label.setFont(QFont("Arial", 9))
         self.time_label.setStyleSheet("color: black; font-weight: bold;")
         
-        self.speed_label = QLabel("Vitesse: --")
+        self.speed_label = QLabel("Speed: --")
         self.speed_label.setFont(QFont("Arial", 9))
         self.speed_label.setStyleSheet("color: black; font-weight: bold;")
         
@@ -91,12 +91,12 @@ class ModernProgressWidget(QWidget):
             self.progress_bar.setFormat(f"{current:,}/{maximum:,}")
             
     def set_status(self, status, color="black"):
-        """Change le statut avec couleur"""
+        """Change le statut with couleur"""
         self.status_label.setText(status)
         self.status_label.setStyleSheet(f"color: {color}; font-weight: bold; font-size: 10px;")
         
     def set_time_remaining(self, seconds):
-        """Met à jour le temps restant"""
+        """Met à jour le time remaining"""
         if seconds > 0:
             if seconds < 60:
                 self.time_label.setText(f"Restant: {int(seconds)}s")
@@ -109,26 +109,26 @@ class ModernProgressWidget(QWidget):
                 minutes = int((seconds % 3600) // 60)
                 self.time_label.setText(f"Restant: {hours}h{minutes:02d}")
         else:
-            self.time_label.setText("Temps: --:--")
+            self.time_label.setText("Time: --:--")
             
     def set_speed(self, items_per_second):
-        """Met à jour la vitesse"""
+        """Met à jour la speed"""
         if items_per_second > 0:
             if items_per_second >= 1000:
-                self.speed_label.setText(f"Vitesse: {items_per_second/1000:.1f}k/s")
+                self.speed_label.setText(f"Speed: {items_per_second/1000:.1f}k/s")
             elif items_per_second >= 10:
-                self.speed_label.setText(f"Vitesse: {items_per_second:.0f}/s")
+                self.speed_label.setText(f"Speed: {items_per_second:.0f}/s")
             elif items_per_second >= 1:
-                self.speed_label.setText(f"Vitesse: {items_per_second:.1f}/s")
+                self.speed_label.setText(f"Speed: {items_per_second:.1f}/s")
             else:
                 time_per_item = 1 / items_per_second
-                self.speed_label.setText(f"Vitesse: {time_per_item:.1f}s/item")
+                self.speed_label.setText(f"Speed: {time_per_item:.1f}s/item")
         else:
-            self.speed_label.setText("Vitesse: --")
+            self.speed_label.setText("Speed: --")
 
 
 class FileListWidget(QWidget):
-    """Widget de liste de fichiers - TEXTE NOIR GARANTI"""
+    """Widget de liste de files - TEXTE NOIR GARANTI"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -149,7 +149,7 @@ class FileListWidget(QWidget):
         title.setFont(QFont("Arial", 12, QFont.Weight.Bold))  # PLUS PETIT
         title.setStyleSheet("color: black; font-weight: bold; background-color: white; padding: 3px;")
         
-        self.file_count_label = QLabel("0 fichier")
+        self.file_count_label = QLabel("0 file")
         self.file_count_label.setFont(QFont("Arial", 10))  # PLUS PETIT
         self.file_count_label.setStyleSheet("color: black; font-weight: bold; background-color: white; padding: 3px;")
         
@@ -179,7 +179,7 @@ class FileListWidget(QWidget):
         self.files_layout.setSpacing(5)  # PLUS D'ESPACE : 3 → 5px
         
         # Message par défaut
-        self.empty_label = QLabel("Aucun fichier ajouté")
+        self.empty_label = QLabel("Aucun file ajouté")
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_label.setFont(QFont("Arial", 12))
         self.empty_label.setStyleSheet("color: black; background-color: #F0F0F0; padding: 20px; border: 1px dashed #CCCCCC;")
@@ -190,7 +190,7 @@ class FileListWidget(QWidget):
         layout.addWidget(self.scroll_area)
         
     def add_files(self, file_paths):
-        """Ajoute des fichiers"""
+        """Adds des files"""
         new_count = 0
         for file_path in file_paths:
             if file_path not in self.files:
@@ -209,10 +209,10 @@ class FileListWidget(QWidget):
         return new_count
         
     def create_file_item(self, file_path):
-        """Crée un item de fichier avec TEXTE NOIR FORCÉ"""
+        """Crée un item de file with TEXTE NOIR FORCÉ"""
         import os
         
-        # Frame avec bordure visible - HAUTEUR PLUS GÉNÉREUSE
+        # Frame with bordure visible - HAUTEUR PLUS GÉNÉREUSE
         item_frame = QFrame()
         item_frame.setMinimumHeight(70)  # PLUS HAUT : 50 → 70px
         item_frame.setMaximumHeight(70)  # PLUS HAUT : 50 → 70px
@@ -228,12 +228,12 @@ class FileListWidget(QWidget):
             }
         """)
         
-        # Layout horizontal avec PLUS DE PADDING
+        # Layout horizontal with PLUS DE PADDING
         layout = QHBoxLayout(item_frame)
         layout.setContentsMargins(12, 10, 12, 10)  # PLUS DE PADDING : 8,5 → 12,10
         layout.setSpacing(12)  # PLUS D'ESPACE : 8 → 12
         
-        # NOM DU FICHIER - NOIR FORCÉ avec PLUS DE PLACE
+        # NOM DU FICHIER - NOIR FORCÉ with PLUS DE PLACE
         filename = os.path.basename(file_path)
         if len(filename) > 40:
             filename = filename[:37] + "..."
@@ -241,19 +241,19 @@ class FileListWidget(QWidget):
         name_label = QLabel(filename)
         name_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))  # PLUS GRAND : 10 → 11
         name_label.setMinimumHeight(30)  # HAUTEUR MINIMALE POUR LE TEXTE
-        # FORCE la couleur noire avec setPalette
+        # FORCE la couleur noire with setPalette
         palette = name_label.palette()
         palette.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))  # Noir pur
         name_label.setPalette(palette)
         name_label.setStyleSheet("color: black; background-color: transparent; padding: 5px;")  # PADDING AJOUTÉ
         name_label.setToolTip(file_path)
         
-        # TAILLE - NOIR FORCÉ avec PLUS DE PLACE
+        # TAILLE - NOIR FORCÉ with PLUS DE PLACE
         try:
             size = os.path.getsize(file_path)
             size_text = self.format_file_size(size)
         except:
-            size_text = "Erreur"
+            size_text = "Error"
             
         size_label = QLabel(size_text)
         size_label.setFont(QFont("Arial", 10))  # PLUS GRAND : 9 → 10
@@ -265,8 +265,8 @@ class FileListWidget(QWidget):
         size_label.setStyleSheet("color: black; background-color: transparent; padding: 5px;")  # PADDING AJOUTÉ
         size_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)  # CENTRÉ VERTICALEMENT
         
-        # STATUT - NOIR FORCÉ avec PLUS DE PLACE
-        status_label = QLabel("⏳ À analyser")
+        # STATUT - NOIR FORCÉ with PLUS DE PLACE
+        status_label = QLabel("⏳ À analyze")
         status_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))  # PLUS GRAND : 9 → 10
         status_label.setFixedWidth(120)  # PLUS LARGE : 100 → 120
         status_label.setMinimumHeight(30)  # HAUTEUR MINIMALE
@@ -276,7 +276,7 @@ class FileListWidget(QWidget):
         status_label.setStyleSheet("color: black; background-color: transparent; padding: 5px;")  # PADDING AJOUTÉ
         status_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)  # CENTRÉ
         
-        # Ajoute au layout
+        # Adds au layout
         layout.addWidget(name_label, 1)
         layout.addWidget(size_label, 0)
         layout.addWidget(status_label, 0)
@@ -294,13 +294,13 @@ class FileListWidget(QWidget):
         return item_frame
         
     def update_file_status(self, file_path, status):
-        """Met à jour le statut avec couleur noire forcée"""
+        """Met à jour le statut with couleur noire forcée"""
         if file_path in self.file_items:
             item_widget = self.file_items[file_path]
             if hasattr(item_widget, 'status_label'):
                 item_widget.status_label.setText(status)
                 
-                # FORCE la couleur noire avec palette
+                # FORCE la couleur noire with palette
                 palette = item_widget.status_label.palette()
                 palette.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))
                 item_widget.status_label.setPalette(palette)
@@ -308,7 +308,7 @@ class FileListWidget(QWidget):
                 # Style selon statut mais TOUJOURS noir
                 if "✅" in status or "cache" in status.lower() or "analysé" in status.lower():
                     item_widget.status_label.setStyleSheet("color: black; background-color: #D4FFDA; border: 1px solid #4CAF50; padding: 2px; border-radius: 2px;")
-                elif "❌" in status or "échec" in status.lower():
+                elif "❌" in status or "failed" in status.lower():
                     item_widget.status_label.setStyleSheet("color: black; background-color: #FFD4D4; border: 1px solid #F44336; padding: 2px; border-radius: 2px;")
                 elif "🔄" in status or "cours" in status.lower():
                     item_widget.status_label.setStyleSheet("color: black; background-color: #D4E6FF; border: 1px solid #2196F3; padding: 2px; border-radius: 2px;")
@@ -326,11 +326,11 @@ class FileListWidget(QWidget):
         return False
                     
     def clear_files(self):
-        """Vide la liste des fichiers"""
+        """Vide the list des files"""
         self.files.clear()
         self.file_items.clear()
         
-        # Supprime tous les items sauf le label vide
+        # Removes tous les items sauf le label vide
         items_to_remove = []
         for i in range(self.files_layout.count()):
             item = self.files_layout.itemAt(i)
@@ -348,18 +348,18 @@ class FileListWidget(QWidget):
         """Met à jour le compteur"""
         count = len(self.files)
         if count == 0:
-            self.file_count_label.setText("Aucun fichier")
+            self.file_count_label.setText("Aucun file")
         elif count == 1:
-            self.file_count_label.setText("1 fichier")
+            self.file_count_label.setText("1 file")
         else:
-            self.file_count_label.setText(f"{count} fichiers")
+            self.file_count_label.setText(f"{count} files")
             
     def get_files(self):
-        """Retourne la liste des fichiers"""
+        """Returns the list des files"""
         return self.files.copy()
         
     def format_file_size(self, size_bytes):
-        """Formate la taille de fichier"""
+        """Formate la size de file"""
         if size_bytes < 1024:
             return f"{size_bytes} B"
         elif size_bytes < 1024 * 1024:
@@ -398,7 +398,7 @@ class StatusIndicator(QFrame):
         self.icon_label.setFont(QFont("Arial", 20))  # PLUS PETIT
         
         # Texte plus petit
-        self.status_label = QLabel("Prêt à analyser")
+        self.status_label = QLabel("Ready à analyze")
         self.status_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))  # PLUS PETIT
         self.status_label.setStyleSheet("color: black; font-weight: bold;")
         

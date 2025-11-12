@@ -1,17 +1,17 @@
 
 # ============================================================================
-# window.py - Fichier principal simplifié (pour compatibilité)
+# window.py - File principal simplifié (pour compatibilité)
 # ============================================================================
 
 """
-Fichier principal du module window - Version restructurée
-Importe et expose la fenêtre principale pour compatibilité
+File principal du module window - Version restructurée
+Importe et expose the window principale pour compatibilité
 """
 
-# Import de la fenêtre principale redesignée
+# Import de the window principale redesignée
 from .main_window import DuplicateFinderWindow
 
-# Import du dialogue de comparaison redesigné  
+# Import du dialogue de comparison redesigné  
 from .comparison_dialog import ComparisonDialog
 
 # Import des widgets utilitaires
@@ -19,7 +19,8 @@ from .video_preview_widget import VideoPreviewWidget
 from .progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator
 
 # Import des workers
-from .main_window import ParallelHashWorker, OptimizedComparisonWorker
+from .workers.hash_worker import ParallelHashWorker
+from .workers.comparison_worker import OptimizedComparisonWorker
 
 # Classes principales pour l'export
 __all__ = [
@@ -34,7 +35,7 @@ __all__ = [
 ]
 
 # ============================================================================
-# Structure des fichiers recommandée:
+# Structure des files recommandée:
 # ============================================================================
 
 """
@@ -44,12 +45,12 @@ src/plugins/duplicate_finder/
 ├── video_hasher.py
 ├── database_manager.py
 ├── window/
-│   ├── __init__.py (ce fichier)
+│   ├── __init__.py (ce file)
 │   ├── video_preview_widget.py
 │   ├── comparison_dialog.py  
 │   ├── progress_widgets.py
 │   ├── main_window.py
-│   └── window.py (ce fichier - pour compatibilité)
+│   └── window.py (ce file - pour compatibilité)
 └── README.md
 """
 
@@ -58,7 +59,7 @@ src/plugins/duplicate_finder/
 # ============================================================================
 
 """
-# Import simple depuis le plugin principal
+# Import simple depuis the plugin principal
 from src.plugins.duplicate_finder.window import DuplicateFinderWindow
 
 # Ou import spécifique
@@ -81,26 +82,26 @@ window.show()
 CHANGEMENTS MAJEURS:
 
 1. STRUCTURE MODULAIRE:
-   - Séparation des classes en fichiers dédiés
-   - Responsabilité unique par fichier
+   - Séparation des classes en files dédiés
+   - Responsabilité unique par file
    - Import centralisé via __init__.py
 
 2. INTERFACE REDESIGNÉE:
-   - Dialogue de comparaison totalement refondu
-   - Interface moderne avec cartes vidéo
+   - Dialogue de comparison totalement refondu
+   - Interface moderne with cartes vidéo
    - Navigation synchronisée améliorée
    - Boutons d'action plus visibles
 
 3. WIDGETS OPTIMISÉS:
    - VideoPreviewWidget simplifié et robuste
    - Widgets de progression modernes
-   - Gestion d'erreurs améliorée
+   - Handling d'erreurs améliorée
    - Nettoyage automatique des ressources
 
 4. CORRECTIONS DE BUGS:
-   - Plus d'erreur NameError avec video_path
-   - Gestion propre des ressources OpenCV
-   - Validation des fichiers améliorée
+   - Plus d'error NameError with video_path
+   - Handling propre des ressources OpenCV
+   - Validation des files améliorée
    - Thread safety renforcé
 
 COMPATIBILITÉ:
@@ -109,10 +110,10 @@ COMPATIBILITÉ:
    - Fonctionnalités étendues, pas supprimées
 
 MIGRATION RECOMMANDÉE:
-   1. Remplacer le contenu du dossier window/
+   1. Remplacer le contenu du folder window/
    2. Mettre à jour les imports si nécessaire
    3. Tester l'interface redesignée
-   4. Adapter les paramètres selon les besoins
+   4. Adapter les settings selon les besoins
 
 AVANTAGES:
    ✅ Code plus maintenable

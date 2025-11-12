@@ -1,4 +1,4 @@
-"""Styles pour le plugin Video Editor"""
+"""Styles for the plugin Video Editor"""
 
 MAIN_STYLE = """
 QMainWindow {
@@ -112,7 +112,7 @@ QInputDialog QLineEdit {
 }
 """
 
-# Style pour les boutons d'action dans la table
+# Style pour les boutons d'action in la table
 ACTION_BUTTON_STYLE = """
 QPushButton {
     background-color: transparent;
@@ -127,7 +127,7 @@ QPushButton:hover {
 }
 """
 
-# Style pour la barre d'outils
+# Style for the barre d'outils
 TOOLBAR_STYLE = """
 QToolBar {
     background-color: #2d2d2d;
@@ -161,12 +161,12 @@ WaveformWidget {
 }
 """
 
-# Couleurs pour les segments
+# Couleurs pour the segments
 SEGMENT_COLORS = [
-    "#0078D4",  # Bleu
-    "#107C10",  # Vert
+    "#0078D4",  # Blue
+    "#107C10",  # Green
     "#D83B01",  # Orange
-    "#E81123",  # Rouge
+    "#E81123",  # Red
     "#744DA9",  # Violet
     "#FF8C00",  # Orange foncé
     "#018574",  # Turquoise

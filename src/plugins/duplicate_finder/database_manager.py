@@ -10,11 +10,11 @@ from src.core.logger import Logger
 logger = Logger.get_logger('DuplicateFinder.DatabaseManager')
 
 class VideoDatabase:
-    """Gestionnaire de base de données optimisé pour les hashs et comparaisons de vidéos - Version avec migration corrigée"""
+    """Handlingnaire de base de données optimisé pour les hashs et comparaisons de vidéos - Version with migration corrigée"""
     
     def __init__(self, db_path=None):
         if db_path is None:
-            # Place la DB dans le même dossier que le plugin
+            # Place la DB in le même folder que the plugin
             plugin_dir = os.path.dirname(__file__)
             db_path = os.path.join(plugin_dir, 'video_duplicates.db')
         
@@ -25,7 +25,7 @@ class VideoDatabase:
         logger.info(f"Base de données initialisée: {self.db_path}")
     
     def _ensure_database_exists(self):
-        """S'assure que la base de données et ses tables existent - UNE SEULE FOIS"""
+        """S'asone que la base de données et ses tables existent - UNE SEULE FOIS"""
         if self._initialized:
             return
             
@@ -49,11 +49,11 @@ class VideoDatabase:
             }
                 
         except Exception as e:
-            logger.error(f"Erreur lors de l'initialisation de la DB: {e}")
+            logger.error(f"Error during l'initialization of the DB: {e}")
             raise
     
     def init_database(self):
-        """Initialise la structure de la base de données - AVEC MIGRATION CORRIGÉE"""
+        """Initialise la structure of the base de données - AVEC MIGRATION CORRIGÉE"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -139,18 +139,18 @@ class VideoDatabase:
                     )
                 ''')
                 
-                # ÉTAPE 3: Vérifie et ajoute la colonne ignore_type si nécessaire
+                # ÉTAPE 3: Checks et ajoute la colonne ignore_type si nécessaire
                 cursor.execute("PRAGMA table_info(ignored_pairs)")
                 columns = [column[1] for column in cursor.fetchall()]
                 
                 if 'ignore_type' not in columns:
-                    logger.info("Ajout de la colonne ignore_type à la table ignored_pairs")
+                    logger.info("Ajout of the colonne ignore_type à la table ignored_pairs")
                     cursor.execute("ALTER TABLE ignored_pairs ADD COLUMN ignore_type TEXT DEFAULT 'permanent'")
                     
                     # Met à jour les entrées existantes
                     cursor.execute("UPDATE ignored_pairs SET ignore_type = 'permanent' WHERE ignore_type IS NULL")
                     
-                    logger.info("Migration de la base de données terminée")
+                    logger.info("Migration of the base de données terminée")
                 
                 # ÉTAPE 4: Crée les index
                 index_commands = [
@@ -171,15 +171,15 @@ class VideoDatabase:
                     cursor.execute(cmd)
                 
                 conn.commit()
-                logger.debug("Structure de base de données créée/vérifiée avec migration")
+                logger.debug("Structure de base de données créée/vérifiée with migration")
                 
         except Exception as e:
-            logger.error(f"Erreur lors de l'initialisation de la base de données: {e}")
+            logger.error(f"Error during l'initialization of the base de données: {e}")
             raise
     
     def _table_exists(self, table_name):
-        """Vérifie si une table existe - AVEC CACHE"""
-        # Utilise le cache en premier
+        """Checks si une table existe - AVEC CACHE"""
+        # Utilise le cache en first
         if table_name in self._tables_exist:
             return self._tables_exist[table_name]
             
@@ -198,7 +198,7 @@ class VideoDatabase:
             return False
     
     def get_connection(self):
-        """Retourne une connexion à la base optimisée"""
+        """Returns une connexion à la base optimisée"""
         conn = sqlite3.connect(self.db_path)
         # Active les optimisations pour cette connexion
         conn.execute("PRAGMA journal_mode=WAL")
@@ -208,7 +208,7 @@ class VideoDatabase:
         return conn
     
     def file_needs_reanalysis(self, file_path):
-        """Vérifie si un fichier a été modifié - OPTIMISÉ"""
+        """Checks si un file a été modifié - OPTIMISÉ"""
         if not os.path.exists(file_path):
             return True
             
@@ -225,39 +225,59 @@ class VideoDatabase:
                 
                 result = cursor.fetchone()
                 if not result:
-                    return True  # Fichier pas en base
+                    return True  # File pas en base
                 
                 stored_mtime, stored_size = result
                 
-                # Vérifie si modifié (tolérance de 1 seconde pour les systèmes de fichiers)
+                # Checks si modifié (tolérance de 1 seconde pour les systèmes de files)
                 return (abs(current_mtime - stored_mtime) > 1.0 or 
                        current_size != stored_size)
                 
         except Exception as e:
-            logger.error(f"Erreur vérification modification {file_path}: {e}")
+            logger.error(f"Error vérification modification {file_path}: {e}")
             return True
     
-    def store_video_hash(self, file_path, hash_data, duration, width=None, height=None, 
+    def store_video_hash(self, file_path, hash_data, duration, width=None, height=None,
                         hash_method="pHash", frames_indices=None, sampling_method=None):
-        """Stocke l'empreinte d'une vidéo - OPTIMISÉ"""
+        """
+        Store video hash in database.
+
+        **OPTIMIZED**: Uses JSON serialization instead of pickle for security and speed.
+
+        Args:
+            file_path (str): Path to the video file.
+            hash_data (np.ndarray): Video hash data.
+            duration (float): Video duration in seconds.
+            width (int, optional): Video width.
+            height (int, optional): Video height.
+            hash_method (str): Hash method used ('pHash', 'dHash', 'aHash').
+            frames_indices (list, optional): Frame indices used for hashing.
+            sampling_method (str, optional): Sampling method used.
+
+        Returns:
+            bool: True if successful, False otherwise.
+        """
         try:
+            from src.core.serialization import serialize_numpy_to_json
+
             file_stats = os.stat(file_path)
-            
+
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # Sérialise le hash numpy en binaire
-                hash_blob = pickle.dumps(hash_data)
+
+                # OPTIMIZED: Use JSON instead of pickle (secure + faster)
+                hash_json = serialize_numpy_to_json(hash_data)
+                hash_blob = hash_json.encode('utf-8')
                 frames_json = json.dumps(frames_indices) if frames_indices else None
-                
-                # Combine la méthode de hash et d'échantillonnage si fournie
+
+                # Combine hash method and sampling method if provided
                 full_method = hash_method
                 if sampling_method:
                     full_method += f"_{sampling_method}"
-                
+
                 cursor.execute('''
-                    INSERT OR REPLACE INTO video_files 
-                    (file_path, file_name, file_size, modification_time, duration, 
+                    INSERT OR REPLACE INTO video_files
+                    (file_path, file_name, file_size, modification_time, duration,
                      width, height, hash_method, hash_data, frames_indices, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ''', (
@@ -272,50 +292,67 @@ class VideoDatabase:
                     hash_blob,
                     frames_json
                 ))
-                
+
                 conn.commit()
                 return True
-                
+
         except Exception as e:
-            logger.error(f"Erreur stockage hash {file_path}: {e}")
+            logger.error(f"Error storing hash {file_path}: {e}")
             return False
     
     def get_video_hash(self, file_path):
-        """Récupère l'empreinte d'une vidéo - OPTIMISÉ"""
+        """
+        Retrieve video hash from database.
+
+        **OPTIMIZED**: Supports both JSON (new) and pickle (legacy) formats.
+
+        Args:
+            file_path (str): Path to the video file.
+
+        Returns:
+            dict: Dictionary with 'hash', 'duration', and 'frames' keys, or None if not found.
+        """
         try:
+            from src.core.serialization import deserialize_numpy_from_json
+
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    SELECT hash_data, duration, frames_indices FROM video_files 
+                    SELECT hash_data, duration, frames_indices FROM video_files
                     WHERE file_path = ?
                 ''', (file_path,))
-                
+
                 result = cursor.fetchone()
                 if result:
                     hash_blob, duration, frames_json = result
-                    
-                    # Désérialise le hash
-                    hash_data = pickle.loads(hash_blob)
+
+                    # OPTIMIZED: Try JSON first (new format), fallback to pickle (legacy)
+                    try:
+                        hash_data = deserialize_numpy_from_json(hash_blob.decode('utf-8'))
+                    except (UnicodeDecodeError, AttributeError):
+                        # Legacy pickle format
+                        hash_data = pickle.loads(hash_blob)
+
                     frames_indices = json.loads(frames_json) if frames_json else None
-                    
+
                     return {
                         'hash': hash_data,
                         'duration': duration,
                         'frames': frames_indices
                     }
-                    
+
         except Exception as e:
-            logger.error(f"Erreur récupération hash {file_path}: {e}")
+            logger.error(f"Error retrieving hash {file_path}: {e}")
             
         return None
     
     def get_cached_comparison(self, file1_path, file2_path):
-        """Récupère un résultat de comparaison - OPTIMISÉ"""
+        """Récupère un résultat de comparison - OPTIMISÉ"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Requête optimisée avec index
+                # Requête optimisée with index
                 cursor.execute('''
                     SELECT c.similarity
                     FROM comparisons c
@@ -330,13 +367,13 @@ class VideoDatabase:
                     return result[0]
                     
         except Exception as e:
-            logger.error(f"Erreur récupération comparaison: {e}")
+            logger.error(f"Error récupération comparison: {e}")
             
         return None
     
     def store_comparison(self, file1_path, file2_path, similarity, 
                         comparison_method="optimized", is_early_exit=False, computation_time=0.0):
-        """Stocke un résultat de comparaison - OPTIMISÉ avec batch"""
+        """Stocke un résultat de comparison - OPTIMISÉ with batch"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -354,7 +391,7 @@ class VideoDatabase:
                 
                 file1_id, file2_id = result
                 
-                # Assure l'ordre pour éviter les doublons
+                # Asone l'ordre pour éviter les doublons
                 if file1_id > file2_id:
                     file1_id, file2_id = file2_id, file1_id
                 
@@ -368,16 +405,16 @@ class VideoDatabase:
                 return True
                 
         except Exception as e:
-            logger.error(f"Erreur stockage comparaison: {e}")
+            logger.error(f"Error stockage comparison: {e}")
             return False
     
     def is_pair_ignored(self, file1_path, file2_path):
-        """Vérifie si une paire est ignorée - CORRIGÉ avec ignore_type"""
+        """Checks si une paire est ignorée - CORRIGÉ with ignore_type"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # CORRECTION: Vérifie seulement les paires ignorées DÉFINITIVEMENT
+                # CORRECTION: Checks seulement les paires ignorées DÉFINITIVEMENT
                 # Utilise COALESCE pour gérer les anciennes entrées sans ignore_type
                 cursor.execute('''
                     SELECT 1 FROM ignored_pairs ip
@@ -392,12 +429,38 @@ class VideoDatabase:
                 return cursor.fetchone() is not None
                 
         except Exception as e:
-            logger.error(f"Erreur vérification paire ignorée: {e}")
+            logger.error(f"Error vérification paire ignorée: {e}")
             
         return False
-    
+
+    def get_all_ignored_pairs(self):
+        """
+        Get all permanently ignored pairs.
+
+        Returns:
+            List[Tuple[str, str]]: List of tuples (file1_path, file2_path) for all ignored pairs.
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Get all permanently ignored pairs in one batch query
+                cursor.execute('''
+                    SELECT v1.file_path, v2.file_path
+                    FROM ignored_pairs ip
+                    JOIN video_files v1 ON ip.file1_id = v1.id
+                    JOIN video_files v2 ON ip.file2_id = v2.id
+                    WHERE COALESCE(ip.ignore_type, 'permanent') = 'permanent'
+                ''')
+
+                return cursor.fetchall()
+
+        except Exception as e:
+            logger.error(f"Error fetching all ignored pairs: {e}")
+            return []
+
     def add_ignored_pair(self, file1_path, file2_path, reason="user_choice", ignore_type="permanent"):
-        """Ajoute une paire à ignorer - CORRIGÉ avec ignore_type"""
+        """Adds une paire à ignorer - CORRIGÉ with ignore_type"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -411,16 +474,16 @@ class VideoDatabase:
                 
                 result = cursor.fetchone()
                 if not result or not result[0] or not result[1]:
-                    logger.warning(f"Fichiers non trouvés en base: {file1_path}, {file2_path}")
+                    logger.warning(f"Fichiers non found en base: {file1_path}, {file2_path}")
                     return False
                 
                 file1_id, file2_id = result
                 
-                # Assure l'ordre
+                # Asone l'ordre
                 if file1_id > file2_id:
                     file1_id, file2_id = file2_id, file1_id
                 
-                # Vérifie si ignore_type existe dans la table
+                # Checks si ignore_type existe in la table
                 cursor.execute("PRAGMA table_info(ignored_pairs)")
                 columns = [column[1] for column in cursor.fetchall()]
                 
@@ -441,22 +504,22 @@ class VideoDatabase:
                 return True
                 
         except Exception as e:
-            logger.error(f"Erreur ajout paire ignorée: {e}")
+            logger.error(f"Error ajout paire ignorée: {e}")
             return False
     
     def get_statistics(self):
-        """Récupère les statistiques - OPTIMISÉ avec une seule requête"""
+        """Récupère les statistics - OPTIMISÉ with une seule requête"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Vérifie si ignore_type existe
+                # Checks si ignore_type existe
                 cursor.execute("PRAGMA table_info(ignored_pairs)")
                 columns = [column[1] for column in cursor.fetchall()]
                 has_ignore_type = 'ignore_type' in columns
                 
                 if has_ignore_type:
-                    # Version avec ignore_type
+                    # Version with ignore_type
                     cursor.execute('''
                         SELECT 
                             (SELECT COUNT(*) FROM video_files) as files_count,
@@ -484,10 +547,10 @@ class VideoDatabase:
                     ignored_perm = ignored_total
                     ignored_temp = 0
                 
-                # Taille de la base
+                # Size of the base
                 db_size = os.path.getsize(self.db_path) / 1024 if os.path.exists(self.db_path) else 0
                 
-                # Calcul du temps économisé (estimé à 2s par comparaison)
+                # Calcul du time économisé (estimé à 2s par comparison)
                 time_saved = comparisons_count * 2
                 
                 return {
@@ -503,7 +566,7 @@ class VideoDatabase:
                 }
                 
         except Exception as e:
-            logger.error(f"Erreur récupération statistiques: {e}")
+            logger.error(f"Error récupération statistics: {e}")
             return {
                 'files_count': 0,
                 'comparisons_count': 0,
@@ -517,12 +580,12 @@ class VideoDatabase:
             }
     
     def cleanup_missing_files(self):
-        """Nettoie la base des fichiers qui n'existent plus"""
+        """Nettoie la base des files qui n'existent plus"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Récupère tous les fichiers
+                # Récupère tous les files
                 cursor.execute('SELECT id, file_path FROM video_files')
                 files = cursor.fetchall()
                 
@@ -532,37 +595,37 @@ class VideoDatabase:
                         missing_ids.append(file_id)
                 
                 if missing_ids:
-                    # Supprime en une seule transaction
+                    # Removes en une seule transaction
                     placeholders = ','.join('?' * len(missing_ids))
                     
-                    # Supprime les comparaisons
+                    # Removes les comparaisons
                     cursor.execute(f'''
                         DELETE FROM comparisons 
                         WHERE file1_id IN ({placeholders}) OR file2_id IN ({placeholders})
                     ''', missing_ids + missing_ids)
                     
-                    # Supprime les paires ignorées
+                    # Removes les paires ignorées
                     cursor.execute(f'''
                         DELETE FROM ignored_pairs 
                         WHERE file1_id IN ({placeholders}) OR file2_id IN ({placeholders})
                     ''', missing_ids + missing_ids)
                     
-                    # Supprime les doublons trouvés
+                    # Removes les doublons found
                     cursor.execute(f'''
                         DELETE FROM found_duplicates 
                         WHERE file1_id IN ({placeholders}) OR file2_id IN ({placeholders})
                     ''', missing_ids + missing_ids)
                     
-                    # Supprime les fichiers
+                    # Removes les files
                     cursor.execute(f'DELETE FROM video_files WHERE id IN ({placeholders})', missing_ids)
                     
                     conn.commit()
-                    logger.info(f"Nettoyage base: {len(missing_ids)} fichiers supprimés")
+                    logger.info(f"Nettoyage base: {len(missing_ids)} files supprimés")
                     
                 return len(missing_ids)
                 
         except Exception as e:
-            logger.error(f"Erreur nettoyage base: {e}")
+            logger.error(f"Error nettoyage base: {e}")
             return 0
     
     def auto_cleanup_on_access(self):
@@ -572,7 +635,7 @@ class VideoDatabase:
             self._cleaned_this_session = True
             removed = self.cleanup_missing_files()
             if removed > 0:
-                logger.info(f"Nettoyage automatique: {removed} fichiers manquants supprimés")
+                logger.info(f"Nettoyage automatique: {removed} files manquants supprimés")
     
     def clear_all_data(self):
         """Vide complètement la base de données"""
@@ -580,7 +643,7 @@ class VideoDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Transaction unique pour tout supprimer
+                # Transaction unique pour tout remove
                 cursor.executescript('''
                     DELETE FROM comparisons;
                     DELETE FROM ignored_pairs;
@@ -595,11 +658,11 @@ class VideoDatabase:
                 return True
                 
         except Exception as e:
-            logger.error(f"Erreur vidage base: {e}")
+            logger.error(f"Error vidage base: {e}")
             return False
     
     def mark_file_as_corrupted(self, file_path, error_message):
-        """Marque un fichier comme corrompu"""
+        """Marque un file comme corrompu"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -612,10 +675,10 @@ class VideoDatabase:
                 conn.commit()
                 
         except Exception as e:
-            logger.error(f"Erreur marquage fichier corrompu: {e}")
+            logger.error(f"Error marquage file corrompu: {e}")
 
     def get_files_needing_analysis(self, file_paths):
-        """Retourne les fichiers qui ont besoin d'être analysés - OPTIMISÉ"""
+        """Returns les files qui ont besoin d'être analysés - OPTIMISÉ"""
         if not file_paths:
             return []
             
@@ -625,7 +688,7 @@ class VideoDatabase:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             
-            # Récupère tous les fichiers existants en une requête
+            # Récupère tous les files existants en une requête
             placeholders = ','.join('?' * len(file_paths))
             cursor.execute(f'''
                 SELECT file_path, modification_time, file_size 
@@ -635,7 +698,7 @@ class VideoDatabase:
             
             existing_files = {row[0]: (row[1], row[2]) for row in cursor.fetchall()}
         
-        # Vérifie chaque fichier
+        # Checks chaque file
         for file_path in file_paths:
             if not os.path.exists(file_path):
                 continue
@@ -643,7 +706,7 @@ class VideoDatabase:
             if file_path not in existing_files:
                 files_to_analyze.append(file_path)
             else:
-                # Vérifie si modifié
+                # Checks si modifié
                 current_mtime = os.path.getmtime(file_path)
                 current_size = os.path.getsize(file_path)
                 stored_mtime, stored_size = existing_files[file_path]
@@ -654,7 +717,7 @@ class VideoDatabase:
         return files_to_analyze
     
     def store_found_duplicate(self, file1_path, file2_path, similarity):
-        """Stocke un doublon trouvé pour récupération ultérieure"""
+        """Stocke un doublon found pour récupération ultérieure"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -672,7 +735,7 @@ class VideoDatabase:
                 
                 file1_id, file2_id = result
                 
-                # Assure l'ordre
+                # Asone l'ordre
                 if file1_id > file2_id:
                     file1_id, file2_id = file2_id, file1_id
                 
@@ -686,11 +749,11 @@ class VideoDatabase:
                 return True
                 
         except Exception as e:
-            logger.error(f"Erreur stockage doublon trouvé: {e}")
+            logger.error(f"Error stockage doublon found: {e}")
             return False
     
     def get_pending_duplicates(self):
-        """Récupère les doublons en attente de traitement"""
+        """Récupère les doublons pending de processing"""
         try:
             duplicates = []
             
@@ -708,14 +771,14 @@ class VideoDatabase:
                 
                 for row in cursor.fetchall():
                     file1, file2, similarity, dup_id = row
-                    # Vérifie si les fichiers existent encore
+                    # Checks si les files existent encore
                     if os.path.exists(file1) and os.path.exists(file2):
                         duplicates.append((file1, file2, similarity, dup_id))
                 
                 return duplicates
                 
         except Exception as e:
-            logger.error(f"Erreur récupération doublons en attente: {e}")
+            logger.error(f"Error récupération doublons pending: {e}")
             return []
     
     def update_duplicate_status(self, dup_id, status, action=None):
@@ -734,11 +797,11 @@ class VideoDatabase:
                 return True
                 
         except Exception as e:
-            logger.error(f"Erreur mise à jour statut doublon: {e}")
+            logger.error(f"Error mise à jour statut doublon: {e}")
             return False
     
     def clear_processed_duplicates(self):
-        """Supprime les doublons déjà traités"""
+        """Removes les doublons déjà traités"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -755,11 +818,11 @@ class VideoDatabase:
                 return deleted
                 
         except Exception as e:
-            logger.error(f"Erreur suppression doublons traités: {e}")
+            logger.error(f"Error suppression doublons traités: {e}")
             return 0
     
     def get_duplicate_statistics(self):
-        """Récupère les statistiques des doublons"""
+        """Récupère les statistics des doublons"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -789,7 +852,7 @@ class VideoDatabase:
                     }
                     
         except Exception as e:
-            logger.error(f"Erreur récupération stats doublons: {e}")
+            logger.error(f"Error récupération stats doublons: {e}")
             
         return {
             'total': 0,
@@ -807,7 +870,7 @@ class VideoDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Vérifie si ignore_type existe
+                # Checks si ignore_type existe
                 cursor.execute("PRAGMA table_info(ignored_pairs)")
                 columns = [column[1] for column in cursor.fetchall()]
                 
@@ -829,18 +892,18 @@ class VideoDatabase:
                 return deleted
                 
         except Exception as e:
-            logger.error(f"Erreur suppression ignores temporaires: {e}")
+            logger.error(f"Error suppression ignores temporaires: {e}")
             return 0
     
     def get_ignored_pairs_details(self):
-        """Récupère les détails des paires ignorées"""
+        """Récupère les details des paires ignorées"""
         try:
             ignored_pairs = []
             
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Vérifie si ignore_type existe
+                # Checks si ignore_type existe
                 cursor.execute("PRAGMA table_info(ignored_pairs)")
                 columns = [column[1] for column in cursor.fetchall()]
                 has_ignore_type = 'ignore_type' in columns
@@ -877,7 +940,7 @@ class VideoDatabase:
                 return ignored_pairs
                 
         except Exception as e:
-            logger.error(f"Erreur récupération détails paires ignorées: {e}")
+            logger.error(f"Error récupération details paires ignorées: {e}")
             return []
     
     def force_recreate_table(self, table_name):
@@ -887,13 +950,13 @@ class VideoDatabase:
                 cursor = conn.cursor()
                 
                 if table_name == "ignored_pairs":
-                    # Sauvegarde les données existantes
+                    # Saves les données existantes
                     cursor.execute('''
                         CREATE TEMPORARY TABLE ignored_pairs_backup AS 
                         SELECT * FROM ignored_pairs
                     ''')
                     
-                    # Supprime l'ancienne table
+                    # Removes l'ancienne table
                     cursor.execute("DROP TABLE ignored_pairs")
                     
                     # Recrée la nouvelle table
@@ -918,7 +981,7 @@ class VideoDatabase:
                         FROM ignored_pairs_backup
                     ''')
                     
-                    # Supprime la table temporaire
+                    # Removes la table temporaire
                     cursor.execute("DROP TABLE ignored_pairs_backup")
                     
                     # Recrée les index
@@ -926,20 +989,20 @@ class VideoDatabase:
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ignored_type ON ignored_pairs(ignore_type)")
                     
                     conn.commit()
-                    logger.info(f"Table {table_name} recréée avec succès")
+                    logger.info(f"Table {table_name} recréée with success")
                     return True
                     
         except Exception as e:
-            logger.error(f"Erreur recréation table {table_name}: {e}")
+            logger.error(f"Error recréation table {table_name}: {e}")
             return False
     
     def verify_database_integrity(self):
-        """Vérifie l'intégrité de la base de données"""
+        """Checks l'intégrité of the base de données"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Vérifie l'intégrité SQLite
+                # Checks l'intégrité SQLite
                 cursor.execute("PRAGMA integrity_check")
                 integrity_result = cursor.fetchone()
                 
@@ -947,7 +1010,7 @@ class VideoDatabase:
                     logger.warning(f"Problème d'intégrité détecté: {integrity_result[0]}")
                     return False
                 
-                # Vérifie que toutes les tables existent
+                # Checks que toutes les tables existent
                 required_tables = ['video_files', 'comparisons', 'ignored_pairs', 'corrupted_files', 'found_duplicates']
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
                 existing_tables = [row[0] for row in cursor.fetchall()]
@@ -957,7 +1020,7 @@ class VideoDatabase:
                     logger.warning(f"Tables manquantes: {missing_tables}")
                     return False
                 
-                # Vérifie la structure de ignored_pairs
+                # Checks la structure de ignored_pairs
                 cursor.execute("PRAGMA table_info(ignored_pairs)")
                 columns = [column[1] for column in cursor.fetchall()]
                 
@@ -965,15 +1028,15 @@ class VideoDatabase:
                     logger.info("Colonne ignore_type manquante - migration nécessaire")
                     return False
                 
-                logger.info("Intégrité de la base de données vérifiée avec succès")
+                logger.info("Intégrité of the base de données vérifiée with success")
                 return True
                 
         except Exception as e:
-            logger.error(f"Erreur vérification intégrité: {e}")
+            logger.error(f"Error vérification intégrité: {e}")
             return False
     
     def get_database_info(self):
-        """Récupère des informations détaillées sur la base"""
+        """Récupère des information détaillées on la base"""
         try:
             info = {
                 'path': self.db_path,
@@ -998,7 +1061,7 @@ class VideoDatabase:
                     cursor.execute("SELECT sqlite_version()")
                     info['version'] = cursor.fetchone()[0]
                     
-                    # Paramètres PRAGMA
+                    # Settings PRAGMA
                     pragmas = ['journal_mode', 'synchronous', 'cache_size', 'temp_store', 'foreign_keys']
                     for pragma in pragmas:
                         try:
@@ -1011,5 +1074,5 @@ class VideoDatabase:
             return info
             
         except Exception as e:
-            logger.error(f"Erreur récupération infos DB: {e}")
+            logger.error(f"Error récupération infos DB: {e}")
             return {'error': str(e)}

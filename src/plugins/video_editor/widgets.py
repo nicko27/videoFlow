@@ -1,4 +1,4 @@
-"""Widgets personnalisés pour le plugin Video Editor"""
+"""Custom widgets for the plugin Video Editor"""
 
 from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout,
                            QPushButton, QSlider, QStyle, QStyleOption)
@@ -6,7 +6,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtGui import QPainter, QColor, QPen, QLinearGradient
 
 class WaveformWidget(QWidget):
-    """Widget amélioré pour afficher la forme d'onde audio"""
+    """Enhanced widget for display the forme d'onde audio"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.waveform = None
@@ -15,7 +15,11 @@ class WaveformWidget(QWidget):
         self.gradient = self._create_gradient()
     
     def _create_gradient(self):
-        """Crée un dégradé pour la forme d'onde"""
+        """Create a gradient for the waveform rendering.
+
+        Returns:
+            QLinearGradient: Gradient from green to cyan to blue.
+        """
         gradient = QLinearGradient(0, 0, 0, self.height())
         gradient.setColorAt(0, QColor(0, 255, 127))
         gradient.setColorAt(0.5, QColor(0, 255, 255))
@@ -23,12 +27,20 @@ class WaveformWidget(QWidget):
         return gradient
     
     def set_waveform(self, waveform):
-        """Définit les données de la forme d'onde"""
+        """Set the waveform data to display.
+
+        Args:
+            waveform (numpy.ndarray): Array of normalized waveform values (0-1).
+        """
         self.waveform = waveform
         self.update()
     
     def paintEvent(self, event):
-        """Dessine la forme d'onde avec un style amélioré"""
+        """Draw the waveform with enhanced visual style.
+
+        Args:
+            event (QPaintEvent): Paint event to handle.
+        """
         if self.waveform is None:
             return
             
@@ -45,7 +57,7 @@ class WaveformWidget(QWidget):
             y = i * step
             painter.drawLine(0, y, self.width(), y)
         
-        # Forme d'onde avec dégradé
+        # Forme d'onde with dégradé
         painter.setPen(Qt.PenStyle.NoPen)
         step = len(self.waveform) / self.width()
         path_top = []
@@ -61,7 +73,7 @@ class WaveformWidget(QWidget):
                 path_top.append((x, y_top))
                 path_bottom.append((x, y_bottom))
         
-        # Dessiner le remplissage avec dégradé
+        # Drawsr le remplissage with dégradé
         for i in range(len(path_top) - 1):
             x1, y1 = path_top[i]
             x2, y2 = path_top[i + 1]
@@ -69,7 +81,14 @@ class WaveformWidget(QWidget):
             painter.drawRect(x1, y1, 1, path_bottom[i][1] - y1)
 
 class TimelineWidget(QWidget):
-    """Widget personnalisé pour la timeline"""
+    """Custom timeline widget for video editing.
+
+    Displays a timeline with position indicator, markers, and colored segments.
+    Allows clicking to jump to specific positions.
+
+    Signals:
+        positionChanged (float): Emitted when position changes (0-1).
+    """
     positionChanged = pyqtSignal(float)  # Position en pourcentage (0-1)
     
     def __init__(self, parent=None):
@@ -80,22 +99,42 @@ class TimelineWidget(QWidget):
         self.segments = []  # Liste des segments [(début, fin, couleur), ...]
     
     def set_position(self, pos):
-        """Définit la position actuelle"""
+        """Set the current playback position.
+
+        Args:
+            pos (float): Position as a percentage (0.0 to 1.0).
+        """
         self.position = max(0, min(1, pos))
         self.update()
     
     def set_markers(self, markers):
-        """Définit les marqueurs"""
+        """Set timeline markers.
+
+        Args:
+            markers (list): List of (position, color) tuples where position
+                is 0-1 and color is a QColor or hex string.
+        """
         self.markers = markers
         self.update()
     
     def set_segments(self, segments):
-        """Définit les segments"""
+        """Set timeline segments (colored regions).
+
+        Args:
+            segments (list): List of (start, end, color) tuples where
+                start and end are 0-1 positions.
+        """
         self.segments = segments
         self.update()
     
     def mousePressEvent(self, event):
-        """Gère le clic sur la timeline"""
+        """Handle mouse click on the timeline.
+
+        Allows seeking to a position by clicking on the timeline.
+
+        Args:
+            event (QMouseEvent): Mouse event to handle.
+        """
         if event.button() == Qt.MouseButton.LeftButton:
             pos = event.pos().x() / self.width()
             self.position = max(0, min(1, pos))
@@ -103,7 +142,11 @@ class TimelineWidget(QWidget):
             self.update()
     
     def paintEvent(self, event):
-        """Dessine la timeline"""
+        """Draw the timeline with segments, markers, and position indicator.
+
+        Args:
+            event (QPaintEvent): Paint event to handle.
+        """
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
@@ -128,8 +171,18 @@ class TimelineWidget(QWidget):
         painter.drawLine(x, 0, x, self.height())
 
 class VideoControls(QWidget):
-    """Widget pour les contrôles de lecture vidéo"""
+    """Widget providing video playback control buttons and timeline.
+
+    Contains play/pause, frame navigation buttons, position slider,
+    and time display label.
+    """
+
     def __init__(self, parent=None):
+        """Initialize the video controls widget.
+
+        Args:
+            parent (QWidget, optional): Parent widget. Defaults to None.
+        """
         super().__init__(parent)
         self.setup_ui()
     
@@ -155,7 +208,7 @@ class VideoControls(QWidget):
         self.position_slider = QSlider(Qt.Orientation.Horizontal)
         layout.addWidget(self.position_slider)
         
-        # Label de temps
+        # Label de time
         self.time_label = QLabel("00:00 / 00:00")
         self.time_label.setFixedWidth(100)
         layout.addWidget(self.time_label)

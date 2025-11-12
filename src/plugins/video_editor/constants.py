@@ -1,4 +1,4 @@
-"""Constantes pour le plugin Video Editor"""
+"""Constants for the plugin Video Editor"""
 
 # Formats vidéo supportés
 SUPPORTED_VIDEO_FORMATS = {
@@ -48,13 +48,13 @@ QUALITY_PRESETS = {
     },
 }
 
-# Paramètres de détection de scènes
+# Settings de détection de scènes
 SCENE_DETECTION = {
-    'threshold': 30.0,  # Seuil de différence entre les frames
+    'threshold': 30.0,  # Seuil de différence entre the frames
     'min_scene_length': 15,  # Longueur minimale d'une scène en frames
 }
 
-# Paramètres d'interface
+# Settings d'interface
 UI = {
     'min_window_width': 1200,
     'min_window_height': 800,
@@ -65,20 +65,20 @@ UI = {
     'segments_table_height': 150,
 }
 
-# Messages d'erreur
+# Messages d'error
 ERROR_MESSAGES = {
     'no_video': "Aucune vidéo n'est ouverte",
-    'no_segments': "Aucun segment à sauvegarder",
+    'no_segments': "Aucun segment à save",
     'invalid_segment': "Le segment est invalide",
-    'save_error': "Erreur lors de la sauvegarde",
-    'load_error': "Erreur lors du chargement",
+    'save_error': "Error saving",
+    'load_error': "Error loading",
     'codec_error': "Codec non supporté",
 }
 
 # Messages d'information
 INFO_MESSAGES = {
-    'scene_detection': "Détection des scènes en cours...",
-    'save_success': "Vidéo sauvegardée avec succès !",
-    'processing': "Traitement en cours...",
-    'ready': "Prêt",
+    'scene_detection': "Détection des scènes in progress...",
+    'save_success': "Vidéo sauvegardée with success !",
+    'processing': "Processing...",
+    'ready': "Ready",
 }
