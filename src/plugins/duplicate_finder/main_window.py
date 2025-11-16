@@ -25,6 +25,7 @@ from PyQt6.QtGui import QFont
 try:
     from .video_hasher import VideoHasher
     from .comparison_dialog import ComparisonDialog
+    from .subsequence_comparison_dialog import SubsequenceComparisonDialog
     from .progress_widgets import FileListWidget
     from .ui.panels import UIPanels
     from .managers.settings_manager import SettingsManager
@@ -35,6 +36,7 @@ except ImportError:
     # Fallback for direct imports
     from video_hasher import VideoHasher
     from comparison_dialog import ComparisonDialog
+    from subsequence_comparison_dialog import SubsequenceComparisonDialog
     from progress_widgets import FileListWidget
     from ui.panels import UIPanels
     from managers.settings_manager import SettingsManager
@@ -92,6 +94,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.config_tabs = None
         self.analyze_btn = None
         self.stop_btn = None
+        self.reload_last_folder_btn = None
 
         # Initialize parameter widgets (will be set in setup_ui)
         self.threshold_spin = None
@@ -110,6 +113,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.file_handler: Optional[FileHandler] = None
         self.analysis_handler: Optional[AnalysisHandler] = None
         self.duplicate_handler: Optional[DuplicateHandler] = None
+        self.subsequence_detector = None  # Will be created on demand
 
         # UI update timer
         self.status_update_timer = QTimer()
@@ -127,6 +131,9 @@ class DuplicateFinderWindow(QMainWindow):
         # Connect analysis handler signals
         self._connect_analysis_signals()
 
+        # Connect duplicate handler signals
+        self._connect_duplicate_handler_signals()
+
         # Load settings
         self._load_settings()
 
@@ -135,6 +142,9 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Auto cleanup database
         self.auto_cleanup_database()
+
+        # Check and show last folder button if available
+        self.check_and_show_last_folder_button()
 
         logger.info("Main window initialized successfully")
 
@@ -194,6 +204,7 @@ class DuplicateFinderWindow(QMainWindow):
         callbacks = {
             'add_files': self.add_files,
             'add_folder': self.add_folder,
+            'reload_last_folder': self.reload_last_folder,
             'clear_list': self.clear_list,
             'clear_cache': self.clear_cache,
             'apply_preset': self.apply_preset,
@@ -234,6 +245,8 @@ class DuplicateFinderWindow(QMainWindow):
                 self.analyze_btn = child.analyze_btn
                 self.stop_btn = child.stop_btn
                 break
+            if hasattr(child, 'reload_last_folder_btn'):
+                self.reload_last_folder_btn = child.reload_last_folder_btn
 
         return panel
 
@@ -245,6 +258,14 @@ class DuplicateFinderWindow(QMainWindow):
             self.analysis_handler.hash_finished.connect(self._on_hash_finished)
             self.analysis_handler.comparison_finished.connect(self._on_comparison_finished)
             self.analysis_handler.analysis_error.connect(self.handle_error)
+
+    def _connect_duplicate_handler_signals(self) -> None:
+        """
+        Connect duplicate handler signals for processing workflow.
+        """
+        if self.duplicate_handler:
+            self.duplicate_handler.all_duplicates_processed.connect(self._on_all_duplicates_processed)
+            self.duplicate_handler.all_subsequences_processed.connect(self._on_all_subsequences_processed)
 
     def _connect_settings_signals(self) -> None:
         """
@@ -336,13 +357,27 @@ class DuplicateFinderWindow(QMainWindow):
                 "#28A745", "#D4EDDA", "#28A745"
             )
 
-    def add_folder(self) -> None:
+    def add_folder(self, folder_path: str = None) -> None:
         """
         Add all video files from a folder.
+
+        Args:
+            folder_path: Path to folder. If None, shows dialog.
         """
-        count = self.file_handler.add_folder_dialog(self)
+        from PyQt6.QtWidgets import QFileDialog
+
+        if folder_path is None:
+            folder_path = QFileDialog.getExistingDirectory(self, "Select folder")
+
+        if not folder_path:
+            return
+
+        count = self.file_handler.add_folder(folder_path)
 
         if count > 0:
+            # Save last folder
+            self.settings_manager.save_last_folder(folder_path)
+
             # Update cache status
             files = self.file_handler.get_all_files()
             self.file_handler.batch_update_cache_status(files, self.video_hasher)
@@ -355,6 +390,46 @@ class DuplicateFinderWindow(QMainWindow):
                 "📂", f"{count} file(s) found in folder",
                 "#28A745", "#D4EDDA", "#28A745"
             )
+
+    def reload_last_folder(self) -> None:
+        """
+        Reload the last opened folder.
+        """
+        last_folder = self.settings_manager.get_last_folder()
+
+        if last_folder and os.path.exists(last_folder):
+            self.add_folder(last_folder)
+            # Hide the reload button after use
+            if self.reload_last_folder_btn:
+                self.reload_last_folder_btn.setVisible(False)
+        else:
+            QMessageBox.warning(
+                self,
+                "Folder not found",
+                f"The last folder no longer exists:\n{last_folder}"
+            )
+            # Clear invalid last folder
+            self.settings_manager.save_last_folder("")
+            if self.reload_last_folder_btn:
+                self.reload_last_folder_btn.setVisible(False)
+
+    def check_and_show_last_folder_button(self) -> None:
+        """
+        Check if there's a last folder and show reload button if it exists.
+        """
+        last_folder = self.settings_manager.get_last_folder()
+
+        if last_folder and os.path.exists(last_folder) and self.reload_last_folder_btn:
+            # Update button text with folder name
+            folder_name = os.path.basename(last_folder)
+            if len(folder_name) > 25:
+                folder_name = folder_name[:22] + "..."
+            self.reload_last_folder_btn.setText(f"🔄 Reload: {folder_name}")
+            self.reload_last_folder_btn.setToolTip(f"Reload last folder:\n{last_folder}")
+            self.reload_last_folder_btn.setVisible(True)
+            logger.info(f"Last folder available: {last_folder}")
+        elif self.reload_last_folder_btn:
+            self.reload_last_folder_btn.setVisible(False)
 
     def clear_list(self) -> None:
         """
@@ -532,9 +607,94 @@ class DuplicateFinderWindow(QMainWindow):
         Handle comparison analysis completion.
         """
         self.comparison_progress.set_status("Complete", "#28A745")
+
+        # Check if subsequence detection is enabled
+        config = self.get_analysis_config()
+        if config.get('subsequence_detection', {}).get('enabled', False):
+            # Start subsequence detection
+            self._start_subsequence_detection()
+        else:
+            # No subsequence detection, finish analysis
+            self._finish_analysis()
+
+    def _start_subsequence_detection(self) -> None:
+        """
+        Start subsequence detection analysis.
+        """
+        try:
+            from .subsequence_detector import SubsequenceDetector
+
+            config = self.get_analysis_config()
+            subseq_config = config.get('subsequence_detection', {})
+
+            # Create detector if needed
+            if self.subsequence_detector is None:
+                self.subsequence_detector = SubsequenceDetector(
+                    hasher=self.video_hasher,
+                    max_cache_memory_mb=subseq_config.get('cache_memory_mb', 500),
+                    sample_interval_seconds=subseq_config.get('sample_interval', 3.0),
+                    min_match_ratio=subseq_config.get('min_match_ratio', 0.80)
+                )
+
+            # Update UI
+            self.status_indicator.update_status(
+                "🎬", "Detecting subsequences...",
+                "#17A2B8", "#D1ECF1", "#17A2B8"
+            )
+
+            # Get all files
+            files = self.file_handler.get_all_files()
+
+            # Detect subsequences
+            logger.info(f"Starting subsequence detection on {len(files)} files")
+
+            def progress_callback(current, total, message):
+                """Update progress display."""
+                self.comparison_progress.update_progress(current, total, message)
+                self.force_ui_update()
+
+            subsequences = self.subsequence_detector.detect_all_subsequences(
+                files,
+                progress_callback=progress_callback
+            )
+
+            # Store results in database and add to handler
+            for short_video, long_video, result in subsequences:
+                # Store in database
+                self.video_hasher.db.store_subsequence_detection(
+                    short_video,
+                    long_video,
+                    result['match_ratio'],
+                    result['start_frame_idx'],
+                    result['confidence']
+                )
+
+                # Add to duplicate handler for processing
+                self.duplicate_handler.add_subsequence(short_video, long_video, result)
+
+            logger.info(f"Subsequence detection complete: {len(subsequences)} found")
+
+            # Finish analysis (will process subsequences after duplicates)
+            self._finish_analysis()
+
+        except Exception as e:
+            logger.error(f"Error during subsequence detection: {e}")
+            QMessageBox.warning(
+                self,
+                "Subsequence Detection Error",
+                f"An error occurred during subsequence detection:\n{str(e)}\n\n"
+                f"Continuing with duplicate results..."
+            )
+            self._finish_analysis()
+
+    def _finish_analysis(self) -> None:
+        """
+        Complete the analysis and show results.
+        """
         self.stop_ui_updates()
 
         duplicates_count = self.duplicate_handler.get_duplicate_count()
+        subsequence_count = self.duplicate_handler.get_subsequence_count()
         elapsed = self.analysis_handler.get_elapsed_time()
 
         if duplicates_count > 0:
@@ -543,24 +703,85 @@ class DuplicateFinderWindow(QMainWindow):
                 "#28A745", "#D4EDDA", "#28A745"
             )
 
-            # Start processing duplicates
+            # Start processing duplicates (subsequences will be processed after)
             QTimer.singleShot(1000, lambda: self.duplicate_handler.process_duplicates(
                 self, ComparisonDialog
             ))
-        else:
+        elif subsequence_count > 0:
+            # No duplicates but have subsequences
             self.status_indicator.update_status(
-                "✅", "Analysis complete - No duplicates found",
+                "🎬", f"Analysis complete! {subsequence_count} subsequence(s) found",
+                "#17A2B8", "#D1ECF1", "#17A2B8"
+            )
+
+            # Start processing subsequences directly
+            QTimer.singleShot(1000, lambda: self.duplicate_handler.process_subsequences(
+                self, SubsequenceComparisonDialog
+            ))
+        else:
+            # No duplicates or subsequences
+            self.status_indicator.update_status(
+                "✅", "Analysis complete - No duplicates or subsequences found",
                 "#28A745", "#D4EDDA", "#28A745"
             )
 
             threshold = self.threshold_spin.value()
             QMessageBox.information(
                 self, "Analysis complete",
-                f"No duplicates detected with {threshold}% threshold\n\n"
+                f"No duplicates or subsequences detected with {threshold}% threshold\n\n"
                 f"Total time: {elapsed:.1f} seconds"
             )
 
         self.set_analysis_mode(False)
+
+    def _on_all_duplicates_processed(self) -> None:
+        """
+        Called when all duplicates have been processed.
+        Start subsequence processing if any exist.
+        """
+        logger.info("All duplicates processed, checking for subsequences")
+
+        subsequence_count = self.duplicate_handler.get_subsequence_count()
+
+        if subsequence_count > 0:
+            # Start processing subsequences
+            logger.info(f"Starting subsequence processing: {subsequence_count} subsequences")
+            self.status_indicator.update_status(
+                "🎬", f"Processing {subsequence_count} subsequence(s)...",
+                "#17A2B8", "#D1ECF1", "#17A2B8"
+            )
+
+            QTimer.singleShot(500, lambda: self.duplicate_handler.process_subsequences(
+                self, SubsequenceComparisonDialog
+            ))
+        else:
+            # No subsequences, show final message
+            self._show_final_completion_message()
+
+    def _on_all_subsequences_processed(self) -> None:
+        """
+        Called when all subsequences have been processed.
+        Show final completion message.
+        """
+        logger.info("All subsequences processed")
+        self._show_final_completion_message()
+
+    def _show_final_completion_message(self) -> None:
+        """
+        Show final completion message after all processing is done.
+        """
+        elapsed = self.analysis_handler.get_elapsed_time()
+
+        self.status_indicator.update_status(
+            "✅", "All processing complete!",
+            "#28A745", "#D4EDDA", "#28A745"
+        )
+
+        QMessageBox.information(
+            self, "Processing Complete",
+            f"All duplicate and subsequence processing complete!\n\n"
+            f"Total time: {elapsed:.1f} seconds"
+        )
 
     def _on_duplicate_found(self, file1: str, file2: str, similarity: float) -> None:
         """

@@ -159,6 +159,17 @@ class UIPanels:
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
+        # Reload last folder button (optional, hidden by default)
+        reload_last_folder_btn = QPushButton("🔄 Reload last folder")
+        reload_last_folder_btn.setMinimumHeight(35)
+        reload_last_folder_btn.setStyleSheet(UIPanels._get_button_style("#17A2B8", "#138496"))
+        reload_last_folder_btn.clicked.connect(callbacks.get('reload_last_folder', lambda: None))
+        reload_last_folder_btn.setVisible(False)  # Hidden by default
+        layout.addWidget(reload_last_folder_btn)
+
+        # Store reference for later access
+        tab.reload_last_folder_btn = reload_last_folder_btn
+
         # Button grid
         buttons_layout = QGridLayout()
         buttons_layout.setSpacing(10)
