@@ -319,7 +319,39 @@ class SafeSerializer:
             json.dump(data, f, cls=NumpyEncoder, indent=indent, ensure_ascii=False)
 
 
-# Convenience functions
+# Convenience functions for backward compatibility
+def serialize_numpy_to_json(obj: Any) -> str:
+    """
+    Serialize NumPy arrays and other objects to JSON string.
+
+    This is a convenience wrapper for backward compatibility.
+
+    Args:
+        obj: Object to serialize (can be np.ndarray, list of arrays, dict, etc.)
+
+    Returns:
+        JSON string
+    """
+    return json.dumps(obj, cls=NumpyEncoder)
+
+
+def deserialize_numpy_from_json(json_str: str) -> Any:
+    """
+    Deserialize JSON string back to original object with NumPy arrays.
+
+    This is a convenience wrapper for backward compatibility.
+
+    Args:
+        json_str: JSON string to deserialize
+
+    Returns:
+        Deserialized object
+    """
+    if not json_str:
+        return None
+    return json.loads(json_str, object_hook=numpy_decoder)
+
+
 def safe_save(file_path: Union[str, Path], data: Any, indent: int = 2) -> bool:
     """
     Safely save data to JSON file with atomic write.

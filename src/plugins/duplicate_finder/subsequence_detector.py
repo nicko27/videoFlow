@@ -303,10 +303,11 @@ class SubsequenceDetector:
                 logger.debug(f"Short video duration ({dur_short:.1f}s) below minimum ({min_duration_seconds}s)")
                 return None
 
-            # Short video must actually be shorter
+            # If short video has more frames, swap and retry
             if len(hash_short) > len(hash_long):
-                logger.debug(f"Short video has more frames than long video, swapping")
-                return None
+                logger.debug(f"Videos mislabeled, swapping: {os.path.basename(short_video)} has more frames than {os.path.basename(long_video)}")
+                # Recursively call with swapped parameters
+                return self.find_subsequence(long_video, short_video, min_ratio, min_duration_seconds)
 
             # Sliding window comparison
             window_size = len(hash_short)
@@ -404,14 +405,24 @@ class SubsequenceDetector:
 
         # Check each pair
         total = len(pairs)
+        matches_found = 0
         for idx, (short_video, long_video) in enumerate(pairs):
             if progress_callback:
-                progress_callback(idx + 1, total, f"Checking {os.path.basename(short_video)}")
+                progress_callback(
+                    idx + 1,
+                    total,
+                    f"Checking {os.path.basename(short_video)} ({matches_found} match(es) found)"
+                )
 
             result = self.find_subsequence(short_video, long_video)
 
             if result and result['is_subsequence']:
                 results.append((short_video, long_video, result))
+                matches_found += 1
+                logger.info(
+                    f"✓ Subsequence detected: {os.path.basename(short_video)} in "
+                    f"{os.path.basename(long_video)} ({result['match_ratio']*100:.1f}% match)"
+                )
 
             # Periodically log memory usage
             if (idx + 1) % 10 == 0:
