@@ -139,9 +139,19 @@ class SettingsManager(QObject):
                         combo.setCurrentIndex(i)
                         break
 
+            # Load algorithm choice (combobox)
+            if 'scene_algorithm_combo' in widgets and widgets['scene_algorithm_combo'] is not None:
+                algorithm = self.settings.value('algorithm', 'hash_index', type=str)
+                combo = widgets['scene_algorithm_combo']
+                # Find and set the correct index
+                for i in range(combo.count()):
+                    if combo.itemData(i) == algorithm:
+                        combo.setCurrentIndex(i)
+                        break
+
             # Load checkbox state
             if 'enable_scene_check' in widgets and widgets['enable_scene_check'] is not None:
-                enabled = self.settings.value('enabled', False, type=bool)
+                enabled = self.settings.value('enabled', False, type=str)
                 widgets['enable_scene_check'].setChecked(enabled)
 
             self.settings.endGroup()
@@ -206,6 +216,11 @@ class SettingsManager(QObject):
             if 'scene_precision_combo' in widgets and widgets['scene_precision_combo'] is not None:
                 precision = widgets['scene_precision_combo'].currentData()
                 self.settings.setValue('precision_mode', precision)
+
+            # Save algorithm choice (combobox)
+            if 'scene_algorithm_combo' in widgets and widgets['scene_algorithm_combo'] is not None:
+                algorithm = widgets['scene_algorithm_combo'].currentData()
+                self.settings.setValue('algorithm', algorithm)
 
             # Save checkbox state
             if 'enable_scene_check' in widgets and widgets['enable_scene_check'] is not None:
@@ -431,6 +446,7 @@ class SettingsManager(QObject):
             min_duration = 10  # Default 10 seconds from UI
             cache_size = 500  # Default from UI
             precision_mode = 'balanced'  # Default from UI
+            algorithm = 'hash_index'  # Default: Hash Index (fastest)
 
             # Override with actual widget values if available
             if 'scene_min_match_spin' in widgets and widgets['scene_min_match_spin'] is not None:
@@ -445,9 +461,13 @@ class SettingsManager(QObject):
             if 'scene_precision_combo' in widgets and widgets['scene_precision_combo'] is not None:
                 precision_mode = widgets['scene_precision_combo'].currentData() or 'balanced'
 
+            if 'scene_algorithm_combo' in widgets and widgets['scene_algorithm_combo'] is not None:
+                algorithm = widgets['scene_algorithm_combo'].currentData() or 'hash_index'
+
             config['scene_detection'] = {
                 'enabled': enabled,
                 'precision_mode': precision_mode,
+                'algorithm': algorithm,
                 'min_match_ratio': min_match_ratio,
                 'min_duration': min_duration,
                 'cache_size': cache_size
@@ -463,38 +483,6 @@ class SettingsManager(QObject):
             True if loading is in progress, False otherwise.
         """
         return self._loading
-
-    def save_last_folder(self, folder_path: str) -> None:
-        """
-        Save the last opened folder path.
-
-        Args:
-            folder_path: Path to the folder to save.
-        """
-        try:
-            self.settings.beginGroup("recent")
-            self.settings.setValue("last_folder", folder_path)
-            self.settings.endGroup()
-            self.settings.sync()
-            logger.debug(f"Last folder saved: {folder_path}")
-        except Exception as e:
-            logger.error(f"Error saving last folder: {e}")
-
-    def get_last_folder(self) -> Optional[str]:
-        """
-        Get the last opened folder path.
-
-        Returns:
-            Path to the last folder, or None if not set.
-        """
-        try:
-            self.settings.beginGroup("recent")
-            last_folder = self.settings.value("last_folder", None, type=str)
-            self.settings.endGroup()
-            return last_folder
-        except Exception as e:
-            logger.error(f"Error getting last folder: {e}")
-            return None
 
     def save_layout_preference(self, layout_key: str) -> None:
         """

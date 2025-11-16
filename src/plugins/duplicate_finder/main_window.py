@@ -929,6 +929,7 @@ class DuplicateFinderWindow(QMainWindow):
     def _start_scene_detection(self) -> None:
         """
         Start scene detection analysis using audio fingerprinting.
+        Supports 3 algorithms: hash_index (fast), shazam (ultra-fast), sliding_window (classic).
         """
         try:
             from .workers.scene_worker import SceneDetectionWorker
@@ -936,7 +937,10 @@ class DuplicateFinderWindow(QMainWindow):
             config = self.get_analysis_config()
             scene_config = config.get('scene_detection', {})
 
-            # Get precision mode
+            # Get algorithm choice
+            algorithm = scene_config.get('algorithm', 'hash_index')
+
+            # Get precision mode (for Chromaprint-based methods)
             precision_mode_name = scene_config.get('precision_mode', 'balanced')
             if precision_mode_name == 'maximum':
                 precision_mode = PrecisionMode.MAXIMUM
@@ -945,17 +949,41 @@ class DuplicateFinderWindow(QMainWindow):
             else:
                 precision_mode = PrecisionMode.BALANCED
 
-            # Create detector if needed
-            if self.scene_detector is None:
-                self.scene_detector = AudioFingerprintDetector(
-                    precision_mode=precision_mode,
-                    min_match_ratio=scene_config.get('min_match_ratio', 0.85),
-                    max_cache_items=scene_config.get('cache_size', 500)
-                )
+            # Create detector based on algorithm choice
+            if algorithm == 'shazam':
+                # Use Shazam algorithm (ultra-fast, experimental)
+                try:
+                    from .shazam_detector import ShazamSceneDetector
+                    self.scene_detector = ShazamSceneDetector(
+                        sample_rate=11025,
+                        min_match_ratio=scene_config.get('min_match_ratio', 0.85),
+                        min_cluster_size=10
+                    )
+                    algorithm_name = "Shazam (ultra-fast)"
+                    logger.info("Using Shazam algorithm for scene detection")
+                except ImportError as e:
+                    logger.warning(f"Shazam detector not available: {e}, falling back to hash index")
+                    algorithm = 'hash_index'
+
+            if algorithm in ['hash_index', 'sliding_window']:
+                # Use Chromaprint-based detector (hash_index or sliding_window)
+                if self.scene_detector is None or not isinstance(self.scene_detector, AudioFingerprintDetector):
+                    self.scene_detector = AudioFingerprintDetector(
+                        precision_mode=precision_mode,
+                        min_match_ratio=scene_config.get('min_match_ratio', 0.85),
+                        max_cache_items=scene_config.get('cache_size', 500)
+                    )
+
+                if algorithm == 'hash_index':
+                    algorithm_name = "Hash Index (10-100x faster)"
+                    logger.info("Using Hash Index algorithm for scene detection")
+                else:
+                    algorithm_name = "Sliding Window (improved)"
+                    logger.info("Using improved Sliding Window algorithm for scene detection")
 
             # Update UI
             self.status_indicator.update_status(
-                "🎬", "Detecting scenes (audio fingerprinting)...",
+                "🎬", f"Detecting scenes ({algorithm_name})...",
                 "#17A2B8", "#D1ECF1", "#17A2B8"
             )
 
@@ -968,11 +996,12 @@ class DuplicateFinderWindow(QMainWindow):
                 self.scene_worker.stop()
                 self.scene_worker.wait()
 
-            # Create and configure worker
-            logger.info(f"Starting scene detection on {len(files)} files (audio fingerprinting)")
+            # Create and configure worker with algorithm choice
+            logger.info(f"Starting scene detection on {len(files)} files using {algorithm_name}")
             self.scene_worker = SceneDetectionWorker(
                 self.scene_detector,
-                files
+                files,
+                algorithm=algorithm  # Pass algorithm choice to worker
             )
 
             # Connect signals
@@ -1391,14 +1420,43 @@ class DuplicateFinderWindow(QMainWindow):
 
     def cleanup_resources(self) -> None:
         """
-        Clean up all resources.
+        Clean up all resources before closing.
+        Stops all workers, closes database connections, and frees memory.
         """
         try:
+            # Stop UI updates
             self.stop_ui_updates()
-            self.analysis_handler.cleanup()
+
+            # Stop scene worker if running
+            if self.scene_worker and self.scene_worker.isRunning():
+                logger.info("Stopping scene worker...")
+                self.scene_worker.stop()
+                self.scene_worker.wait(5000)  # Wait max 5 seconds
+
+            # Stop subsequence worker if running
+            if hasattr(self, 'subsequence_worker') and self.subsequence_worker:
+                if self.subsequence_worker.isRunning():
+                    logger.info("Stopping subsequence worker...")
+                    self.subsequence_worker.stop()
+                    self.subsequence_worker.wait(5000)
+
+            # Cleanup analysis handler (stops hash/comparison workers)
+            if self.analysis_handler:
+                self.analysis_handler.cleanup()
+
+            # Close database connections
+            if self.video_hasher and self.video_hasher.db:
+                logger.info("Closing database connections...")
+                self.video_hasher.db.close()
+
+            # Clear caches
+            if self.scene_detector and hasattr(self.scene_detector, 'clear_cache'):
+                logger.info("Clearing scene detection cache...")
+                self.scene_detector.clear_cache()
+
             logger.info("Resources cleaned up successfully")
         except Exception as e:
-            logger.error(f"Error cleaning up resources: {e}")
+            logger.error(f"Error cleaning up resources: {e}", exc_info=True)
 
     def closeEvent(self, event) -> None:
         """
