@@ -8,7 +8,7 @@ from typing import Callable, Dict
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox,
     QGridLayout, QDoubleSpinBox, QSpinBox, QFrame, QLabel, QTabWidget,
-    QCheckBox, QComboBox
+    QCheckBox, QComboBox, QScrollArea
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -221,7 +221,7 @@ class UIPanels:
     @staticmethod
     def _create_parameters_tab(callbacks: Dict[str, Callable]) -> QWidget:
         """
-        Create the parameters configuration tab.
+        Create the parameters configuration tab with scrollbar.
 
         Args:
             callbacks: Dictionary of callbacks.
@@ -230,7 +230,17 @@ class UIPanels:
             Tuple of (QWidget, dict of parameter widgets).
         """
         tab = QWidget()
-        layout = QVBoxLayout(tab)
+
+        # Create scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+
+        # Create content widget for scrollable content
+        content_widget = QWidget()
+        layout = QVBoxLayout(content_widget)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(15)
 
@@ -422,9 +432,9 @@ class UIPanels:
         subsequence_layout.addWidget(subsequence_temporal_window_spin, 5, 1)
 
         # Adaptive refinement (SOLUTION 5)
-        subsequence_adaptive_refinement_check = QCheckBox("Enable adaptive refinement")
-        subsequence_adaptive_refinement_check.setChecked(True)
-        subsequence_adaptive_refinement_check.setToolTip("Automatically re-sample at 0.2s intervals for 70-95% matches (default: enabled)")
+        subsequence_adaptive_refinement_check = QCheckBox("Enable adaptive refinement (⚠️ SLOW)")
+        subsequence_adaptive_refinement_check.setChecked(False)
+        subsequence_adaptive_refinement_check.setToolTip("Automatically re-sample at 0.2s intervals for 80-95% matches.\n⚠️ WARNING: Can be VERY slow (minutes per comparison) with H.264/H.265 codecs.\nOnly enable if you need the extra 5-10% accuracy for borderline matches.")
         subsequence_layout.addWidget(subsequence_adaptive_refinement_check, 6, 0, 1, 2)
 
         # Info label
@@ -455,18 +465,34 @@ class UIPanels:
         tab.subsequence_temporal_window_spin = subsequence_temporal_window_spin
         tab.subsequence_adaptive_refinement_check = subsequence_adaptive_refinement_check
 
+        # Set scroll area content and add to tab
+        scroll_area.setWidget(content_widget)
+        tab_layout = QVBoxLayout(tab)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        tab_layout.addWidget(scroll_area)
+
         return tab
 
     @staticmethod
     def _create_debug_tab() -> QWidget:
         """
-        Create the debug tab with interactive hash debugger.
+        Create the debug tab with interactive hash debugger and scrollbar.
 
         Returns:
             Configured QWidget for debug tab.
         """
         tab = QWidget()
-        layout = QVBoxLayout(tab)
+
+        # Create scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+
+        # Create content widget for scrollable content
+        content_widget = QWidget()
+        layout = QVBoxLayout(content_widget)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
@@ -478,6 +504,12 @@ class UIPanels:
 
         # Store reference for later access
         tab.hash_debugger_v2 = hash_debugger_v2
+
+        # Set scroll area content and add to tab
+        scroll_area.setWidget(content_widget)
+        tab_layout = QVBoxLayout(tab)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        tab_layout.addWidget(scroll_area)
 
         return tab
 

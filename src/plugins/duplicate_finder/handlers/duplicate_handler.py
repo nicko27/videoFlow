@@ -446,10 +446,10 @@ class DuplicateHandler(QObject):
 
                 # Update database
                 self.video_hasher.db.update_subsequence_status(
-                    short_video,
-                    long_video,
-                    "processed",
-                    "kept_short"
+                    short_video_path=short_video,
+                    long_video_path=long_video,
+                    status="processed",
+                    action="kept_short"
                 )
 
             elif choice == "keep_long":
@@ -460,10 +460,10 @@ class DuplicateHandler(QObject):
 
                 # Update database
                 self.video_hasher.db.update_subsequence_status(
-                    short_video,
-                    long_video,
-                    "processed",
-                    "kept_long"
+                    short_video_path=short_video,
+                    long_video_path=long_video,
+                    status="processed",
+                    action="kept_long"
                 )
 
             elif choice == "keep_both":
@@ -475,10 +475,10 @@ class DuplicateHandler(QObject):
 
                 # Update database
                 self.video_hasher.db.update_subsequence_status(
-                    short_video,
-                    long_video,
-                    "processed",
-                    "kept_both"
+                    short_video_path=short_video,
+                    long_video_path=long_video,
+                    status="processed",
+                    action="kept_both"
                 )
 
             # Emit signal
@@ -500,11 +500,12 @@ class DuplicateHandler(QObject):
             self.pending_subsequences = []
 
             for row in pending:
-                short_video, long_video, match_ratio, start_frame_idx, confidence = row[:5]
+                short_video, long_video, match_ratio, start_frame_idx, confidence, subseq_id = row
                 match_info = {
                     'match_ratio': match_ratio,
                     'start_frame_idx': start_frame_idx,
-                    'confidence': confidence
+                    'confidence': confidence,
+                    'id': subseq_id  # Include ID for database updates
                 }
                 self.pending_subsequences.append((short_video, long_video, match_info))
 
