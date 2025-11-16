@@ -1073,6 +1073,7 @@ class DuplicateFinderWindow(QMainWindow):
 
 🔍 COMPARISONS
    Total: {stats.get('comparisons_count', 0):,}
+   Early exits: {stats.get('early_exits', 0):,} ({stats.get('early_exit_percentage', 0):.1f}%)
    Ignored pairs: {stats.get('ignored_count', 0):,}
 
 💾 MEMORY CACHE

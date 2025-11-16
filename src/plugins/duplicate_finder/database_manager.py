@@ -681,7 +681,7 @@ class VideoDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # After migration, ignore_type column ALWAYS exists
+                # Query all statistics in a single optimized query
                 cursor.execute('''
                     SELECT
                         (SELECT COUNT(*) FROM video_files) as files_count,
@@ -694,22 +694,6 @@ class VideoDatabase:
 
                 result = cursor.fetchone()
                 files_count, comparisons_count, early_exits, ignored_perm, ignored_temp, ignored_total = result
-
-                # Legacy compatibility removed - ignore_type always exists after migration
-                if False:
-                    # Version without ignore_type (compatibility - DEPRECATED)
-                    cursor.execute('''
-                        SELECT 
-                            (SELECT COUNT(*) FROM video_files) as files_count,
-                            (SELECT COUNT(*) FROM comparisons) as comparisons_count,
-                            (SELECT COUNT(*) FROM comparisons WHERE is_early_exit = 1) as early_exits,
-                            (SELECT COUNT(*) FROM ignored_pairs) as ignored_count
-                    ''')
-                    
-                    result = cursor.fetchone()
-                    files_count, comparisons_count, early_exits, ignored_total = result
-                    ignored_perm = ignored_total
-                    ignored_temp = 0
                 
                 # Size of the base
                 db_size = os.path.getsize(self.db_path) / 1024 if os.path.exists(self.db_path) else 0
