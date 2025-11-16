@@ -14,6 +14,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 from ..progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator
+from ..themes import get_current_theme
+from ..design_system import Colors, Spacing, Typography
 
 
 class UIPanels:
@@ -40,18 +42,11 @@ class UIPanels:
         Returns:
             Configured QLabel for the window title.
         """
+        theme = get_current_theme()
         title = QLabel("🔍 Video Duplicate Detector")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("""
-            QLabel {
-                color: #1976D2;
-                background-color: #E3F2FD;
-                border-radius: 8px;
-                padding: 8px;
-                margin: 5px 0px;
-            }
-        """)
+        title.setStyleSheet(theme.get_title_style())
         return title
 
     @staticmethod
@@ -72,17 +67,22 @@ class UIPanels:
         Returns:
             Configured QFrame containing the left panel.
         """
+        theme = get_current_theme()
+        colors = theme.get_colors()
+        spacing = theme.get_spacing()
+
         panel = QFrame()
-        panel.setStyleSheet("""
-            QFrame {
-                background-color: #FFFFFF;
-                border: 1px solid #DEE2E6;
-                border-radius: 12px;
-            }
+        panel.setStyleSheet(f"""
+            QFrame {{
+                background-color: {colors['surface']};
+                border: 1px solid {colors['border']};
+                border-radius: {spacing['radius']}px;
+            }}
         """)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(15)
+        layout.setContentsMargins(spacing['padding'], spacing['padding'],
+                                   spacing['padding'], spacing['padding'])
+        layout.setSpacing(spacing['gap'])
 
         # Configuration tabs
         config_tabs = UIPanels._create_config_tabs(file_list_widget, callbacks)
@@ -451,17 +451,22 @@ class UIPanels:
         Returns:
             Tuple of (QFrame, dict of widgets).
         """
+        theme = get_current_theme()
+        colors = theme.get_colors()
+        spacing = theme.get_spacing()
+
         panel = QFrame()
-        panel.setStyleSheet("""
-            QFrame {
-                background-color: #FFFFFF;
-                border: 1px solid #DEE2E6;
-                border-radius: 12px;
-            }
+        panel.setStyleSheet(f"""
+            QFrame {{
+                background-color: {colors['surface']};
+                border: 1px solid {colors['border']};
+                border-radius: {spacing['radius']}px;
+            }}
         """)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
+        layout.setContentsMargins(spacing['padding'], spacing['padding'],
+                                   spacing['padding'], spacing['padding'])
+        layout.setSpacing(spacing['gap'])
 
         # Status indicator
         status_indicator = StatusIndicator()
