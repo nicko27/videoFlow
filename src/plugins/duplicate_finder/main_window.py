@@ -245,7 +245,7 @@ class DuplicateFinderWindow(QMainWindow):
         # Update main window background
         self.setStyleSheet(f"""
             QMainWindow {{
-                background-color: {theme.get_colors()['background']};
+                background-color: {theme.get_colors()['bg_main']};
             }}
         """)
 
