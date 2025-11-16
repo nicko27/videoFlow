@@ -364,14 +364,15 @@ class SettingsManager(QObject):
 
         # Add subsequence detection config if widgets exist
         if 'enable_subsequence_check' in widgets and widgets['enable_subsequence_check'] is not None:
+            # Initialize with defaults
             config['subsequence_detection'] = {
                 'enabled': widgets['enable_subsequence_check'].isChecked(),
-                'sample_interval': widgets.get('subsequence_sample_interval_spin', {}).get('value', lambda: 3.0)() if 'subsequence_sample_interval_spin' in widgets else 3.0,
-                'min_match_ratio': widgets.get('subsequence_min_match_spin', {}).get('value', lambda: 80.0)() if 'subsequence_min_match_spin' in widgets else 80.0,
-                'cache_memory_mb': widgets.get('subsequence_cache_memory_spin', {}).get('value', lambda: 500)() if 'subsequence_cache_memory_spin' in widgets else 500
+                'sample_interval': 3.0,
+                'min_match_ratio': 0.80,
+                'cache_memory_mb': 500
             }
 
-            # Better handling for actual widget values
+            # Override with actual widget values if available
             if 'subsequence_sample_interval_spin' in widgets and widgets['subsequence_sample_interval_spin'] is not None:
                 config['subsequence_detection']['sample_interval'] = widgets['subsequence_sample_interval_spin'].value()
             if 'subsequence_min_match_spin' in widgets and widgets['subsequence_min_match_spin'] is not None:
