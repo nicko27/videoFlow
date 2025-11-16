@@ -7,7 +7,8 @@ separating UI construction from business logic.
 from typing import Callable, Dict, Any
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox,
-    QGridLayout, QDoubleSpinBox, QSpinBox, QFrame, QLabel, QTabWidget
+    QGridLayout, QDoubleSpinBox, QSpinBox, QFrame, QLabel, QTabWidget,
+    QCheckBox
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -294,6 +295,54 @@ class UIPanels:
         presets_layout.addWidget(quality_btn)
 
         layout.addWidget(presets_group)
+
+        # Subsequence detection group
+        subsequence_group = QGroupBox("🎬 Subsequence Detection (Optional)")
+        subsequence_layout = QGridLayout(subsequence_group)
+        subsequence_layout.setSpacing(10)
+
+        # Enable checkbox
+        enable_subsequence_check = QCheckBox("Enable subsequence detection")
+        enable_subsequence_check.setStyleSheet("QCheckBox { font-weight: bold; }")
+        subsequence_layout.addWidget(enable_subsequence_check, 0, 0, 1, 2)
+
+        # Sample interval
+        subsequence_layout.addWidget(QLabel("Sample interval:"), 1, 0)
+        subsequence_sample_interval_spin = QDoubleSpinBox()
+        subsequence_sample_interval_spin.setRange(1.0, 10.0)
+        subsequence_sample_interval_spin.setValue(3.0)
+        subsequence_sample_interval_spin.setSuffix(" sec")
+        subsequence_sample_interval_spin.setDecimals(1)
+        subsequence_sample_interval_spin.setToolTip("Interval between sampled frames (default: 3.0s)")
+        subsequence_layout.addWidget(subsequence_sample_interval_spin, 1, 1)
+
+        # Min match ratio
+        subsequence_layout.addWidget(QLabel("Min match ratio:"), 2, 0)
+        subsequence_min_match_spin = QDoubleSpinBox()
+        subsequence_min_match_spin.setRange(70.0, 95.0)
+        subsequence_min_match_spin.setValue(80.0)
+        subsequence_min_match_spin.setSuffix("%")
+        subsequence_min_match_spin.setDecimals(1)
+        subsequence_min_match_spin.setToolTip("Minimum match ratio to consider a subsequence (default: 80%)")
+        subsequence_layout.addWidget(subsequence_min_match_spin, 2, 1)
+
+        # Cache memory limit
+        subsequence_layout.addWidget(QLabel("Cache memory limit:"), 3, 0)
+        subsequence_cache_memory_spin = QSpinBox()
+        subsequence_cache_memory_spin.setRange(100, 2000)
+        subsequence_cache_memory_spin.setValue(500)
+        subsequence_cache_memory_spin.setSuffix(" MB")
+        subsequence_cache_memory_spin.setToolTip("Maximum memory for dense hash cache (default: 500MB)")
+        subsequence_layout.addWidget(subsequence_cache_memory_spin, 3, 1)
+
+        # Info label
+        info_label = QLabel("ℹ️ Detects when a short video is extracted from a longer video.\n"
+                           "Uses more memory but protected by LRU cache with limit above.")
+        info_label.setStyleSheet("QLabel { color: #6C757D; font-size: 9px; padding: 5px; }")
+        info_label.setWordWrap(True)
+        subsequence_layout.addWidget(info_label, 4, 0, 1, 2)
+
+        layout.addWidget(subsequence_group)
         layout.addStretch()
 
         # Store widget references in tab for later access
@@ -303,6 +352,10 @@ class UIPanels:
         tab.batch_size_spin = batch_size_spin
         tab.hash_timeout_spin = hash_timeout_spin
         tab.comparison_timeout_spin = comparison_timeout_spin
+        tab.enable_subsequence_check = enable_subsequence_check
+        tab.subsequence_sample_interval_spin = subsequence_sample_interval_spin
+        tab.subsequence_min_match_spin = subsequence_min_match_spin
+        tab.subsequence_cache_memory_spin = subsequence_cache_memory_spin
 
         return tab
 
