@@ -6,7 +6,7 @@ import os
 import numpy as np
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame,
                               QScrollArea, QPushButton, QTextEdit, QSpinBox, QDialog, QSlider,
-                              QApplication)
+                              QApplication, QComboBox, QListWidget, QFileDialog)
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage
 
