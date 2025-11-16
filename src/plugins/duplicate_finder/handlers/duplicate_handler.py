@@ -38,6 +38,8 @@ class DuplicateHandler(QObject):
 
     duplicate_processed = pyqtSignal(str, str, str)  # file1, file2, action
     all_duplicates_processed = pyqtSignal()
+    subsequence_processed = pyqtSignal(str, str, str)  # short_video, long_video, action
+    all_subsequences_processed = pyqtSignal()
 
     def __init__(self, video_hasher, file_handler) -> None:
         """
@@ -51,6 +53,7 @@ class DuplicateHandler(QObject):
         self.video_hasher = video_hasher
         self.file_handler = file_handler
         self.potential_duplicates: List[Tuple[str, str, float]] = []
+        self.pending_subsequences: List[Tuple[str, str, dict]] = []
         self.processing_stopped = False
         logger.info("Duplicate handler initialized")
 
@@ -311,3 +314,203 @@ class DuplicateHandler(QObject):
             'pending_count': len(self.potential_duplicates),
             'processing_stopped': self.processing_stopped
         }
+
+    # ========== Subsequence Processing Methods ==========
+
+    def add_subsequence(self, short_video: str, long_video: str, match_info: dict) -> None:
+        """
+        Add a detected subsequence to the list.
+
+        Args:
+            short_video: Path to shorter video (extracted).
+            long_video: Path to longer video (source).
+            match_info: Dictionary with match details (match_ratio, start_frame_idx, etc.).
+        """
+        self.pending_subsequences.append((short_video, long_video, match_info))
+        logger.info(
+            f"Subsequence added: {os.path.basename(short_video)} in "
+            f"{os.path.basename(long_video)} ({match_info.get('match_ratio', 0)*100:.1f}%)"
+        )
+
+    def get_subsequence_count(self) -> int:
+        """
+        Get the number of pending subsequences.
+
+        Returns:
+            Number of subsequences in the queue.
+        """
+        return len(self.pending_subsequences)
+
+    def clear_subsequences(self) -> None:
+        """
+        Clear all pending subsequences.
+        """
+        self.pending_subsequences.clear()
+        logger.info("Subsequence list cleared")
+
+    def process_subsequences(
+        self,
+        parent_window,
+        comparison_dialog_class
+    ) -> None:
+        """
+        Start processing subsequences interactively.
+
+        This method shows comparison dialogs for each subsequence and handles
+        user decisions.
+
+        Args:
+            parent_window: Parent window for dialogs.
+            comparison_dialog_class: Class to instantiate for comparison dialogs.
+        """
+        self.processing_stopped = False
+
+        if not self.pending_subsequences:
+            logger.info("No subsequences to process")
+            self.all_subsequences_processed.emit()
+            return
+
+        logger.info(f"Starting subsequence processing: {len(self.pending_subsequences)} subsequences")
+        self._process_next_subsequence(parent_window, comparison_dialog_class)
+
+    def _process_next_subsequence(
+        self,
+        parent_window,
+        comparison_dialog_class
+    ) -> None:
+        """
+        Process the next subsequence in the queue.
+
+        Args:
+            parent_window: Parent window for dialogs.
+            comparison_dialog_class: Class for comparison dialogs.
+        """
+        if not self.pending_subsequences or self.processing_stopped:
+            if not self.processing_stopped:
+                logger.info("All subsequences processed")
+                self.all_subsequences_processed.emit()
+            return
+
+        # Get next subsequence
+        short_video, long_video, match_info = self.pending_subsequences[0]
+
+        # Validate files still exist
+        if not os.path.exists(short_video) or not os.path.exists(long_video):
+            logger.warning(f"Files no longer exist, skipping: {short_video} or {long_video}")
+            self.pending_subsequences.pop(0)
+            self._process_next_subsequence(parent_window, comparison_dialog_class)
+            return
+
+        # Show comparison dialog
+        dialog = comparison_dialog_class(short_video, long_video, match_info, parent_window)
+        result = dialog.exec()
+
+        # Handle user decision
+        if result == QDialog.DialogCode.Accepted and dialog.result:
+            self.handle_subsequence_choice(
+                dialog.result,
+                short_video,
+                long_video
+            )
+        elif result == QDialog.DialogCode.Rejected or dialog.result == "skip":
+            # User chose to skip
+            logger.info(f"Subsequence skipped: {os.path.basename(short_video)}")
+
+        # Remove processed subsequence
+        self.pending_subsequences.pop(0)
+
+        # Process next subsequence
+        if not self.processing_stopped:
+            self._process_next_subsequence(parent_window, comparison_dialog_class)
+
+    def handle_subsequence_choice(
+        self,
+        choice: str,
+        short_video: str,
+        long_video: str
+    ) -> None:
+        """
+        Handle user's choice for a subsequence pair.
+
+        Args:
+            choice: User choice ('keep_short', 'keep_long', 'keep_both', 'skip').
+            short_video: Path to shorter video.
+            long_video: Path to longer video.
+        """
+        try:
+            if choice == "keep_short":
+                # Delete long video
+                send2trash(long_video)
+                self.file_handler.update_file_status(long_video, "🗑️ Deleted")
+                logger.info(f"Long video deleted: {os.path.basename(long_video)}")
+
+                # Update database
+                self.video_hasher.db.update_subsequence_status(
+                    short_video,
+                    long_video,
+                    "processed",
+                    "kept_short"
+                )
+
+            elif choice == "keep_long":
+                # Delete short video
+                send2trash(short_video)
+                self.file_handler.update_file_status(short_video, "🗑️ Deleted")
+                logger.info(f"Short video deleted: {os.path.basename(short_video)}")
+
+                # Update database
+                self.video_hasher.db.update_subsequence_status(
+                    short_video,
+                    long_video,
+                    "processed",
+                    "kept_long"
+                )
+
+            elif choice == "keep_both":
+                # Keep both files
+                logger.info(
+                    f"Both videos kept: {os.path.basename(short_video)} & "
+                    f"{os.path.basename(long_video)}"
+                )
+
+                # Update database
+                self.video_hasher.db.update_subsequence_status(
+                    short_video,
+                    long_video,
+                    "processed",
+                    "kept_both"
+                )
+
+            # Emit signal
+            self.subsequence_processed.emit(short_video, long_video, choice)
+
+        except Exception as e:
+            logger.error(f"Error handling subsequence choice: {e}")
+            raise
+
+    def load_pending_subsequences(self) -> int:
+        """
+        Load pending subsequences from the database.
+
+        Returns:
+            Number of subsequences loaded.
+        """
+        try:
+            pending = self.video_hasher.db.get_pending_subsequences()
+            self.pending_subsequences = []
+
+            for row in pending:
+                short_video, long_video, match_ratio, start_frame_idx, confidence = row[:5]
+                match_info = {
+                    'match_ratio': match_ratio,
+                    'start_frame_idx': start_frame_idx,
+                    'confidence': confidence
+                }
+                self.pending_subsequences.append((short_video, long_video, match_info))
+
+            count = len(self.pending_subsequences)
+            logger.info(f"Loaded {count} pending subsequences from database")
+            return count
+        except Exception as e:
+            logger.error(f"Error loading pending subsequences: {e}")
+            return 0

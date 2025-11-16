@@ -129,6 +129,37 @@ class SubsequenceDetector:
         logger.info(f"SubsequenceDetector initialized: {sample_interval_seconds}s intervals, "
                    f"{max_cache_memory_mb}MB cache limit, {min_match_ratio*100}% min match")
 
+    def _is_frame_blank(self, frame: np.ndarray, threshold: float = 0.1) -> bool:
+        """
+        Check if a frame is mostly blank (black or white).
+
+        Args:
+            frame: Video frame (numpy array)
+            threshold: Maximum mean brightness for black (0-1 scale)
+
+        Returns:
+            True if frame is blank, False otherwise
+        """
+        try:
+            # Convert to grayscale
+            if len(frame.shape) == 3:
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = frame
+
+            # Calculate mean brightness (normalized to 0-1)
+            mean_brightness = np.mean(gray) / 255.0
+
+            # Check if mostly black (mean < threshold) or mostly white (mean > 1-threshold)
+            is_black = mean_brightness < threshold
+            is_white = mean_brightness > (1.0 - threshold)
+
+            return is_black or is_white
+
+        except Exception as e:
+            logger.error(f"Error checking blank frame: {e}")
+            return False
+
     def compute_dense_hash(self, video_path: str) -> Tuple[Optional[np.ndarray], float]:
         """Compute dense hash for a video with memory-safe caching.
 
@@ -192,17 +223,21 @@ class SubsequenceDetector:
                     ret, frame = cap.read()
 
                     if ret and frame is not None:
-                        frame_hash = self.hasher.compute_frame_hash(frame)
-                        if frame_hash is not None:
-                            hashes.append(frame_hash)
+                        # Skip blank frames to avoid false positives
+                        if not self._is_frame_blank(frame):
+                            frame_hash = self.hasher.compute_frame_hash(frame)
+                            if frame_hash is not None:
+                                hashes.append(frame_hash)
                     else:
                         # Try next frame
                         cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx + 1)
                         ret, frame = cap.read()
                         if ret and frame is not None:
-                            frame_hash = self.hasher.compute_frame_hash(frame)
-                            if frame_hash is not None:
-                                hashes.append(frame_hash)
+                            # Skip blank frames to avoid false positives
+                            if not self._is_frame_blank(frame):
+                                frame_hash = self.hasher.compute_frame_hash(frame)
+                                if frame_hash is not None:
+                                    hashes.append(frame_hash)
 
                 if len(hashes) < 3:
                     raise Exception(f"Only {len(hashes)} frames read")
@@ -229,7 +264,8 @@ class SubsequenceDetector:
         self,
         short_video: str,
         long_video: str,
-        min_ratio: Optional[float] = None
+        min_ratio: Optional[float] = None,
+        min_duration_seconds: float = 5.0
     ) -> Optional[Dict]:
         """Find if short_video is a subsequence of long_video using sliding window.
 
@@ -240,6 +276,7 @@ class SubsequenceDetector:
             short_video: Path to potentially shorter video
             long_video: Path to potentially longer video
             min_ratio: Minimum match ratio (overrides instance default if provided)
+            min_duration_seconds: Minimum duration for valid subsequence (default: 5.0s)
 
         Returns:
             Dict with detection results or None if not a subsequence:
@@ -259,6 +296,11 @@ class SubsequenceDetector:
             hash_long, dur_long = self.compute_dense_hash(long_video)
 
             if hash_short is None or hash_long is None:
+                return None
+
+            # Short video must have minimum duration to avoid false positives
+            if dur_short < min_duration_seconds:
+                logger.debug(f"Short video duration ({dur_short:.1f}s) below minimum ({min_duration_seconds}s)")
                 return None
 
             # Short video must actually be shorter
