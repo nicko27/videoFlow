@@ -6,10 +6,10 @@ import os
 import re
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QFrame, QSlider, QProgressBar, QApplication
+    QFrame, QSlider, QProgressBar
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QScreen
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont
 
 # Import video widget
 try:

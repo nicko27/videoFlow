@@ -16,7 +16,7 @@ from typing import Optional, Dict, Any
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QMessageBox,
-    QSplitter, QApplication
+    QSplitter, QApplication, QLabel
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
@@ -33,7 +33,7 @@ try:
     from .handlers.analysis_handler import AnalysisHandler
     from .handlers.duplicate_handler import DuplicateHandler
     from .theme_selector import ThemeSelector
-    from .themes import get_theme_manager, get_current_theme
+    from .themes import get_current_theme
 except ImportError:
     # Fallback for direct imports
     from video_hasher import VideoHasher
@@ -46,7 +46,7 @@ except ImportError:
     from handlers.analysis_handler import AnalysisHandler
     from handlers.duplicate_handler import DuplicateHandler
     from theme_selector import ThemeSelector
-    from themes import get_theme_manager, get_current_theme
+    from themes import get_current_theme
 
 from src.core.logger import Logger
 
@@ -216,8 +216,6 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Title
         theme = get_current_theme()
-        colors = theme.get_colors()
-        spacing = theme.get_spacing()
 
         title = QLabel("🔍 Video Duplicate Detector")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))

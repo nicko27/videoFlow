@@ -4,7 +4,7 @@ UI panel creation utilities for the duplicate finder.
 This module provides factory methods for creating UI panels and their components,
 separating UI construction from business logic.
 """
-from typing import Callable, Dict, Any
+from typing import Callable, Dict
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox,
     QGridLayout, QDoubleSpinBox, QSpinBox, QFrame, QLabel, QTabWidget,
@@ -15,7 +15,6 @@ from PyQt6.QtGui import QFont
 
 from ..progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator
 from ..themes import get_current_theme
-from ..design_system import Colors, Spacing, Typography
 
 
 class UIPanels:

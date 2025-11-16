@@ -146,8 +146,6 @@ class ParallelHashWorker(QThread):
         in parallel using a thread pool executor. Progress is reported through signals.
         """
         try:
-            total_files = len(self.files)
-
             # Process cached files first (fast path)
             for file_path in self.files_cached:
                 if self.is_stopped():
