@@ -116,33 +116,33 @@ class SettingsManager(QObject):
 
             self.settings.endGroup()
 
-            # Load subsequence detection settings
-            self.settings.beginGroup("subsequence_detection")
+            # Load scene detection settings
+            self.settings.beginGroup("scene_detection")
 
             self._load_widget_value(
-                widgets, 'subsequence_sample_interval_spin', 'sample_interval', 0.75, float
+                widgets, 'scene_min_match_spin', 'min_match_ratio', 85.0, float
             )
             self._load_widget_value(
-                widgets, 'subsequence_min_match_spin', 'min_match_ratio', 80.0, float
+                widgets, 'scene_min_duration_spin', 'min_duration', 10, int
             )
             self._load_widget_value(
-                widgets, 'subsequence_cache_memory_spin', 'cache_memory_mb', 500, int
-            )
-            self._load_widget_value(
-                widgets, 'subsequence_sliding_tolerance_spin', 'sliding_window_tolerance', 3, int
-            )
-            self._load_widget_value(
-                widgets, 'subsequence_temporal_window_spin', 'temporal_window_frames', 5, int
+                widgets, 'scene_cache_size_spin', 'cache_size', 500, int
             )
 
-            # Load checkbox states
-            if 'enable_subsequence_check' in widgets and widgets['enable_subsequence_check'] is not None:
+            # Load precision mode (combobox)
+            if 'scene_precision_combo' in widgets and widgets['scene_precision_combo'] is not None:
+                precision = self.settings.value('precision_mode', 'balanced', type=str)
+                combo = widgets['scene_precision_combo']
+                # Find and set the correct index
+                for i in range(combo.count()):
+                    if combo.itemData(i) == precision:
+                        combo.setCurrentIndex(i)
+                        break
+
+            # Load checkbox state
+            if 'enable_scene_check' in widgets and widgets['enable_scene_check'] is not None:
                 enabled = self.settings.value('enabled', False, type=bool)
-                widgets['enable_subsequence_check'].setChecked(enabled)
-
-            if 'subsequence_adaptive_refinement_check' in widgets and widgets['subsequence_adaptive_refinement_check'] is not None:
-                adaptive = self.settings.value('enable_adaptive_refinement', False, type=bool)  # Default FALSE - can be VERY slow
-                widgets['subsequence_adaptive_refinement_check'].setChecked(adaptive)
+                widgets['enable_scene_check'].setChecked(enabled)
 
             self.settings.endGroup()
 
@@ -195,21 +195,21 @@ class SettingsManager(QObject):
 
             self.settings.endGroup()
 
-            # Subsequence detection settings
-            self.settings.beginGroup("subsequence_detection")
+            # Scene detection settings
+            self.settings.beginGroup("scene_detection")
 
-            self._save_widget_value(widgets, 'subsequence_sample_interval_spin', 'sample_interval')
-            self._save_widget_value(widgets, 'subsequence_min_match_spin', 'min_match_ratio')
-            self._save_widget_value(widgets, 'subsequence_cache_memory_spin', 'cache_memory_mb')
-            self._save_widget_value(widgets, 'subsequence_sliding_tolerance_spin', 'sliding_window_tolerance')
-            self._save_widget_value(widgets, 'subsequence_temporal_window_spin', 'temporal_window_frames')
+            self._save_widget_value(widgets, 'scene_min_match_spin', 'min_match_ratio')
+            self._save_widget_value(widgets, 'scene_min_duration_spin', 'min_duration')
+            self._save_widget_value(widgets, 'scene_cache_size_spin', 'cache_size')
 
-            # Save checkbox states
-            if 'enable_subsequence_check' in widgets and widgets['enable_subsequence_check'] is not None:
-                self.settings.setValue('enabled', widgets['enable_subsequence_check'].isChecked())
+            # Save precision mode (combobox)
+            if 'scene_precision_combo' in widgets and widgets['scene_precision_combo'] is not None:
+                precision = widgets['scene_precision_combo'].currentData()
+                self.settings.setValue('precision_mode', precision)
 
-            if 'subsequence_adaptive_refinement_check' in widgets and widgets['subsequence_adaptive_refinement_check'] is not None:
-                self.settings.setValue('enable_adaptive_refinement', widgets['subsequence_adaptive_refinement_check'].isChecked())
+            # Save checkbox state
+            if 'enable_scene_check' in widgets and widgets['enable_scene_check'] is not None:
+                self.settings.setValue('enabled', widgets['enable_scene_check'].isChecked())
 
             self.settings.endGroup()
 
@@ -423,46 +423,36 @@ class SettingsManager(QObject):
             if algorithm:
                 config['comparison_algorithm'] = algorithm
 
-        # Add subsequence detection config if widgets exist
-        if 'enable_subsequence_check' in widgets and widgets['enable_subsequence_check'] is not None:
+        # Add scene detection config if widgets exist
+        if 'enable_scene_check' in widgets and widgets['enable_scene_check'] is not None:
             # Get enabled status
-            enabled = widgets['enable_subsequence_check'].isChecked()
+            enabled = widgets['enable_scene_check'].isChecked()
 
             # Get actual widget values (with defaults matching UI)
-            sample_interval = 0.75  # Default from UI (changed from 3.0)
-            min_match_ratio = 0.80  # Default 80% from UI, converted to ratio
-            cache_memory_mb = 500  # Default from UI
-            sliding_window_tolerance = 3  # Default from UI (SOLUTION 1)
-            temporal_window_frames = 5  # Default from UI (SOLUTION 4)
-            enable_adaptive_refinement = False  # Default from UI (SOLUTION 5) - DISABLED by default, can be VERY slow
+            min_match_ratio = 0.85  # Default 85% from UI
+            min_duration = 10  # Default 10 seconds from UI
+            cache_size = 500  # Default from UI
+            precision_mode = 'balanced'  # Default from UI
 
             # Override with actual widget values if available
-            if 'subsequence_sample_interval_spin' in widgets and widgets['subsequence_sample_interval_spin'] is not None:
-                sample_interval = widgets['subsequence_sample_interval_spin'].value()
+            if 'scene_min_match_spin' in widgets and widgets['scene_min_match_spin'] is not None:
+                min_match_ratio = widgets['scene_min_match_spin'].value() / 100.0  # Convert percentage to ratio
 
-            if 'subsequence_min_match_spin' in widgets and widgets['subsequence_min_match_spin'] is not None:
-                min_match_ratio = widgets['subsequence_min_match_spin'].value() / 100.0  # Convert percentage to ratio
+            if 'scene_min_duration_spin' in widgets and widgets['scene_min_duration_spin'] is not None:
+                min_duration = widgets['scene_min_duration_spin'].value()
 
-            if 'subsequence_cache_memory_spin' in widgets and widgets['subsequence_cache_memory_spin'] is not None:
-                cache_memory_mb = widgets['subsequence_cache_memory_spin'].value()
+            if 'scene_cache_size_spin' in widgets and widgets['scene_cache_size_spin'] is not None:
+                cache_size = widgets['scene_cache_size_spin'].value()
 
-            if 'subsequence_sliding_tolerance_spin' in widgets and widgets['subsequence_sliding_tolerance_spin'] is not None:
-                sliding_window_tolerance = widgets['subsequence_sliding_tolerance_spin'].value()
+            if 'scene_precision_combo' in widgets and widgets['scene_precision_combo'] is not None:
+                precision_mode = widgets['scene_precision_combo'].currentData() or 'balanced'
 
-            if 'subsequence_temporal_window_spin' in widgets and widgets['subsequence_temporal_window_spin'] is not None:
-                temporal_window_frames = widgets['subsequence_temporal_window_spin'].value()
-
-            if 'subsequence_adaptive_refinement_check' in widgets and widgets['subsequence_adaptive_refinement_check'] is not None:
-                enable_adaptive_refinement = widgets['subsequence_adaptive_refinement_check'].isChecked()
-
-            config['subsequence_detection'] = {
+            config['scene_detection'] = {
                 'enabled': enabled,
-                'sample_interval': sample_interval,
+                'precision_mode': precision_mode,
                 'min_match_ratio': min_match_ratio,
-                'cache_memory_mb': cache_memory_mb,
-                'sliding_window_tolerance': sliding_window_tolerance,
-                'temporal_window_frames': temporal_window_frames,
-                'enable_adaptive_refinement': enable_adaptive_refinement
+                'min_duration': min_duration,
+                'cache_size': cache_size
             }
 
         return config
