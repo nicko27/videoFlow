@@ -208,16 +208,24 @@ class DuplicateHandler(QObject):
         """
         try:
             if choice == "keep_left":
-                # Delete second file
-                send2trash(file2)
-                self.file_handler.update_file_status(file2, "🗑️ Deleted")
-                logger.info(f"File deleted: {os.path.basename(file2)}")
+                # Delete second file (with existence check)
+                if not os.path.exists(file2):
+                    logger.warning(f"File no longer exists, skipping deletion: {file2}")
+                    self.file_handler.update_file_status(file2, "⚠️ Already deleted")
+                else:
+                    send2trash(file2)
+                    self.file_handler.update_file_status(file2, "🗑️ Deleted")
+                    logger.info(f"File deleted: {os.path.basename(file2)}")
 
             elif choice == "keep_right":
-                # Delete first file
-                send2trash(file1)
-                self.file_handler.update_file_status(file1, "🗑️ Deleted")
-                logger.info(f"File deleted: {os.path.basename(file1)}")
+                # Delete first file (with existence check)
+                if not os.path.exists(file1):
+                    logger.warning(f"File no longer exists, skipping deletion: {file1}")
+                    self.file_handler.update_file_status(file1, "⚠️ Already deleted")
+                else:
+                    send2trash(file1)
+                    self.file_handler.update_file_status(file1, "🗑️ Deleted")
+                    logger.info(f"File deleted: {os.path.basename(file1)}")
 
             elif choice == "ignore_perm":
                 # Permanently ignore this pair
@@ -439,10 +447,14 @@ class DuplicateHandler(QObject):
         """
         try:
             if choice == "keep_short":
-                # Delete long video
-                send2trash(long_video)
-                self.file_handler.update_file_status(long_video, "🗑️ Deleted")
-                logger.info(f"Long video deleted: {os.path.basename(long_video)}")
+                # Delete long video (with existence check)
+                if not os.path.exists(long_video):
+                    logger.warning(f"File no longer exists, skipping deletion: {long_video}")
+                    self.file_handler.update_file_status(long_video, "⚠️ Already deleted")
+                else:
+                    send2trash(long_video)
+                    self.file_handler.update_file_status(long_video, "🗑️ Deleted")
+                    logger.info(f"Long video deleted: {os.path.basename(long_video)}")
 
                 # Update database
                 self.video_hasher.db.update_subsequence_status(
@@ -453,10 +465,14 @@ class DuplicateHandler(QObject):
                 )
 
             elif choice == "keep_long":
-                # Delete short video
-                send2trash(short_video)
-                self.file_handler.update_file_status(short_video, "🗑️ Deleted")
-                logger.info(f"Short video deleted: {os.path.basename(short_video)}")
+                # Delete short video (with existence check)
+                if not os.path.exists(short_video):
+                    logger.warning(f"File no longer exists, skipping deletion: {short_video}")
+                    self.file_handler.update_file_status(short_video, "⚠️ Already deleted")
+                else:
+                    send2trash(short_video)
+                    self.file_handler.update_file_status(short_video, "🗑️ Deleted")
+                    logger.info(f"Short video deleted: {os.path.basename(short_video)}")
 
                 # Update database
                 self.video_hasher.db.update_subsequence_status(

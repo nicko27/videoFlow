@@ -7,82 +7,13 @@ It can detect when a shorter video is a subset of a longer video.
 import cv2
 import numpy as np
 import os
-from collections import OrderedDict
 from typing import Optional, Tuple, List, Dict
 from .video_hasher import VideoHasher
 from .database_manager import VideoDatabase
+from .lru_cache import MemoryBoundedLRUCache
 from src.core.logger import Logger
 
 logger = Logger.get_logger('DuplicateFinder.SubsequenceDetector')
-
-
-class LRUCache:
-    """Memory-bounded LRU cache for dense video hashes.
-
-    Automatically evicts least recently used items when memory limit is reached.
-    """
-
-    def __init__(self, max_memory_mb: int = 500):
-        """Initialize LRU cache with memory limit.
-
-        Args:
-            max_memory_mb: Maximum memory usage in MB (default: 500MB)
-        """
-        self.max_memory_bytes = max_memory_mb * 1024 * 1024
-        self.current_memory = 0
-        self.cache = OrderedDict()  # path -> {'hash': array, 'size': bytes, 'duration': float}
-        self.max_memory_mb = max_memory_mb
-
-    def _estimate_size(self, hash_array: np.ndarray) -> int:
-        """Estimate memory size of a numpy array in bytes."""
-        return hash_array.nbytes + 200  # Array + overhead
-
-    def get(self, key: str) -> Optional[Dict]:
-        """Get item from cache, moving it to end (most recent)."""
-        if key not in self.cache:
-            return None
-        # Move to end (most recently used)
-        self.cache.move_to_end(key)
-        return self.cache[key]
-
-    def put(self, key: str, hash_array: np.ndarray, duration: float):
-        """Add item to cache, evicting old items if necessary."""
-        # Remove if already exists
-        if key in self.cache:
-            old_size = self.cache[key]['size']
-            self.current_memory -= old_size
-            del self.cache[key]
-
-        # Calculate size
-        item_size = self._estimate_size(hash_array)
-
-        # Evict until we have space
-        while self.current_memory + item_size > self.max_memory_bytes and self.cache:
-            evicted_key, evicted_value = self.cache.popitem(last=False)  # Remove oldest
-            self.current_memory -= evicted_value['size']
-            logger.debug(f"Evicted {os.path.basename(evicted_key)} from cache (memory limit)")
-
-        # Add new item
-        self.cache[key] = {
-            'hash': hash_array,
-            'duration': duration,
-            'size': item_size
-        }
-        self.current_memory += item_size
-
-    def clear(self):
-        """Clear all cache."""
-        self.cache.clear()
-        self.current_memory = 0
-
-    def get_stats(self) -> Dict:
-        """Get cache statistics."""
-        return {
-            'items': len(self.cache),
-            'memory_mb': self.current_memory / (1024 * 1024),
-            'max_memory_mb': self.max_memory_mb,
-            'usage_percent': (self.current_memory / self.max_memory_bytes * 100) if self.max_memory_bytes > 0 else 0
-        }
 
 
 class SubsequenceDetector:
@@ -128,7 +59,7 @@ class SubsequenceDetector:
         """
         self.hasher = hasher
         self.db = hasher.db
-        self.dense_cache = LRUCache(max_memory_mb=max_cache_memory_mb)
+        self.dense_cache = MemoryBoundedLRUCache(max_memory_mb=max_cache_memory_mb)
         self.sample_interval_seconds = sample_interval_seconds
         self.min_match_ratio = min_match_ratio
         self.temporal_window_frames = temporal_window_frames

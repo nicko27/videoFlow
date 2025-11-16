@@ -859,7 +859,10 @@ class DuplicateFinderWindow(QMainWindow):
             if self.subsequence_worker and self.subsequence_worker.isRunning():
                 logger.info("Stopping subsequence detection worker...")
                 self.subsequence_worker.stop()
-                self.subsequence_worker.wait()
+                # Wait with timeout to prevent indefinite blocking
+                if not self.subsequence_worker.wait(5000):  # 5 second timeout
+                    logger.warning("Subsequence worker did not stop gracefully, forcing termination")
+                    self.subsequence_worker.terminate()
                 self.subsequence_worker = None
 
             # Stop duplicate processing

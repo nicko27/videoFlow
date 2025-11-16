@@ -16,6 +16,83 @@ from src.core.logger import Logger
 
 logger = Logger.get_logger('DuplicateFinder.VideoHasher')
 
+
+# CONSTANTS: Sample times in seconds (FPS-independent)
+# These will be converted to frame indices based on actual video FPS
+SAMPLE_TIMES_SECONDS = [
+    1,      # 1 second
+    5,      # 5 seconds
+    10,     # 10 seconds
+    20,     # 20 seconds
+    30,     # 30 seconds
+    50,     # 50 seconds
+    70,     # 70 seconds
+    100     # 100 seconds
+]
+
+# Fallback FPS if video metadata is invalid/missing
+DEFAULT_FPS = 25.0
+
+# Minimum number of sample frames required
+MIN_SAMPLE_FRAMES = 3
+
+
+class HashCache:
+    """
+    Specialized LRU cache for video hashes with memory limit.
+
+    This wrapper provides dict-like interface while enforcing a maximum
+    number of cached video hashes to prevent unbounded memory growth.
+
+    Features:
+        - Automatic eviction of least recently used items
+        - Maximum 2000 videos cached (configurable)
+        - Dict-like interface for compatibility
+    """
+
+    def __init__(self, max_items: int = 2000):
+        """
+        Initialize hash cache with item limit.
+
+        Args:
+            max_items: Maximum number of video hashes to cache (default: 2000)
+        """
+        self._cache = LRUCache(max_size=max_items)
+        self.max_items = max_items
+        logger.info(f"HashCache initialized with limit of {max_items} videos")
+
+    def get(self, key: str, default=None):
+        """Get cache entry or default if not found."""
+        value = self._cache.get(key)
+        return value if value is not None else default
+
+    def __getitem__(self, key: str):
+        """Dict-like access."""
+        value = self._cache.get(key)
+        if value is None:
+            raise KeyError(key)
+        return value
+
+    def __setitem__(self, key: str, value: dict):
+        """Dict-like assignment."""
+        self._cache.set(key, value)
+
+    def __contains__(self, key: str) -> bool:
+        """Check if key exists in cache."""
+        return key in self._cache
+
+    def clear(self):
+        """Clear all cached hashes."""
+        self._cache.clear()
+
+    def __len__(self) -> int:
+        """Get number of cached videos."""
+        return len(self._cache)
+
+    def get_stats(self) -> dict:
+        """Get cache statistics."""
+        return self._cache.get_stats()
+
 class HashMethod(Enum):
     """Available hashing methods for video frames.
 
@@ -57,7 +134,7 @@ class VideoHasher:
         similarity = hasher.compare_videos('video1.mp4', 'video2.mp4')
     """
 
-    def __init__(self, method=HashMethod.PHASH.value, enable_preload=True, max_preload_items=1000):
+    def __init__(self, method=HashMethod.PHASH.value, enable_preload=True, max_preload_items=1000, max_cache_videos=2000):
         """Initialize the VideoHasher with specified hashing method.
 
         Args:
@@ -67,30 +144,19 @@ class VideoHasher:
                 Defaults to True.
             max_preload_items (int, optional): Maximum number of hashes to preload.
                 Defaults to 1000. Set to 0 for unlimited (not recommended).
+            max_cache_videos (int, optional): Maximum number of videos to cache in memory.
+                Defaults to 2000. Older videos are automatically evicted.
         """
         self.method = method if isinstance(method, str) else method.value
         self.plugin_dir = os.path.dirname(__file__)
         self.db = VideoDatabase()
 
-        # Memory cache PERMANENT for entire session
-        self.hash_cache = {}  # file_path -> (hash, duration, mtime)
+        # Memory cache with automatic eviction (LRU - prevents unbounded growth)
+        self.hash_cache = HashCache(max_items=max_cache_videos)  # file_path -> {'hash', 'duration', 'mtime', 'file_size'}
 
         # LRU cache for comparisons (limited to 10000 most recent)
         # Prevents unlimited memory growth while keeping hot comparisons fast
         self.comparison_cache = LRUCache(max_size=10000)
-
-        # Fixed absolute positions for consistency
-        # Exact frame indices for all videos
-        self.absolute_positions = [
-            30,    # 1 second at 30fps
-            150,   # 5 seconds
-            300,   # 10 seconds
-            600,   # 20 seconds
-            900,   # 30 seconds
-            1500,  # 50 seconds
-            2100,  # 70 seconds
-            3000   # 100 seconds
-        ]
 
         # Smart preload: only recent hashes with file existence check
         if enable_preload:
@@ -307,20 +373,31 @@ class VideoHasher:
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 
                 if fps <= 0:
-                    fps = 25.0
-                
+                    fps = DEFAULT_FPS
+
                 duration = total_frames / fps
-                
-                # Filtre les positions selon la longueur de the video
-                valid_positions = [pos for pos in self.absolute_positions if pos < total_frames]
-                
-                # Minimum 3 positions, maximum 8
-                if len(valid_positions) < 3:
-                    # Pour les très courtes vidéos, positions adaptées
+
+                # Calculate frame positions based on actual FPS (FPS-independent)
+                # Convert sample times (in seconds) to frame indices
+                valid_positions = []
+                for time_seconds in SAMPLE_TIMES_SECONDS:
+                    frame_idx = int(time_seconds * fps)
+                    if frame_idx < total_frames:
+                        valid_positions.append(frame_idx)
+
+                # Ensure minimum sample frames
+                if len(valid_positions) < MIN_SAMPLE_FRAMES:
+                    # For very short videos, use adaptive positions
                     if total_frames < 90:
                         valid_positions = [0, total_frames // 2, total_frames - 1]
                     else:
-                        valid_positions = [0, 30, 60, total_frames - 1]
+                        # Sample at 1s, 2s, 3s for short videos
+                        valid_positions = [int(fps), int(2 * fps), int(3 * fps)]
+                        # Ensure all are within bounds
+                        valid_positions = [pos for pos in valid_positions if pos < total_frames]
+                        # Fallback if still not enough
+                        if len(valid_positions) < MIN_SAMPLE_FRAMES:
+                            valid_positions = [0, total_frames // 2, total_frames - 1]
                 
                 hashes = []
                 
@@ -611,9 +688,9 @@ class VideoHasher:
 
     # Optimisations supplémentaires
     def quick_similarity_test(self, file1, file2):
-        """Perform quick similarity test using a single frame at fixed position.
+        """Perform quick similarity test using a single frame at fixed time.
 
-        Compares videos using only one frame at position 300 (10 seconds).
+        Compares videos using only one frame at 10 seconds (FPS-independent).
         Useful for fast pre-filtering before full comparison.
 
         Args:
@@ -624,23 +701,35 @@ class VideoHasher:
             float: Similarity percentage (0-100), or -1 if test failed.
         """
         try:
-            # Position absolue fixe pour cohérence
-            test_position = 300  # 10 secondes
+            # Test at 10 seconds (FPS-independent)
+            test_time_seconds = 10
             
             cv2.setLogLevel(0)
             cap1 = cv2.VideoCapture(file1)
             cap2 = cv2.VideoCapture(file2)
-            
+
             if not cap1.isOpened() or not cap2.isOpened():
                 return -1
-            
-            # Ajuste si nécessaire
+
+            # Get FPS for both videos
+            fps1 = cap1.get(cv2.CAP_PROP_FPS)
+            fps2 = cap2.get(cv2.CAP_PROP_FPS)
+            if fps1 <= 0:
+                fps1 = DEFAULT_FPS
+            if fps2 <= 0:
+                fps2 = DEFAULT_FPS
+
+            # Convert time to frame indices based on actual FPS
             total1 = int(cap1.get(cv2.CAP_PROP_FRAME_COUNT))
             total2 = int(cap2.get(cv2.CAP_PROP_FRAME_COUNT))
-            
-            pos1 = min(test_position, total1 - 1) if total1 > 0 else 0
-            pos2 = min(test_position, total2 - 1) if total2 > 0 else 0
-            
+
+            pos1 = int(test_time_seconds * fps1)
+            pos2 = int(test_time_seconds * fps2)
+
+            # Ensure positions are within bounds
+            pos1 = min(pos1, total1 - 1) if total1 > 0 else 0
+            pos2 = min(pos2, total2 - 1) if total2 > 0 else 0
+
             cap1.set(cv2.CAP_PROP_POS_FRAMES, pos1)
             cap2.set(cv2.CAP_PROP_POS_FRAMES, pos2)
             
