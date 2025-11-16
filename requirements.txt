@@ -1,3 +1,4 @@
+# Core dependencies
 PyQt6>=6.4.0
 opencv-python>=4.8.0
 numpy>=1.24.0
@@ -6,11 +7,25 @@ ffmpeg-python>=0.2.0
 send2trash==1.8.0
 imagehash==4.3.1
 Pillow==10.0.0
+
+# macOS specific
 osxmetadata==1.3.5
 xattr==1.1.0
-bitstring==4.2.3
-click==8.1.8
 py-applescript==1.0.3
 pyobjc-core==10.3.2
 pyobjc-framework-Cocoa==10.3.2
 python-magic==0.4.27
+
+# Optional dependencies
+bitstring==4.2.3
+click==8.1.8
+
+# Audio fingerprinting (OPTIONAL - for scene detection)
+# Uncomment to enable accurate scene detection anywhere in videos
+# pyacoustid>=1.2.0
+
+# To install with audio fingerprinting support:
+#   pip install -r requirements.txt
+#   pip install pyacoustid
+# Or:
+#   pip install -r requirements-audio-fingerprinting.txt

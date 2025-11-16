@@ -1,0 +1,105 @@
+# Requirements for Audio Fingerprinting / Scene Detection
+# Install with: pip3 install -r requirements-audio-fingerprinting.txt
+
+# ============================================
+# OPTION 1: Chromaprint (RECOMMANDÉ pour VideoFlow)
+# ============================================
+# Avantages:
+# - Optimisé pour comparer des fichiers audio COMPLETS
+# - Détection précise de scènes longues (15-60 minutes)
+# - Fonctionne avec pyacoustid pour comparaison avancée
+# - Le plus rapide pour notre cas d'usage
+
+pyacoustid>=1.2.0
+
+
+# ============================================
+# OPTION 2: Dejavu (Shazam-like)
+# ============================================
+# Avantages:
+# - Algorithme type Shazam (constellation hashing)
+# - Tolérant au bruit (musique en fond, compression)
+# - Peut créer une base de données de fingerprints
+# Inconvénients:
+# - Plus lent pour comparer des longues séquences
+# - Nécessite une base de données (plus complexe)
+
+# dejavu>=0.1.0  # Décommenter pour utiliser Dejavu
+# PyMySQL>=1.0.0  # Pour la base de données
+# pydub>=0.25.0   # Pour le traitement audio
+
+
+# ============================================
+# OPTION 3: Audfprint (Academic)
+# ============================================
+# Avantages:
+# - Algorithme académique robuste
+# - Très bonne précision
+# Inconvénients:
+# - Moins maintenu
+# - Plus complexe à intégrer
+
+# audfprint>=1.0.0  # Décommenter pour utiliser Audfprint
+
+
+# ============================================
+# Dépendances communes
+# ============================================
+
+# Pour traitement audio avancé (optionnel)
+numpy>=1.20.0
+scipy>=1.7.0
+
+# Pour lecture de fichiers audio (optionnel, améliore la compatibilité)
+# pydub>=0.25.0
+# audioread>=2.1.9
+
+# Pour visualisation des fingerprints (debug, optionnel)
+# matplotlib>=3.3.0
+
+
+# ============================================
+# Installation système requise
+# ============================================
+
+# macOS:
+#   brew install chromaprint
+#   brew install ffmpeg  # Pour pydub si utilisé
+
+# Linux (Ubuntu/Debian):
+#   sudo apt install libchromaprint-dev
+#   sudo apt install ffmpeg  # Pour pydub si utilisé
+
+# Windows:
+#   Installer chromaprint depuis: https://acoustid.org/chromaprint
+#   Installer ffmpeg depuis: https://ffmpeg.org/download.html
+
+
+# ============================================
+# COMPARAISON DES MÉTHODES
+# ============================================
+
+# | Méthode     | Vitesse | Précision | Bruit | Longues scènes | Recommandation |
+# |-------------|---------|-----------|-------|----------------|----------------|
+# | Chromaprint | ⚡⚡⚡    | ✅✅✅     | ⚠️    | ✅✅✅          | ⭐ MEILLEUR   |
+# | Dejavu      | ⚡⚡     | ✅✅      | ✅✅   | ⚡             | Pour DB       |
+# | Audfprint   | ⚡⚡     | ✅✅✅     | ✅    | ✅✅           | Académique    |
+
+# RECOMMANDATION pour VideoFlow:
+#   → Utilisez pyacoustid (Chromaprint)
+#   → C'est le plus rapide et précis pour détecter des scènes de 15-60 minutes
+#   → Shazam (Dejavu) est meilleur pour des extraits courts (5-10s) avec bruit
+
+
+# ============================================
+# EXEMPLE D'UTILISATION
+# ============================================
+
+# Installation minimale (recommandé):
+#   pip3 install pyacoustid
+
+# Installation complète (toutes options):
+#   pip3 install -r requirements-audio-fingerprinting.txt
+
+# Test:
+#   python3 -c "import acoustid; print('✅ pyacoustid OK')"
