@@ -376,11 +376,11 @@ class UIPanels:
         # Sample interval
         subsequence_layout.addWidget(QLabel("Sample interval:"), 1, 0)
         subsequence_sample_interval_spin = QDoubleSpinBox()
-        subsequence_sample_interval_spin.setRange(1.0, 10.0)
-        subsequence_sample_interval_spin.setValue(3.0)
+        subsequence_sample_interval_spin.setRange(0.5, 10.0)
+        subsequence_sample_interval_spin.setValue(0.75)
         subsequence_sample_interval_spin.setSuffix(" sec")
-        subsequence_sample_interval_spin.setDecimals(1)
-        subsequence_sample_interval_spin.setToolTip("Interval between sampled frames (default: 3.0s)")
+        subsequence_sample_interval_spin.setDecimals(2)
+        subsequence_sample_interval_spin.setToolTip("Interval between sampled frames (default: 0.75s, reduced for better temporal alignment)")
         subsequence_layout.addWidget(subsequence_sample_interval_spin, 1, 1)
 
         # Min match ratio
