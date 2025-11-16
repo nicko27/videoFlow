@@ -12,6 +12,11 @@ from PyQt6.QtCore import QThread, pyqtSignal, QMutex
 
 from src.core.logger import Logger
 
+try:
+    from ..validators import ConfigValidator
+except ImportError:
+    from validators import ConfigValidator
+
 logger = Logger.get_logger('DuplicateFinder.ComparisonWorker')
 
 
@@ -74,8 +79,14 @@ class OptimizedComparisonWorker(QThread):
         super().__init__()
         self.files = files
         self.video_hasher = video_hasher
-        self.threshold = threshold
-        self.config = config
+
+        # Validate and sanitize configuration
+        self.config = ConfigValidator.validate_config(config)
+        logger.info(f"Validated config: {self.config}")
+
+        # Validate threshold
+        self.threshold = ConfigValidator.validate_threshold(threshold)
+
         self._stop = False
         self._mutex = QMutex()
         self.processed_count = 0
@@ -216,10 +227,20 @@ class OptimizedComparisonWorker(QThread):
 
             self.status_update.emit(f"🚀 {len(pairs)} comparisons to process")
 
-            # Process pairs in batches
-            with ThreadPoolExecutor(max_workers=self.config['comparison_workers']) as executor:
-                batch_size = self.config['batch_size']
+            # Process pairs in batches (config already validated in __init__)
+            comparison_workers = self.config['comparison_workers']
+            batch_size = self.config['batch_size']
 
+            # Additional runtime validation
+            if batch_size <= 0:
+                logger.error(f"Invalid batch_size: {batch_size}. Using default.")
+                batch_size = ConfigValidator.DEFAULT_BATCH_SIZE
+
+            if batch_size > len(pairs):
+                batch_size = len(pairs)
+                logger.info(f"Adjusted batch_size to {batch_size} (total pairs count)")
+
+            with ThreadPoolExecutor(max_workers=comparison_workers) as executor:
                 for i in range(0, len(pairs), batch_size):
                     if self.is_stopped():
                         break

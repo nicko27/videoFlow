@@ -4,25 +4,161 @@ import json
 import pickle
 import hashlib
 from datetime import datetime
+from contextlib import contextmanager
+from queue import Queue, Empty
+from threading import Lock
 import numpy as np
 from src.core.logger import Logger
 
 logger = Logger.get_logger('DuplicateFinder.DatabaseManager')
 
+
+class ConnectionPool:
+    """Thread-safe SQLite connection pool.
+
+    Manages a pool of SQLite connections to avoid the overhead of creating
+    new connections for each operation. Designed for SQLite's single-writer
+    limitation with a small pool size.
+
+    Attributes:
+        db_path: Path to the SQLite database file
+        pool_size: Maximum number of connections (default: 5)
+        pool: Queue containing available connections
+        lock: Thread lock for pool operations
+    """
+
+    def __init__(self, db_path: str, pool_size: int = 5):
+        """
+        Initialize the connection pool.
+
+        Args:
+            db_path: Path to SQLite database
+            pool_size: Maximum number of connections (default: 5)
+        """
+        self.db_path = db_path
+        self.pool_size = pool_size
+        self.pool = Queue(maxsize=pool_size)
+        self.lock = Lock()
+        self._closed = False
+
+        # Create initial connections
+        for _ in range(pool_size):
+            conn = self._create_connection()
+            self.pool.put(conn)
+
+        logger.debug(f"Connection pool created with {pool_size} connections")
+
+    def _create_connection(self) -> sqlite3.Connection:
+        """
+        Create a new optimized SQLite connection.
+
+        Returns:
+            Configured SQLite connection
+        """
+        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        # Apply optimizations
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA cache_size=10000")
+        conn.execute("PRAGMA temp_store=MEMORY")
+        return conn
+
+    @contextmanager
+    def get_connection(self):
+        """
+        Get a connection from the pool (context manager).
+
+        Yields:
+            SQLite connection from the pool
+
+        Example:
+            with pool.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT ...")
+        """
+        if self._closed:
+            raise RuntimeError("Connection pool is closed")
+
+        conn = None
+        try:
+            # Get connection from pool (timeout 30 seconds)
+            conn = self.pool.get(timeout=30)
+            yield conn
+        except Empty:
+            # Pool exhausted - create temporary connection
+            logger.warning("Connection pool exhausted, creating temporary connection")
+            temp_conn = self._create_connection()
+            try:
+                yield temp_conn
+            finally:
+                temp_conn.close()
+        finally:
+            # Return connection to pool
+            if conn is not None:
+                try:
+                    # Rollback any uncommitted transaction
+                    conn.rollback()
+                    self.pool.put(conn, block=False)
+                except Exception as e:
+                    logger.error(f"Error returning connection to pool: {e}")
+                    # Connection might be broken, create a new one
+                    try:
+                        conn.close()
+                    except:
+                        pass
+                    new_conn = self._create_connection()
+                    self.pool.put(new_conn, block=False)
+
+    def close_all(self):
+        """
+        Close all connections in the pool.
+
+        Should be called when shutting down the application.
+        """
+        with self.lock:
+            if self._closed:
+                return
+
+            self._closed = True
+            closed_count = 0
+
+            # Close all connections in pool
+            while not self.pool.empty():
+                try:
+                    conn = self.pool.get(block=False)
+                    conn.close()
+                    closed_count += 1
+                except Empty:
+                    break
+                except Exception as e:
+                    logger.error(f"Error closing connection: {e}")
+
+            logger.info(f"Connection pool closed ({closed_count} connections)")
+
+    def __del__(self):
+        """Destructor to ensure connections are closed."""
+        self.close_all()
+
+
 class VideoDatabase:
-    """Handlingnaire de base de données optimisé pour les hashs et comparaisons de vidéos - Version with migration corrigée"""
-    
+    """Optimized database manager for video hashes and comparisons - With proper migration"""
+
     def __init__(self, db_path=None):
         if db_path is None:
-            # Place la DB in le même folder que the plugin
+            # Place DB in the same folder as the plugin
             plugin_dir = os.path.dirname(__file__)
             db_path = os.path.join(plugin_dir, 'video_duplicates.db')
-        
+
         self.db_path = db_path
-        self._initialized = False  # Flag pour éviter les vérifications répétées
-        self._tables_exist = {}  # Cache pour l'existence des tables
+        self._initialized = False  # Flag to avoid repeated checks
+        self._tables_exist = {}  # Cache for table existence
+        self._ignore_type_exists = False  # Flag for ignore_type column (set after migration)
+
+        # Create connection pool (5 connections)
+        self.connection_pool = ConnectionPool(db_path, pool_size=5)
+
         self._ensure_database_exists()
-        logger.info(f"Base de données initialisée: {self.db_path}")
+        logger.info(f"Database initialized with connection pool: {self.db_path}")
     
     def _ensure_database_exists(self):
         """S'asone que la base de données et ses tables existent - UNE SEULE FOIS"""
@@ -159,18 +295,21 @@ class VideoDatabase:
                     )
                 ''')
 
-                # ÉTAPE 3: Checks et ajoute la colonne ignore_type si nécessaire
+                # STEP 3: Check and add ignore_type column if necessary (migration)
                 cursor.execute("PRAGMA table_info(ignored_pairs)")
                 columns = [column[1] for column in cursor.fetchall()]
-                
+
                 if 'ignore_type' not in columns:
-                    logger.info("Ajout of the colonne ignore_type à la table ignored_pairs")
+                    logger.info("Adding ignore_type column to ignored_pairs table")
                     cursor.execute("ALTER TABLE ignored_pairs ADD COLUMN ignore_type TEXT DEFAULT 'permanent'")
-                    
-                    # Met à jour les entrées existantes
+
+                    # Update existing entries
                     cursor.execute("UPDATE ignored_pairs SET ignore_type = 'permanent' WHERE ignore_type IS NULL")
-                    
-                    logger.info("Migration of the base de données terminée")
+
+                    logger.info("Database migration completed")
+
+                # After migration, ignore_type column ALWAYS exists
+                self._ignore_type_exists = True
                 
                 # ÉTAPE 4: Crée les index
                 index_commands = [
@@ -220,15 +359,30 @@ class VideoDatabase:
         except Exception:
             return False
     
+    @contextmanager
     def get_connection(self):
-        """Returns une connexion à la base optimisée"""
-        conn = sqlite3.connect(self.db_path)
-        # Active les optimisations pour cette connexion
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA cache_size=10000")
-        conn.execute("PRAGMA temp_store=MEMORY")
-        return conn
+        """
+        Get an optimized database connection from the pool (context manager).
+
+        Yields:
+            SQLite connection from the connection pool
+
+        Example:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT ...")
+        """
+        with self.connection_pool.get_connection() as conn:
+            yield conn
+
+    def close(self):
+        """
+        Close all database connections.
+
+        Should be called when shutting down.
+        """
+        self.connection_pool.close_all()
+        logger.info("Database connections closed")
     
     def file_needs_reanalysis(self, file_path):
         """Checks si un file a été modifié - OPTIMISÉ"""
@@ -483,80 +637,67 @@ class VideoDatabase:
             return []
 
     def add_ignored_pair(self, file1_path, file2_path, reason="user_choice", ignore_type="permanent"):
-        """Adds une paire à ignorer - CORRIGÉ with ignore_type"""
+        """Add a pair to ignore list with specified type (permanent/temporary)"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # Récupère les IDs en une seule requête
+
+                # Get IDs in a single query
                 cursor.execute('''
-                    SELECT 
+                    SELECT
                         (SELECT id FROM video_files WHERE file_path = ?) as id1,
                         (SELECT id FROM video_files WHERE file_path = ?) as id2
                 ''', (file1_path, file2_path))
-                
+
                 result = cursor.fetchone()
                 if not result or not result[0] or not result[1]:
-                    logger.warning(f"Fichiers non found en base: {file1_path}, {file2_path}")
+                    logger.warning(f"Files not found in database: {file1_path}, {file2_path}")
                     return False
-                
+
                 file1_id, file2_id = result
-                
-                # Asone l'ordre
+
+                # Ensure order
                 if file1_id > file2_id:
                     file1_id, file2_id = file2_id, file1_id
-                
-                # Checks si ignore_type existe in la table
-                cursor.execute("PRAGMA table_info(ignored_pairs)")
-                columns = [column[1] for column in cursor.fetchall()]
-                
-                if 'ignore_type' in columns:
-                    cursor.execute('''
-                        INSERT OR REPLACE INTO ignored_pairs (file1_id, file2_id, reason, ignore_type)
-                        VALUES (?, ?, ?, ?)
-                    ''', (file1_id, file2_id, reason, ignore_type))
-                else:
-                    # Fallback pour anciennes DB
-                    cursor.execute('''
-                        INSERT OR REPLACE INTO ignored_pairs (file1_id, file2_id, reason)
-                        VALUES (?, ?, ?)
-                    ''', (file1_id, file2_id, reason))
-                
+
+                # After migration, ignore_type column ALWAYS exists
+                # No need to check - just use it
+                cursor.execute('''
+                    INSERT OR REPLACE INTO ignored_pairs (file1_id, file2_id, reason, ignore_type)
+                    VALUES (?, ?, ?, ?)
+                ''', (file1_id, file2_id, reason, ignore_type))
+
                 conn.commit()
-                logger.info(f"Paire ignorée ({ignore_type}): {os.path.basename(file1_path)} <-> {os.path.basename(file2_path)}")
+                logger.info(f"Pair ignored ({ignore_type}): {os.path.basename(file1_path)} <-> {os.path.basename(file2_path)}")
                 return True
-                
+
         except Exception as e:
-            logger.error(f"Error ajout paire ignorée: {e}")
+            logger.error(f"Error adding ignored pair: {e}")
             return False
     
     def get_statistics(self):
-        """Récupère les statistics - OPTIMISÉ with une seule requête"""
+        """Get database statistics - Optimized with a single query"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # Checks si ignore_type existe
-                cursor.execute("PRAGMA table_info(ignored_pairs)")
-                columns = [column[1] for column in cursor.fetchall()]
-                has_ignore_type = 'ignore_type' in columns
-                
-                if has_ignore_type:
-                    # Version with ignore_type
-                    cursor.execute('''
-                        SELECT 
-                            (SELECT COUNT(*) FROM video_files) as files_count,
-                            (SELECT COUNT(*) FROM comparisons) as comparisons_count,
-                            (SELECT COUNT(*) FROM comparisons WHERE is_early_exit = 1) as early_exits,
-                            (SELECT COUNT(*) FROM ignored_pairs WHERE COALESCE(ignore_type, 'permanent') = 'permanent') as ignored_permanent,
-                            (SELECT COUNT(*) FROM ignored_pairs WHERE ignore_type = 'temporary') as ignored_temporary,
-                            (SELECT COUNT(*) FROM ignored_pairs) as ignored_total
-                    ''')
-                    
-                    result = cursor.fetchone()
-                    files_count, comparisons_count, early_exits, ignored_perm, ignored_temp, ignored_total = result
-                else:
-                    # Version sans ignore_type (compatibilité)
+
+                # After migration, ignore_type column ALWAYS exists
+                cursor.execute('''
+                    SELECT
+                        (SELECT COUNT(*) FROM video_files) as files_count,
+                        (SELECT COUNT(*) FROM comparisons) as comparisons_count,
+                        (SELECT COUNT(*) FROM comparisons WHERE is_early_exit = 1) as early_exits,
+                        (SELECT COUNT(*) FROM ignored_pairs WHERE COALESCE(ignore_type, 'permanent') = 'permanent') as ignored_permanent,
+                        (SELECT COUNT(*) FROM ignored_pairs WHERE ignore_type = 'temporary') as ignored_temporary,
+                        (SELECT COUNT(*) FROM ignored_pairs) as ignored_total
+                ''')
+
+                result = cursor.fetchone()
+                files_count, comparisons_count, early_exits, ignored_perm, ignored_temp, ignored_total = result
+
+                # Legacy compatibility removed - ignore_type always exists after migration
+                if False:
+                    # Version without ignore_type (compatibility - DEPRECATED)
                     cursor.execute('''
                         SELECT 
                             (SELECT COUNT(*) FROM video_files) as files_count,

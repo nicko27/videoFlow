@@ -6,6 +6,11 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgress
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QPalette, QColor
 
+try:
+    from .design_system import Colors, Spacing, Typography, Styles, get_status_colors
+except ImportError:
+    from design_system import Colors, Spacing, Typography, Styles, get_status_colors
+
 
 class ModernProgressWidget(QWidget):
     """Widget de progression moderne with statistics"""
@@ -19,65 +24,65 @@ class ModernProgressWidget(QWidget):
     def setup_ui(self):
         """Configure l'interface"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(8)
-        
+        layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
+        layout.setSpacing(Spacing.SM)
+
         # En-tête with titre et statut
         header_layout = QHBoxLayout()
-        
+
         self.title_label = QLabel(self.title)
-        self.title_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))  # PLUS PETIT
-        self.title_label.setStyleSheet("color: black; font-weight: bold;")
-        
+        self.title_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD, QFont.Weight.Bold))
+        self.title_label.setStyleSheet(Styles.label(
+            color=Colors.BLACK,
+            font_size=Typography.FONT_MD,
+            bold=True
+        ))
+
         self.status_label = QLabel("Pending...")
-        self.status_label.setFont(QFont("Arial", 10))
-        self.status_label.setStyleSheet("color: black; font-weight: bold;")
-        
+        self.status_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
+        self.status_label.setStyleSheet(Styles.label(
+            color=Colors.BLACK,
+            font_size=Typography.FONT_XS,
+            bold=True
+        ))
+
         header_layout.addWidget(self.title_label)
         header_layout.addStretch()
         header_layout.addWidget(self.status_label)
-        
+
         layout.addLayout(header_layout)
-        
+
         # Barre de progression moderne
         self.progress_bar = QProgressBar()
-        self.progress_bar.setMinimumHeight(30)
+        self.progress_bar.setMinimumHeight(Spacing.PROGRESS_BAR_HEIGHT)
         self.progress_bar.setTextVisible(True)
         self.progress_bar.setFormat("0/0")
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 2px solid #BDC3C7;
-                border-radius: 15px;
-                text-align: center;
-                font-weight: bold;
-                font-size: 12px;
-                color: black;
-                background-color: #ECF0F1;
-            }
-            QProgressBar::chunk {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #27AE60, stop:1 #2ECC71);
-                border-radius: 12px;
-                margin: 2px;
-            }
-        """)
+        self.progress_bar.setStyleSheet(Styles.progress_bar())
         layout.addWidget(self.progress_bar)
-        
+
         # Information détaillées
         details_layout = QHBoxLayout()
-        
+
         self.time_label = QLabel("Time: --:--")
-        self.time_label.setFont(QFont("Arial", 9))
-        self.time_label.setStyleSheet("color: black; font-weight: bold;")
-        
+        self.time_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XXS))
+        self.time_label.setStyleSheet(Styles.label(
+            color=Colors.BLACK,
+            font_size=Typography.FONT_XXS,
+            bold=True
+        ))
+
         self.speed_label = QLabel("Speed: --")
-        self.speed_label.setFont(QFont("Arial", 9))
-        self.speed_label.setStyleSheet("color: black; font-weight: bold;")
-        
+        self.speed_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XXS))
+        self.speed_label.setStyleSheet(Styles.label(
+            color=Colors.BLACK,
+            font_size=Typography.FONT_XXS,
+            bold=True
+        ))
+
         details_layout.addWidget(self.time_label)
         details_layout.addStretch()
         details_layout.addWidget(self.speed_label)
-        
+
         layout.addLayout(details_layout)
         
     def update_progress(self, current, maximum, custom_text=None):
@@ -139,53 +144,68 @@ class FileListWidget(QWidget):
     def setup_ui(self):
         """Configure l'interface"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
-        
-        # En-tête PLUS PETIT
+        layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
+        layout.setSpacing(Spacing.MD)
+
+        # En-tête
         header_layout = QHBoxLayout()
-        
+
         title = QLabel("📁 Fichiers vidéo")
-        title.setFont(QFont("Arial", 12, QFont.Weight.Bold))  # PLUS PETIT
-        title.setStyleSheet("color: black; font-weight: bold; background-color: white; padding: 3px;")
-        
+        title.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD, QFont.Weight.Bold))
+        title.setStyleSheet(Styles.label(
+            color=Colors.BLACK,
+            font_size=Typography.FONT_MD,
+            bold=True,
+            bg_color=Colors.WHITE
+        ) + f"padding: {Spacing.XXS}px;")
+
         self.file_count_label = QLabel("0 file")
-        self.file_count_label.setFont(QFont("Arial", 10))  # PLUS PETIT
-        self.file_count_label.setStyleSheet("color: black; font-weight: bold; background-color: white; padding: 3px;")
-        
+        self.file_count_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
+        self.file_count_label.setStyleSheet(Styles.label(
+            color=Colors.BLACK,
+            font_size=Typography.FONT_XS,
+            bold=True,
+            bg_color=Colors.WHITE
+        ) + f"padding: {Spacing.XXS}px;")
+
         header_layout.addWidget(title)
         header_layout.addStretch()
         header_layout.addWidget(self.file_count_label)
-        
+
         layout.addLayout(header_layout)
-        
+
         # Zone scrollable
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setMinimumHeight(200)
-        self.scroll_area.setStyleSheet("""
-            QScrollArea {
-                background-color: white;
-                border: 1px solid #CCCCCC;
-            }
+        self.scroll_area.setStyleSheet(f"""
+            QScrollArea {{
+                background-color: {Colors.WHITE};
+                border: 1px solid {Colors.BORDER_DEFAULT};
+            }}
         """)
-        
+
         # Widget conteneur
         self.files_widget = QWidget()
-        self.files_widget.setStyleSheet("background-color: white;")
-        
+        self.files_widget.setStyleSheet(f"background-color: {Colors.WHITE};")
+
         self.files_layout = QVBoxLayout(self.files_widget)
-        self.files_layout.setContentsMargins(5, 5, 5, 5)
-        self.files_layout.setSpacing(5)  # PLUS D'ESPACE : 3 → 5px
-        
+        self.files_layout.setContentsMargins(Spacing.XS, Spacing.XS, Spacing.XS, Spacing.XS)
+        self.files_layout.setSpacing(Spacing.XS)
+
         # Message par défaut
         self.empty_label = QLabel("Aucun file ajouté")
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_label.setFont(QFont("Arial", 12))
-        self.empty_label.setStyleSheet("color: black; background-color: #F0F0F0; padding: 20px; border: 1px dashed #CCCCCC;")
+        self.empty_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD))
+        self.empty_label.setStyleSheet(f"""
+            color: {Colors.BLACK};
+            background-color: {Colors.GRAY_100};
+            padding: {Spacing.XXL}px;
+            border: 1px dashed {Colors.BORDER_DEFAULT};
+        """)
         self.files_layout.addWidget(self.empty_label)
         self.files_layout.addStretch()
-        
+
         self.scroll_area.setWidget(self.files_widget)
         layout.addWidget(self.scroll_area)
         
@@ -211,70 +231,60 @@ class FileListWidget(QWidget):
     def create_file_item(self, file_path):
         """Crée un item de file with TEXTE NOIR FORCÉ"""
         import os
-        
+
         # Frame with bordure visible - HAUTEUR PLUS GÉNÉREUSE
         item_frame = QFrame()
-        item_frame.setMinimumHeight(70)  # PLUS HAUT : 50 → 70px
-        item_frame.setMaximumHeight(70)  # PLUS HAUT : 50 → 70px
-        item_frame.setStyleSheet("""
-            QFrame {
-                background-color: #F8F8F8;
-                border: 1px solid #DDDDDD;
-                margin: 2px;
-                border-radius: 4px;
-            }
-            QFrame:hover {
-                background-color: #EEEEEE;
-            }
-        """)
-        
+        item_frame.setMinimumHeight(Spacing.FILE_ITEM_HEIGHT)
+        item_frame.setMaximumHeight(Spacing.FILE_ITEM_HEIGHT)
+        item_frame.setStyleSheet(Styles.file_item())
+
         # Layout horizontal with PLUS DE PADDING
         layout = QHBoxLayout(item_frame)
-        layout.setContentsMargins(12, 10, 12, 10)  # PLUS DE PADDING : 8,5 → 12,10
-        layout.setSpacing(12)  # PLUS D'ESPACE : 8 → 12
+        layout.setContentsMargins(Spacing.LG, Spacing.MD, Spacing.LG, Spacing.MD)
+        layout.setSpacing(Spacing.LG)
         
         # NOM DU FICHIER - NOIR FORCÉ with PLUS DE PLACE
         filename = os.path.basename(file_path)
         if len(filename) > 40:
             filename = filename[:37] + "..."
-            
+
         name_label = QLabel(filename)
-        name_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))  # PLUS GRAND : 10 → 11
-        name_label.setMinimumHeight(30)  # HAUTEUR MINIMALE POUR LE TEXTE
+        name_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_SM, QFont.Weight.Bold))
+        name_label.setMinimumHeight(Spacing.INPUT_HEIGHT)
         # FORCE la couleur noire with setPalette
         palette = name_label.palette()
-        palette.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))  # Noir pur
+        palette.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))
         name_label.setPalette(palette)
-        name_label.setStyleSheet("color: black; background-color: transparent; padding: 5px;")  # PADDING AJOUTÉ
+        name_label.setStyleSheet(f"color: {Colors.BLACK}; background-color: transparent; padding: {Spacing.XS}px;")
         name_label.setToolTip(file_path)
-        
+
         # TAILLE - NOIR FORCÉ with PLUS DE PLACE
         try:
             size = os.path.getsize(file_path)
             size_text = self.format_file_size(size)
         except:
             size_text = "Error"
-            
+
         size_label = QLabel(size_text)
-        size_label.setFont(QFont("Arial", 10))  # PLUS GRAND : 9 → 10
-        size_label.setFixedWidth(80)  # PLUS LARGE : 70 → 80
-        size_label.setMinimumHeight(30)  # HAUTEUR MINIMALE
+        size_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
+        size_label.setFixedWidth(80)
+        size_label.setMinimumHeight(Spacing.INPUT_HEIGHT)
         palette = size_label.palette()
         palette.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))
         size_label.setPalette(palette)
-        size_label.setStyleSheet("color: black; background-color: transparent; padding: 5px;")  # PADDING AJOUTÉ
-        size_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)  # CENTRÉ VERTICALEMENT
-        
+        size_label.setStyleSheet(f"color: {Colors.BLACK}; background-color: transparent; padding: {Spacing.XS}px;")
+        size_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
         # STATUT - NOIR FORCÉ with PLUS DE PLACE
         status_label = QLabel("⏳ À analyze")
-        status_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))  # PLUS GRAND : 9 → 10
-        status_label.setFixedWidth(120)  # PLUS LARGE : 100 → 120
-        status_label.setMinimumHeight(30)  # HAUTEUR MINIMALE
+        status_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS, QFont.Weight.Bold))
+        status_label.setFixedWidth(120)
+        status_label.setMinimumHeight(Spacing.INPUT_HEIGHT)
         palette = status_label.palette()
         palette.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))
         status_label.setPalette(palette)
-        status_label.setStyleSheet("color: black; background-color: transparent; padding: 5px;")  # PADDING AJOUTÉ
-        status_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)  # CENTRÉ
+        status_label.setStyleSheet(f"color: {Colors.BLACK}; background-color: transparent; padding: {Spacing.XS}px;")
+        status_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
         
         # Adds au layout
         layout.addWidget(name_label, 1)
@@ -299,30 +309,54 @@ class FileListWidget(QWidget):
             item_widget = self.file_items[file_path]
             if hasattr(item_widget, 'status_label'):
                 item_widget.status_label.setText(status)
-                
+
                 # FORCE la couleur noire with palette
                 palette = item_widget.status_label.palette()
                 palette.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))
                 item_widget.status_label.setPalette(palette)
-                
-                # Style selon statut mais TOUJOURS noir
+
+                # Style selon statut mais TOUJOURS noir - using design system
                 if "✅" in status or "cache" in status.lower() or "analysé" in status.lower():
-                    item_widget.status_label.setStyleSheet("color: black; background-color: #D4FFDA; border: 1px solid #4CAF50; padding: 2px; border-radius: 2px;")
+                    colors = get_status_colors('success')
+                    item_widget.status_label.setStyleSheet(Styles.status_badge(
+                        bg_color=colors['bg'],
+                        border_color=colors['border']
+                    ))
                 elif "❌" in status or "failed" in status.lower():
-                    item_widget.status_label.setStyleSheet("color: black; background-color: #FFD4D4; border: 1px solid #F44336; padding: 2px; border-radius: 2px;")
+                    colors = get_status_colors('error')
+                    item_widget.status_label.setStyleSheet(Styles.status_badge(
+                        bg_color=colors['bg'],
+                        border_color=colors['border']
+                    ))
                 elif "🔄" in status or "cours" in status.lower():
-                    item_widget.status_label.setStyleSheet("color: black; background-color: #D4E6FF; border: 1px solid #2196F3; padding: 2px; border-radius: 2px;")
+                    colors = get_status_colors('processing')
+                    item_widget.status_label.setStyleSheet(Styles.status_badge(
+                        bg_color=colors['bg'],
+                        border_color=colors['border']
+                    ))
                 elif "🗑️" in status or "supprimé" in status.lower():
-                    item_widget.status_label.setStyleSheet("color: black; background-color: #E0E0E0; border: 1px solid #9E9E9E; padding: 2px; border-radius: 2px;")
+                    colors = get_status_colors('deleted')
+                    item_widget.status_label.setStyleSheet(Styles.status_badge(
+                        bg_color=colors['bg'],
+                        border_color=colors['border']
+                    ))
                 elif "💾" in status:
-                    item_widget.status_label.setStyleSheet("color: black; background-color: #D4F4FF; border: 1px solid #00BCD4; padding: 2px; border-radius: 2px;")
+                    colors = get_status_colors('cached')
+                    item_widget.status_label.setStyleSheet(Styles.status_badge(
+                        bg_color=colors['bg'],
+                        border_color=colors['border']
+                    ))
                 else:
-                    item_widget.status_label.setStyleSheet("color: black; background-color: #FFF4D4; border: 1px solid #FF9800; padding: 2px; border-radius: 2px;")
-                
+                    colors = get_status_colors('warning')
+                    item_widget.status_label.setStyleSheet(Styles.status_badge(
+                        bg_color=colors['bg'],
+                        border_color=colors['border']
+                    ))
+
                 item_widget.status_label.update()
                 item_widget.update()
                 return True
-        
+
         return False
                     
     def clear_files(self):

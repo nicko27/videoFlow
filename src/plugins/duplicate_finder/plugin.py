@@ -1,4 +1,4 @@
-"""Module du plugin de search de doublons"""
+"""Duplicate finder plugin module"""
 
 from PyQt6.QtGui import QAction
 from src.core.plugin_interface import PluginInterface
@@ -10,32 +10,32 @@ class DuplicateFinderPlugin(PluginInterface):
     def __init__(self):
         super().__init__()
         self.name = "Duplicate Finder"
-        self.description = "Trouve les doublons in vos vidéos"
+        self.description = "Find duplicate videos in your library"
         self.version = "1.0.0"
         self.window = None
-        logger.debug("Plugin DuplicateFinder initialisé")
-    
+        logger.debug("DuplicateFinder plugin initialized")
+
     def setup(self, main_window):
-        """Configures the plugin"""
+        """Configure the plugin"""
         self.main_window = main_window
-        
-        # Créer l'action in le menu
+
+        # Create menu action
         self.action = QAction(self.name, self.main_window)
         self.action.triggered.connect(self.show_window)
-        
-        # Add au menu Plugins
+
+        # Add to Plugins menu
         self.main_window.plugins_menu.addAction(self.action)
-        logger.debug("Plugin DuplicateFinder configuré")
-    
+        logger.debug("DuplicateFinder plugin configured")
+
     def show_window(self):
-        """Affiche the window du plugin"""
+        """Show the plugin window"""
         if not self.window:
             from .window import DuplicateFinderWindow
             self.window = DuplicateFinderWindow()
-            # Connecte le signal de fermeture
+            # Connect close signal
             self.window.closed.connect(self.handle_window_closed)
         self.window.show()
-        logger.debug("Window DuplicateFinder affichée")
+        logger.debug("DuplicateFinder window shown")
         
     def handle_window_closed(self):
         """Handle window close event.
@@ -44,4 +44,4 @@ class DuplicateFinderPlugin(PluginInterface):
         allowing it to be recreated on next launch.
         """
         self.window = None
-        logger.debug("Window DuplicateFinder fermée")
+        logger.debug("DuplicateFinder window closed")
