@@ -150,7 +150,8 @@ class ComparisonDialog(QDialog):
             }}
             QProgressBar::chunk {{
                 background-color: {bar_color};
-                border-radius: 12px;
+                border-radius: 11px;
+                margin: 2px;
             }}
         """)  # RÉDUIT: border-radius 17 → 14, chunk 14 → 12
         

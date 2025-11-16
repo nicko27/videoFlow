@@ -57,8 +57,8 @@ class ModernProgressWidget(QWidget):
             QProgressBar::chunk {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
                     stop:0 #27AE60, stop:1 #2ECC71);
-                border-radius: 13px;
-                margin: 1px;
+                border-radius: 12px;
+                margin: 2px;
             }
         """)
         layout.addWidget(self.progress_bar)
