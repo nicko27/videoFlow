@@ -492,11 +492,11 @@ class UIPanels:
         layout.addWidget(stats_counter)
 
         # Progress widgets
-        file_progress = ModernProgressWidget("📊 File analysis")
+        file_progress = ModernProgressWidget("📊 File hashing")
         layout.addWidget(file_progress)
 
-        comparison_progress = ModernProgressWidget("🔍 Comparisons")
-        layout.addWidget(comparison_progress)
+        duplicate_progress = ModernProgressWidget("🔍 Duplicate detection")
+        layout.addWidget(duplicate_progress)
 
         subsequence_progress = ModernProgressWidget("🎬 Subsequence detection")
         layout.addWidget(subsequence_progress)
@@ -508,7 +508,7 @@ class UIPanels:
             'status_indicator': status_indicator,
             'stats_counter': stats_counter,
             'file_progress': file_progress,
-            'comparison_progress': comparison_progress,
+            'duplicate_progress': duplicate_progress,
             'subsequence_progress': subsequence_progress
         }
 

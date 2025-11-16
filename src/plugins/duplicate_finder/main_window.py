@@ -97,7 +97,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.status_indicator = None
         self.stats_counter = None
         self.file_progress = None
-        self.comparison_progress = None
+        self.duplicate_progress = None
         self.subsequence_progress = None
         self.config_tabs = None
         self.analyze_btn = None
@@ -198,7 +198,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.status_indicator = right_widgets['status_indicator']
         self.stats_counter = right_widgets['stats_counter']
         self.file_progress = right_widgets['file_progress']
-        self.comparison_progress = right_widgets['comparison_progress']
+        self.duplicate_progress = right_widgets['duplicate_progress']
         self.subsequence_progress = right_widgets['subsequence_progress']
 
         # Header with title, layout selector and theme selector
@@ -318,8 +318,8 @@ class DuplicateFinderWindow(QMainWindow):
         if hasattr(self, 'file_progress') and self.file_progress:
             self.file_progress.progress_bar.setStyleSheet(theme.get_progress_style())
 
-        if hasattr(self, 'comparison_progress') and self.comparison_progress:
-            self.comparison_progress.progress_bar.setStyleSheet(theme.get_progress_style())
+        if hasattr(self, 'duplicate_progress') and self.duplicate_progress:
+            self.duplicate_progress.progress_bar.setStyleSheet(theme.get_progress_style())
 
         # Force UI refresh
         if hasattr(self, 'centralWidget') and self.centralWidget():
@@ -812,7 +812,7 @@ class DuplicateFinderWindow(QMainWindow):
             files,
             config,
             duplicate_callback=self._on_duplicate_found,
-            progress_callback=self.update_comparison_progress,
+            progress_callback=self.update_duplicate_progress,
             status_callback=self.update_comparison_status,
             total_comparisons_callback=self.set_comparison_total,
             comparison_details_callback=self.update_comparison_details
@@ -822,7 +822,7 @@ class DuplicateFinderWindow(QMainWindow):
         """
         Handle comparison analysis completion.
         """
-        self.comparison_progress.set_status("Complete", "#28A745")
+        self.duplicate_progress.set_status("Complete", "#28A745")
 
         # Check if subsequence detection is enabled
         config = self.get_analysis_config()
@@ -1048,16 +1048,16 @@ class DuplicateFinderWindow(QMainWindow):
                     remaining = (max_files - current) / speed
                     self.file_progress.set_time_remaining(remaining)
 
-    def update_comparison_progress(self, current: int) -> None:
+    def update_duplicate_progress(self, current: int) -> None:
         """
         Update comparison progress.
 
         Args:
             current: Current comparison count.
         """
-        max_comparisons = self.comparison_progress.progress_bar.maximum()
+        max_comparisons = self.duplicate_progress.progress_bar.maximum()
         if max_comparisons > 0:
-            self.comparison_progress.update_progress(current, max_comparisons)
+            self.duplicate_progress.update_progress(current, max_comparisons)
 
     def update_current_file_display(self, file_info: str) -> None:
         """
@@ -1097,9 +1097,9 @@ class DuplicateFinderWindow(QMainWindow):
         Args:
             total: Total comparison count.
         """
-        self.comparison_progress.progress_bar.setMaximum(total)
-        self.comparison_progress.update_progress(0, total, "Comparisons in progress...")
-        self.comparison_progress.set_status("Comparisons", "#007BFF")
+        self.duplicate_progress.progress_bar.setMaximum(total)
+        self.duplicate_progress.update_progress(0, total, "Comparisons in progress...")
+        self.duplicate_progress.set_status("Comparisons", "#007BFF")
 
     def update_hash_progress_details(
         self,
@@ -1135,14 +1135,14 @@ class DuplicateFinderWindow(QMainWindow):
             name1: First file name.
             name2: Second file name.
         """
-        self.comparison_progress.update_progress(current, total, f"{current}/{total}")
+        self.duplicate_progress.update_progress(current, total, f"{current}/{total}")
 
         if len(name1) > 15 or len(name2) > 15:
             short_names = f"{name1[:15]}...↔{name2[:15]}..."
         else:
             short_names = f"{name1}↔{name2}"
 
-        self.comparison_progress.set_status(f"🔍 {short_names}", "#007BFF")
+        self.duplicate_progress.set_status(f"🔍 {short_names}", "#007BFF")
 
     def handle_error(self, error_msg: str) -> None:
         """
@@ -1168,7 +1168,7 @@ class DuplicateFinderWindow(QMainWindow):
             self.file_list_widget.update()
             self.status_indicator.update()
             self.file_progress.update()
-            self.comparison_progress.update()
+            self.duplicate_progress.update()
             QApplication.processEvents()
         except Exception as e:
             logger.error(f"Error forcing UI update: {e}")
