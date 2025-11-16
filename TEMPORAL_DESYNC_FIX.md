@@ -305,6 +305,43 @@ Ensure we don't increase false positives:
 
 ## ⚙️ Configuration
 
+### UI Controls (Settings Tab → Subsequence Detection)
+
+All temporal desynchronization parameters are now configurable via the UI:
+
+**Sample interval:** 0.75s (range: 0.5-10.0s, 2 decimals)
+- Controls how frequently frames are sampled
+- Lower = more samples = better accuracy but slower
+- Default optimized for temporal alignment
+
+**Min match ratio:** 80% (range: 70-95%)
+- Minimum similarity to consider a subsequence
+- Unchanged from original implementation
+
+**Cache memory limit:** 500MB (range: 100-2000MB)
+- Memory limit for dense hash cache
+- Unchanged from original implementation
+
+**Sliding window tolerance:** 3 frames (range: 1-10 frames)
+- ±N frame tolerance for temporal desynchronization
+- At 0.75s intervals: 3 frames = ±2.25s tolerance
+- Higher = more tolerant to time offsets
+- **NEW - SOLUTION 1**
+
+**Temporal averaging window:** 5 frames (range: 3-11 frames, odd numbers)
+- Number of consecutive frames for temporal averaging
+- Creates consensus hashes resistant to noise
+- Use odd numbers for symmetric windows
+- **NEW - SOLUTION 4**
+
+**Enable adaptive refinement:** ✓ Enabled (checkbox)
+- Automatically re-sample at 0.2s intervals for 70-95% matches
+- Provides 3.75× finer granularity for precise alignment
+- Minimal performance impact (only triggered on partial matches)
+- **NEW - SOLUTION 5**
+
+All settings are automatically saved and loaded between sessions.
+
 ### Default Settings (Optimized for User's Use Case)
 
 ```python
