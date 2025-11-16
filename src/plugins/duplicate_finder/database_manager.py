@@ -1324,13 +1324,15 @@ class VideoDatabase:
             logger.error(f"Error retrieving pending subsequences: {e}")
             return []
 
-    def update_subsequence_status(self, subseq_id, status, action=None):
+    def update_subsequence_status(self, short_video_path=None, long_video_path=None, status=None, action=None, subseq_id=None):
         """Update the status of a subsequence detection.
 
         Args:
-            subseq_id: Subsequence detection ID
+            short_video_path: Path to short video (used to find ID if subseq_id not provided)
+            long_video_path: Path to long video (used to find ID if subseq_id not provided)
             status: New status
             action: Action taken (optional)
+            subseq_id: Subsequence detection ID (if known, overrides path lookup)
 
         Returns:
             bool: True if successful
@@ -1339,6 +1341,40 @@ class VideoDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
 
+                # If ID not provided, find it using video paths
+                if subseq_id is None:
+                    if short_video_path is None or long_video_path is None:
+                        logger.error("Must provide either subseq_id or both video paths")
+                        return False
+
+                    # Get file IDs
+                    cursor.execute('SELECT id FROM video_files WHERE file_path = ?', (short_video_path,))
+                    result = cursor.fetchone()
+                    if not result:
+                        logger.error(f"Short video not found in database: {short_video_path}")
+                        return False
+                    short_id = result[0]
+
+                    cursor.execute('SELECT id FROM video_files WHERE file_path = ?', (long_video_path,))
+                    result = cursor.fetchone()
+                    if not result:
+                        logger.error(f"Long video not found in database: {long_video_path}")
+                        return False
+                    long_id = result[0]
+
+                    # Find subsequence ID
+                    cursor.execute('''
+                        SELECT id FROM video_subsequences
+                        WHERE short_video_id = ? AND long_video_id = ?
+                        ORDER BY detected_at DESC LIMIT 1
+                    ''', (short_id, long_id))
+                    result = cursor.fetchone()
+                    if not result:
+                        logger.error(f"Subsequence not found: {os.path.basename(short_video_path)} in {os.path.basename(long_video_path)}")
+                        return False
+                    subseq_id = result[0]
+
+                # Update status
                 cursor.execute('''
                     UPDATE video_subsequences
                     SET status = ?, action_taken = ?, processed_at = CURRENT_TIMESTAMP

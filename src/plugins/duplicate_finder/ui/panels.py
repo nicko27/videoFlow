@@ -8,7 +8,7 @@ from typing import Callable, Dict
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox,
     QGridLayout, QDoubleSpinBox, QSpinBox, QFrame, QLabel, QTabWidget,
-    QCheckBox, QComboBox
+    QCheckBox, QComboBox, QScrollArea
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -221,7 +221,7 @@ class UIPanels:
     @staticmethod
     def _create_parameters_tab(callbacks: Dict[str, Callable]) -> QWidget:
         """
-        Create the parameters configuration tab.
+        Create the parameters configuration tab with scrollbar.
 
         Args:
             callbacks: Dictionary of callbacks.
@@ -230,7 +230,17 @@ class UIPanels:
             Tuple of (QWidget, dict of parameter widgets).
         """
         tab = QWidget()
-        layout = QVBoxLayout(tab)
+
+        # Create scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+
+        # Create content widget for scrollable content
+        content_widget = QWidget()
+        layout = QVBoxLayout(content_widget)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(15)
 
@@ -455,18 +465,34 @@ class UIPanels:
         tab.subsequence_temporal_window_spin = subsequence_temporal_window_spin
         tab.subsequence_adaptive_refinement_check = subsequence_adaptive_refinement_check
 
+        # Set scroll area content and add to tab
+        scroll_area.setWidget(content_widget)
+        tab_layout = QVBoxLayout(tab)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        tab_layout.addWidget(scroll_area)
+
         return tab
 
     @staticmethod
     def _create_debug_tab() -> QWidget:
         """
-        Create the debug tab with interactive hash debugger.
+        Create the debug tab with interactive hash debugger and scrollbar.
 
         Returns:
             Configured QWidget for debug tab.
         """
         tab = QWidget()
-        layout = QVBoxLayout(tab)
+
+        # Create scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+
+        # Create content widget for scrollable content
+        content_widget = QWidget()
+        layout = QVBoxLayout(content_widget)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(10)
 
@@ -478,6 +504,12 @@ class UIPanels:
 
         # Store reference for later access
         tab.hash_debugger_v2 = hash_debugger_v2
+
+        # Set scroll area content and add to tab
+        scroll_area.setWidget(content_widget)
+        tab_layout = QVBoxLayout(tab)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        tab_layout.addWidget(scroll_area)
 
         return tab
 
