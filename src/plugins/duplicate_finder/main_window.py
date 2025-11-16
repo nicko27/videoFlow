@@ -35,7 +35,7 @@ try:
     from .theme_selector import ThemeSelector
     from .themes import get_current_theme
     from .layouts import LayoutManager, LayoutType
-    from .workers.subsequence_worker import SubsequenceDetectionWorker
+    from .audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
 except ImportError:
     # Fallback for direct imports
     from video_hasher import VideoHasher
@@ -50,7 +50,7 @@ except ImportError:
     from theme_selector import ThemeSelector
     from themes import get_current_theme
     from layouts import LayoutManager, LayoutType
-    from workers.subsequence_worker import SubsequenceDetectionWorker
+    from audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
 
 from src.core.logger import Logger
 
@@ -115,13 +115,11 @@ class DuplicateFinderWindow(QMainWindow):
         self.comparison_algorithm_combo = None
         self.hash_timeout_spin = None
         self.comparison_timeout_spin = None
-        self.enable_subsequence_check = None
-        self.subsequence_sample_interval_spin = None
-        self.subsequence_min_match_spin = None
-        self.subsequence_cache_memory_spin = None
-        self.subsequence_sliding_tolerance_spin = None
-        self.subsequence_temporal_window_spin = None
-        self.subsequence_adaptive_refinement_check = None
+        self.enable_scene_check = None
+        self.scene_precision_combo = None
+        self.scene_min_match_spin = None
+        self.scene_min_duration_spin = None
+        self.scene_cache_size_spin = None
         self.hash_debugger_v2 = None
 
         # Initialize managers and handlers
@@ -129,8 +127,8 @@ class DuplicateFinderWindow(QMainWindow):
         self.file_handler: Optional[FileHandler] = None
         self.analysis_handler: Optional[AnalysisHandler] = None
         self.duplicate_handler: Optional[DuplicateHandler] = None
-        self.subsequence_detector = None  # Will be created on demand
-        self.subsequence_worker = None  # Worker for background subsequence detection
+        self.scene_detector = None  # Audio fingerprint detector for scene detection
+        self.scene_worker = None  # Worker for background scene detection
 
         # Layout manager
         self.layout_manager = LayoutManager()
@@ -457,13 +455,11 @@ class DuplicateFinderWindow(QMainWindow):
             self.comparison_algorithm_combo = params_tab.comparison_algorithm_combo
             self.hash_timeout_spin = params_tab.hash_timeout_spin
             self.comparison_timeout_spin = params_tab.comparison_timeout_spin
-            self.enable_subsequence_check = params_tab.enable_subsequence_check
-            self.subsequence_sample_interval_spin = params_tab.subsequence_sample_interval_spin
-            self.subsequence_min_match_spin = params_tab.subsequence_min_match_spin
-            self.subsequence_cache_memory_spin = params_tab.subsequence_cache_memory_spin
-            self.subsequence_sliding_tolerance_spin = params_tab.subsequence_sliding_tolerance_spin
-            self.subsequence_temporal_window_spin = params_tab.subsequence_temporal_window_spin
-            self.subsequence_adaptive_refinement_check = params_tab.subsequence_adaptive_refinement_check
+            self.enable_scene_check = params_tab.enable_scene_check
+            self.scene_precision_combo = params_tab.scene_precision_combo
+            self.scene_min_match_spin = params_tab.scene_min_match_spin
+            self.scene_min_duration_spin = params_tab.scene_min_duration_spin
+            self.scene_cache_size_spin = params_tab.scene_cache_size_spin
 
         if debug_tab:
             self.hash_debugger_v2 = debug_tab.hash_debugger_v2
@@ -504,9 +500,8 @@ class DuplicateFinderWindow(QMainWindow):
             self.threshold_spin, self.hash_workers_spin,
             self.comparison_workers_spin, self.batch_size_spin,
             self.hash_timeout_spin, self.comparison_timeout_spin,
-            self.subsequence_sample_interval_spin, self.subsequence_min_match_spin,
-            self.subsequence_cache_memory_spin, self.subsequence_sliding_tolerance_spin,
-            self.subsequence_temporal_window_spin
+            self.scene_min_match_spin, self.scene_min_duration_spin,
+            self.scene_cache_size_spin
         ]
 
         for widget in widgets:
@@ -514,11 +509,8 @@ class DuplicateFinderWindow(QMainWindow):
                 widget.valueChanged.connect(self._on_settings_changed)
 
         # Connect checkboxes separately (uses different signal)
-        if self.enable_subsequence_check:
-            self.enable_subsequence_check.stateChanged.connect(self._on_settings_changed)
-
-        if self.subsequence_adaptive_refinement_check:
-            self.subsequence_adaptive_refinement_check.stateChanged.connect(self._on_settings_changed)
+        if self.enable_scene_check:
+            self.enable_scene_check.stateChanged.connect(self._on_settings_changed)
 
         # Connect combobox separately (uses different signal)
         if self.hash_method_combo:
@@ -526,6 +518,9 @@ class DuplicateFinderWindow(QMainWindow):
 
         if self.comparison_algorithm_combo:
             self.comparison_algorithm_combo.currentIndexChanged.connect(self._on_settings_changed)
+
+        if self.scene_precision_combo:
+            self.scene_precision_combo.currentIndexChanged.connect(self._on_settings_changed)
 
     def _load_settings(self) -> None:
         """
@@ -550,13 +545,11 @@ class DuplicateFinderWindow(QMainWindow):
             'comparison_algorithm_combo': self.comparison_algorithm_combo,
             'hash_timeout_spin': self.hash_timeout_spin,
             'comparison_timeout_spin': self.comparison_timeout_spin,
-            'enable_subsequence_check': self.enable_subsequence_check,
-            'subsequence_sample_interval_spin': self.subsequence_sample_interval_spin,
-            'subsequence_min_match_spin': self.subsequence_min_match_spin,
-            'subsequence_cache_memory_spin': self.subsequence_cache_memory_spin,
-            'subsequence_sliding_tolerance_spin': self.subsequence_sliding_tolerance_spin,
-            'subsequence_temporal_window_spin': self.subsequence_temporal_window_spin,
-            'subsequence_adaptive_refinement_check': self.subsequence_adaptive_refinement_check
+            'enable_scene_check': self.enable_scene_check,
+            'scene_precision_combo': self.scene_precision_combo,
+            'scene_min_match_spin': self.scene_min_match_spin,
+            'scene_min_duration_spin': self.scene_min_duration_spin,
+            'scene_cache_size_spin': self.scene_cache_size_spin
         }
 
     def _on_settings_changed(self) -> None:
@@ -807,34 +800,17 @@ class DuplicateFinderWindow(QMainWindow):
         # Get analysis configuration
         config = self.get_analysis_config()
 
-        # Pre-create subsequence detector if enabled (for dense hash pre-computation)
-        subsequence_detector_for_precompute = None
-        subseq_config = config.get('subsequence_detection', {})
-        if subseq_config.get('enabled', False):
-            logger.info("Subsequence detection enabled - creating detector for hash pre-computation")
-            from .subsequence_detector import SubsequenceDetector
+        # Scene detection will be created after comparison analysis if enabled
+        # (no need for pre-computation with audio fingerprinting)
 
-            subsequence_detector_for_precompute = SubsequenceDetector(
-                self.video_hasher,
-                max_cache_memory_mb=subseq_config.get('cache_memory_mb', 500),
-                sample_interval_seconds=subseq_config.get('sample_interval', 0.75),
-                min_match_ratio=subseq_config.get('min_match_ratio', 0.80),
-                temporal_window_frames=subseq_config.get('temporal_window_frames', 5),
-                sliding_window_tolerance=subseq_config.get('sliding_window_tolerance', 3),
-                enable_adaptive_refinement=subseq_config.get('enable_adaptive_refinement', False)
-            )
-            # Store it for later use in subsequence detection
-            self.subsequence_detector = subsequence_detector_for_precompute
-
-        # Start hash analysis (with optional dense hash pre-computation)
+        # Start hash analysis
         self.analysis_handler.start_hash_analysis(
             valid_files,
             config,
             progress_callback=self.update_file_progress,
             file_processed_callback=self.update_file_processed,
             current_file_callback=self.update_current_file_display,
-            progress_details_callback=self.update_hash_progress_details,
-            subsequence_detector=subsequence_detector_for_precompute
+            progress_details_callback=self.update_hash_progress_details
         )
 
         # Initialize progress display
@@ -855,12 +831,15 @@ class DuplicateFinderWindow(QMainWindow):
             # Stop hash and comparison workers
             self.analysis_handler.stop_analysis()
 
-            # Stop subsequence detection worker
-            if self.subsequence_worker and self.subsequence_worker.isRunning():
-                logger.info("Stopping subsequence detection worker...")
-                self.subsequence_worker.stop()
-                self.subsequence_worker.wait()
-                self.subsequence_worker = None
+            # Stop scene detection worker
+            if self.scene_worker and self.scene_worker.isRunning():
+                logger.info("Stopping scene detection worker...")
+                self.scene_worker.stop()
+                # Wait with timeout to prevent indefinite blocking
+                if not self.scene_worker.wait(5000):  # 5 second timeout
+                    logger.warning("Scene worker did not stop gracefully, forcing termination")
+                    self.scene_worker.terminate()
+                self.scene_worker = None
 
             # Stop duplicate processing
             self.duplicate_handler.stop_processing()
@@ -925,64 +904,68 @@ class DuplicateFinderWindow(QMainWindow):
         """
         self.duplicate_progress.set_status("Complete", "#28A745")
 
-        # Check if subsequence detection is enabled
+        # Check if scene detection is enabled
         config = self.get_analysis_config()
-        subseq_config = config.get('subsequence_detection', {})
-        is_enabled = subseq_config.get('enabled', False)
+        scene_config = config.get('scene_detection', {})
+        is_enabled = scene_config.get('enabled', False)
 
-        logger.info(f"Subsequence detection enabled: {is_enabled}")
+        logger.info(f"Scene detection enabled: {is_enabled}")
         if is_enabled:
-            logger.info(f"Subsequence parameters: sample_interval={subseq_config.get('sample_interval')}s, "
-                       f"min_match_ratio={subseq_config.get('min_match_ratio', 0)*100:.1f}%, "
-                       f"cache_memory={subseq_config.get('cache_memory_mb')}MB")
-            # Start subsequence detection
-            self._start_subsequence_detection()
+            logger.info(f"Scene detection parameters: precision={scene_config.get('precision_mode', 'balanced')}, "
+                       f"min_match_ratio={scene_config.get('min_match_ratio', 0)*100:.1f}%")
+            # Start scene detection
+            self._start_scene_detection()
         else:
-            logger.info("Subsequence detection skipped (not enabled)")
-            # No subsequence detection, finish analysis
+            logger.info("Scene detection skipped (not enabled)")
+            # No scene detection, finish analysis
             self._finish_analysis()
 
-    def _start_subsequence_detection(self) -> None:
+    def _start_scene_detection(self) -> None:
         """
-        Start subsequence detection analysis.
+        Start scene detection analysis using audio fingerprinting.
         """
         try:
-            from .subsequence_detector import SubsequenceDetector
+            from .workers.scene_worker import SceneDetectionWorker
 
             config = self.get_analysis_config()
-            subseq_config = config.get('subsequence_detection', {})
+            scene_config = config.get('scene_detection', {})
+
+            # Get precision mode
+            precision_mode_name = scene_config.get('precision_mode', 'balanced')
+            if precision_mode_name == 'maximum':
+                precision_mode = PrecisionMode.MAXIMUM
+            elif precision_mode_name == 'fast':
+                precision_mode = PrecisionMode.FAST
+            else:
+                precision_mode = PrecisionMode.BALANCED
 
             # Create detector if needed
-            if self.subsequence_detector is None:
-                self.subsequence_detector = SubsequenceDetector(
-                    hasher=self.video_hasher,
-                    max_cache_memory_mb=subseq_config.get('cache_memory_mb', 500),
-                    sample_interval_seconds=subseq_config.get('sample_interval', 0.75),
-                    min_match_ratio=subseq_config.get('min_match_ratio', 0.80),
-                    temporal_window_frames=subseq_config.get('temporal_window_frames', 5),
-                    sliding_window_tolerance=subseq_config.get('sliding_window_tolerance', 3),
-                    enable_adaptive_refinement=subseq_config.get('enable_adaptive_refinement', True)
+            if self.scene_detector is None:
+                self.scene_detector = AudioFingerprintDetector(
+                    precision_mode=precision_mode,
+                    min_match_ratio=scene_config.get('min_match_ratio', 0.85),
+                    max_cache_items=scene_config.get('cache_size', 500)
                 )
 
             # Update UI
             self.status_indicator.update_status(
-                "🎬", "Detecting subsequences...",
+                "🎬", "Detecting scenes (audio fingerprinting)...",
                 "#17A2B8", "#D1ECF1", "#17A2B8"
             )
 
             # Get all files
             files = self.file_handler.get_all_files()
 
-            # Stop any existing subsequence worker
-            if self.subsequence_worker and self.subsequence_worker.isRunning():
-                logger.info("Stopping existing subsequence worker...")
-                self.subsequence_worker.stop()
-                self.subsequence_worker.wait()
+            # Stop any existing scene worker
+            if self.scene_worker and self.scene_worker.isRunning():
+                logger.info("Stopping existing scene worker...")
+                self.scene_worker.stop()
+                self.scene_worker.wait()
 
             # Create and configure worker
-            logger.info(f"Starting subsequence detection on {len(files)} files")
-            self.subsequence_worker = SubsequenceDetectionWorker(
-                self.subsequence_detector,
+            logger.info(f"Starting scene detection on {len(files)} files (audio fingerprinting)")
+            self.scene_worker = SceneDetectionWorker(
+                self.scene_detector,
                 files
             )
 
@@ -992,60 +975,63 @@ class DuplicateFinderWindow(QMainWindow):
                 self.subsequence_progress.update_progress(current, total, message)
                 self.force_ui_update()
 
-            def on_subsequence_found(short_video: str, long_video: str, result: dict):
-                """Handle each found subsequence."""
-                # Store in database
+            def on_scene_found(short_video: str, long_video: str, result: dict):
+                """Handle each found scene."""
+                # Store in database (scenes use same table as subsequences)
+                # Convert start_time_seconds to frame index (approximate)
+                start_frame_idx = int(result.get('start_time_seconds', 0) * 25)  # Assume 25fps
+
                 self.video_hasher.db.store_subsequence_detection(
                     short_video,
                     long_video,
                     result['match_ratio'],
-                    result['start_frame_idx'],
+                    start_frame_idx,
                     result['confidence']
                 )
 
-                # Add to duplicate handler for processing
+                # Add to duplicate handler for processing (scenes are shown like subsequences)
                 self.duplicate_handler.add_subsequence(short_video, long_video, result)
 
-            def on_finished(subsequences: list):
-                """Handle completion of subsequence detection."""
-                logger.info(f"Subsequence detection complete: {len(subsequences)} found")
+            def on_finished(scenes: list):
+                """Handle completion of scene detection."""
+                logger.info(f"Scene detection complete: {len(scenes)} found")
 
                 # Clean up worker reference
-                self.subsequence_worker = None
+                self.scene_worker = None
 
-                # Finish analysis (will process subsequences after duplicates)
+                # Finish analysis (will process scenes after duplicates)
                 self._finish_analysis()
 
             def on_error(error_msg: str):
-                """Handle error in subsequence detection."""
-                logger.error(f"Error during subsequence detection: {error_msg}")
+                """Handle error in scene detection."""
+                logger.error(f"Error during scene detection: {error_msg}")
                 QMessageBox.warning(
                     self,
-                    "Subsequence Detection Error",
-                    f"An error occurred during subsequence detection:\n{error_msg}\n\n"
+                    "Scene Detection Error",
+                    f"An error occurred during scene detection:\n{error_msg}\n\n"
                     f"Continuing with duplicate results..."
                 )
 
                 # Clean up worker reference
-                self.subsequence_worker = None
+                self.scene_worker = None
 
                 # Finish analysis anyway
                 self._finish_analysis()
 
-            self.subsequence_worker.progress.connect(on_progress)
-            self.subsequence_worker.subsequence_found.connect(on_subsequence_found)
-            self.subsequence_worker.finished.connect(on_finished)
-            self.subsequence_worker.error.connect(on_error)
+            self.scene_worker.progress.connect(on_progress)
+            self.scene_worker.scene_found.connect(on_scene_found)
+            self.scene_worker.finished.connect(on_finished)
+            self.scene_worker.error.connect(on_error)
 
             # Start worker
-            self.subsequence_worker.start()
+            self.scene_worker.start()
 
         except Exception as e:
-            logger.error(f"Error setting up subsequence detection: {e}")
+            logger.error(f"Error setting up scene detection: {e}")
             QMessageBox.warning(
                 self,
-                "Subsequence Detection Error",
-                f"An error occurred setting up subsequence detection:\n{str(e)}\n\n"
+                "Scene Detection Error",
+                f"An error occurred setting up scene detection:\n{str(e)}\n\n"
                 f"Continuing with duplicate results..."
             )
             self._finish_analysis()
@@ -1092,10 +1078,13 @@ class DuplicateFinderWindow(QMainWindow):
                 "#28A745", "#D4EDDA", "#28A745"
             )
 
-            threshold = self.threshold_spin.value()
+            threshold_duplicates = self.threshold_spin.value()
+            threshold_scenes = self.scene_min_match_spin.value() if self.scene_min_match_spin else 85.0
             QMessageBox.information(
                 self, "Analysis complete",
-                f"No duplicates or subsequences detected with {threshold}% threshold\n\n"
+                f"No duplicates or scenes detected\n\n"
+                f"Duplicate threshold: {threshold_duplicates}%\n"
+                f"Scene threshold: {threshold_scenes}%\n"
                 f"Total time: {elapsed:.1f} seconds"
             )
 

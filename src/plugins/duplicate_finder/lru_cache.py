@@ -2,11 +2,14 @@
 LRU (Least Recently Used) Cache implementation for duplicate finder.
 
 Provides an efficient cache with automatic eviction of least recently used items
-when the cache reaches its maximum size.
+when the cache reaches its maximum size or memory limit.
 """
 
+import os
+import threading
+import numpy as np
 from collections import OrderedDict
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Tuple, Dict
 from src.core.logger import Logger
 
 logger = Logger.get_logger('DuplicateFinder.LRUCache')
@@ -205,3 +208,136 @@ class LRUCache:
             View of cache items
         """
         return self.cache.items()
+
+
+class MemoryBoundedLRUCache:
+    """
+    Memory-bounded LRU cache for dense video hashes.
+
+    Automatically evicts least recently used items when memory limit is reached.
+    **Thread-safe** using threading.Lock for concurrent access.
+
+    This is an enhanced version of LRUCache that enforces memory limits
+    instead of item count limits, ideal for caching large numpy arrays.
+
+    Attributes:
+        max_memory_bytes: Maximum memory usage in bytes
+        current_memory: Current memory usage in bytes
+        cache: OrderedDict storing cached items
+        max_memory_mb: Maximum memory in MB (for display)
+        _lock: Thread lock for concurrent access
+
+    Example:
+        ```python
+        cache = MemoryBoundedLRUCache(max_memory_mb=500)
+        cache.put('video1.mp4', hash_array, duration=120.5)
+        result = cache.get('video1.mp4')  # Returns {'hash': array, 'duration': 120.5, 'size': bytes}
+        ```
+    """
+
+    def __init__(self, max_memory_mb: int = 500):
+        """
+        Initialize memory-bounded LRU cache.
+
+        Args:
+            max_memory_mb: Maximum memory usage in MB (default: 500MB)
+        """
+        self.max_memory_bytes = max_memory_mb * 1024 * 1024
+        self.current_memory = 0
+        self.cache = OrderedDict()  # path -> {'hash': array, 'size': bytes, 'duration': float}
+        self.max_memory_mb = max_memory_mb
+        self._lock = threading.Lock()  # Thread safety
+        logger.debug(f"MemoryBoundedLRUCache initialized with {max_memory_mb}MB limit")
+
+    def _estimate_size(self, hash_array: np.ndarray) -> int:
+        """
+        Estimate memory size of a numpy array in bytes.
+
+        Args:
+            hash_array: Numpy array to measure
+
+        Returns:
+            Estimated size in bytes (array + overhead)
+        """
+        return hash_array.nbytes + 200  # Array + overhead
+
+    def get(self, key: str) -> Optional[Dict]:
+        """
+        Get item from cache, moving it to end (most recent).
+
+        Thread-safe operation using lock.
+
+        Args:
+            key: Cache key to retrieve
+
+        Returns:
+            Cached dictionary or None if not found
+        """
+        with self._lock:
+            if key not in self.cache:
+                return None
+            # Move to end (most recently used)
+            self.cache.move_to_end(key)
+            return self.cache[key]
+
+    def put(self, key: str, hash_array: np.ndarray, duration: float):
+        """
+        Add item to cache, evicting old items if necessary.
+
+        Thread-safe operation using lock to prevent memory corruption.
+
+        Args:
+            key: Cache key (typically file path)
+            hash_array: Numpy array to cache
+            duration: Video duration in seconds
+        """
+        with self._lock:
+            # Remove if already exists
+            if key in self.cache:
+                old_size = self.cache[key]['size']
+                self.current_memory -= old_size
+                del self.cache[key]
+
+            # Calculate size
+            item_size = self._estimate_size(hash_array)
+
+            # Evict until we have space
+            while self.current_memory + item_size > self.max_memory_bytes and self.cache:
+                evicted_key, evicted_value = self.cache.popitem(last=False)  # Remove oldest
+                self.current_memory -= evicted_value['size']
+                logger.debug(f"Evicted {os.path.basename(evicted_key)} from cache (memory limit)")
+
+            # Add new item
+            self.cache[key] = {
+                'hash': hash_array,
+                'duration': duration,
+                'size': item_size
+            }
+            self.current_memory += item_size
+
+    def clear(self):
+        """
+        Clear all cache.
+
+        Thread-safe operation using lock.
+        """
+        with self._lock:
+            self.cache.clear()
+            self.current_memory = 0
+
+    def get_stats(self) -> Dict:
+        """
+        Get cache statistics.
+
+        Thread-safe operation using lock.
+
+        Returns:
+            Dictionary with cache statistics
+        """
+        with self._lock:
+            return {
+                'items': len(self.cache),
+                'memory_mb': self.current_memory / (1024 * 1024),
+                'max_memory_mb': self.max_memory_mb,
+                'usage_percent': (self.current_memory / self.max_memory_bytes * 100) if self.max_memory_bytes > 0 else 0
+            }

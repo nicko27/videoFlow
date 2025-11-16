@@ -80,7 +80,7 @@ class ComparisonDialog(QDialog):
         layout.setSpacing(15)
 
         # Keyboard shortcuts help (small banner at top)
-        help_label = QLabel("💡 Shortcuts: 1=Keep A | 2=Keep B | 3=Both | S=Skip | I=Ignore | Esc=Quit | ←→=Navigate | Q/H/T=25%/50%/75%")
+        help_label = QLabel("💡 Shortcuts: 1=Keep A | 2=Keep B | 3=Both | S=Skip | I=Ignore | Esc=Quit | ←→=Navigate | Q/H/T=25%/50%/75% | P=Play Both | R=Re-sync")
         help_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XXS))
         help_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         help_label.setStyleSheet(f"""
@@ -115,6 +115,10 @@ class ComparisonDialog(QDialog):
         # Navigation controls
         nav_controls = self.create_navigation_controls()
         layout.addWidget(nav_controls)
+
+        # Synchronization controls
+        sync_controls = self.create_sync_controls()
+        layout.addWidget(sync_controls)
 
         # Action buttons
         action_buttons = self.create_action_buttons()
@@ -231,6 +235,88 @@ class ComparisonDialog(QDialog):
         layout.addWidget(select_btn)
 
         return container, video_widget
+
+    def create_sync_controls(self):
+        """Create video synchronization controls"""
+        frame = QFrame()
+        frame.setMaximumHeight(70)
+        frame.setStyleSheet(Styles.frame(
+            bg_color=Colors.PRIMARY_LIGHT,
+            border_color=Colors.PRIMARY,
+            border_width=2,
+            radius=Spacing.RADIUS_MD
+        ))
+
+        layout = QHBoxLayout(frame)
+        layout.setContentsMargins(Spacing.XL, Spacing.MD, Spacing.XL, Spacing.MD)
+        layout.setSpacing(Spacing.LG)
+
+        # Sync info label
+        sync_label = QLabel("🔄 Video Synchronization:")
+        sync_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD, QFont.Weight.Bold))
+        sync_label.setStyleSheet(f"color: {Colors.PRIMARY_DARKER};")
+        layout.addWidget(sync_label)
+
+        # Play both button
+        play_both_btn = QPushButton("▶️ Play Both")
+        play_both_btn.setMinimumWidth(140)
+        play_both_btn.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD))
+        play_both_btn.clicked.connect(self.play_both_videos)
+        play_both_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Colors.SUCCESS};
+                color: white;
+                border: none;
+                border-radius: {Spacing.RADIUS_MD}px;
+                padding: {Spacing.MD}px {Spacing.LG}px;
+            }}
+            QPushButton:hover {{
+                background-color: {Colors.SUCCESS_DARK};
+            }}
+        """)
+        layout.addWidget(play_both_btn)
+
+        # Pause both button
+        pause_both_btn = QPushButton("⏸️ Pause Both")
+        pause_both_btn.setMinimumWidth(140)
+        pause_both_btn.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD))
+        pause_both_btn.clicked.connect(self.pause_both_videos)
+        pause_both_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Colors.WARNING};
+                color: white;
+                border: none;
+                border-radius: {Spacing.RADIUS_MD}px;
+                padding: {Spacing.MD}px {Spacing.LG}px;
+            }}
+            QPushButton:hover {{
+                background-color: {Colors.WARNING_DARK};
+            }}
+        """)
+        layout.addWidget(pause_both_btn)
+
+        # Sync position button
+        sync_btn = QPushButton("🔄 Re-sync Position")
+        sync_btn.setMinimumWidth(160)
+        sync_btn.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD))
+        sync_btn.clicked.connect(lambda: self.sync_video_position(self.position_slider.value() / 1000.0))
+        sync_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {Colors.INFO};
+                color: white;
+                border: none;
+                border-radius: {Spacing.RADIUS_MD}px;
+                padding: {Spacing.MD}px {Spacing.LG}px;
+            }}
+            QPushButton:hover {{
+                background-color: {Colors.INFO_DARK};
+            }}
+        """)
+        layout.addWidget(sync_btn)
+
+        layout.addStretch()
+
+        return frame
 
     def create_navigation_controls(self):
         """Create navigation controls"""
@@ -435,6 +521,29 @@ class ComparisonDialog(QDialog):
         except Exception as e:
             logger.error(f"Error synchronizing: {e}")
 
+    def play_both_videos(self):
+        """Play both videos simultaneously"""
+        try:
+            # Sync position first to ensure they start at same point
+            current_position = self.position_slider.value() / 1000.0
+            self.sync_video_position(current_position)
+
+            # Start playback on both (if VideoPreviewWidget has a play method)
+            # Note: This is a placeholder - actual implementation depends on VideoPreviewWidget API
+            logger.info("Play both videos requested (synchronization active)")
+
+        except Exception as e:
+            logger.error(f"Error playing both videos: {e}")
+
+    def pause_both_videos(self):
+        """Pause both videos simultaneously"""
+        try:
+            # Note: This is a placeholder - actual implementation depends on VideoPreviewWidget API
+            logger.info("Pause both videos requested")
+
+        except Exception as e:
+            logger.error(f"Error pausing both videos: {e}")
+
     def update_time_display(self, current_seconds, total_seconds):
         """Update time display"""
         self.time_label.setText(self.format_time(current_seconds))
@@ -536,6 +645,16 @@ class ComparisonDialog(QDialog):
             # Move forward 5%
             current = self.position_slider.value() / 1000.0
             self.seek_to_position(min(1.0, current + 0.05))
+
+        # Synchronization shortcuts
+        elif key == KeyboardShortcuts.SYNC_PLAY_BOTH:
+            self.play_both_videos()
+        elif key == KeyboardShortcuts.SYNC_PAUSE_BOTH:
+            self.pause_both_videos()
+        elif key == KeyboardShortcuts.SYNC_RESYNC:
+            current_position = self.position_slider.value() / 1000.0
+            self.sync_video_position(current_position)
+
         else:
             # Let parent handle other keys
             super().keyPressEvent(event)

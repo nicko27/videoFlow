@@ -915,14 +915,24 @@ class VideoDatabase:
             logger.error(f"Error stockage doublon found: {e}")
             return False
     
-    def get_pending_duplicates(self):
-        """Récupère les doublons pending de processing"""
+    def get_pending_duplicates(self, limit: int = 1000, offset: int = 0):
+        """
+        Get pending duplicates with pagination support.
+
+        Args:
+            limit: Maximum number of duplicates to retrieve (default: 1000)
+            offset: Number of duplicates to skip (default: 0)
+
+        Returns:
+            List of tuples (file1_path, file2_path, similarity, dup_id)
+        """
         try:
             duplicates = []
-            
+
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
+
+                # Paginated query to prevent loading all results at once
                 cursor.execute('''
                     SELECT v1.file_path, v2.file_path, d.similarity, d.id
                     FROM found_duplicates d
@@ -930,18 +940,19 @@ class VideoDatabase:
                     JOIN video_files v2 ON d.file2_id = v2.id
                     WHERE d.status = 'pending'
                     ORDER BY d.similarity DESC, d.detected_at DESC
-                ''')
-                
+                    LIMIT ? OFFSET ?
+                ''', (limit, offset))
+
                 for row in cursor.fetchall():
                     file1, file2, similarity, dup_id = row
-                    # Checks si les files existent encore
+                    # Check if files still exist
                     if os.path.exists(file1) and os.path.exists(file2):
                         duplicates.append((file1, file2, similarity, dup_id))
-                
+
                 return duplicates
-                
+
         except Exception as e:
-            logger.error(f"Error récupération doublons pending: {e}")
+            logger.error(f"Error retrieving pending duplicates: {e}")
             return []
     
     def update_duplicate_status(self, dup_id, status, action=None):
@@ -1289,8 +1300,13 @@ class VideoDatabase:
             logger.error(f"Error storing subsequence: {e}")
             return False
 
-    def get_pending_subsequences(self):
-        """Get all pending subsequence detections.
+    def get_pending_subsequences(self, limit: int = 1000, offset: int = 0):
+        """
+        Get pending subsequence detections with pagination support.
+
+        Args:
+            limit: Maximum number of subsequences to retrieve (default: 1000)
+            offset: Number of subsequences to skip (default: 0)
 
         Returns:
             List of tuples: (short_path, long_path, match_ratio, start_frame, confidence, id)
@@ -1301,6 +1317,7 @@ class VideoDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
 
+                # Paginated query to prevent loading all results at once
                 cursor.execute('''
                     SELECT v1.file_path, v2.file_path, s.match_ratio,
                            s.start_frame_idx, s.confidence, s.id
@@ -1309,7 +1326,8 @@ class VideoDatabase:
                     JOIN video_files v2 ON s.long_video_id = v2.id
                     WHERE s.status = 'pending'
                     ORDER BY s.confidence DESC, s.detected_at DESC
-                ''')
+                    LIMIT ? OFFSET ?
+                ''', (limit, offset))
 
                 for row in cursor.fetchall():
                     short_path, long_path, match_ratio, start_frame, confidence, subseq_id = row

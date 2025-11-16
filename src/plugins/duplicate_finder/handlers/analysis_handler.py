@@ -178,18 +178,24 @@ class AnalysisHandler(QObject):
         Stop all running analysis operations.
 
         This method gracefully stops both hash and comparison workers
-        and waits for them to finish.
+        and waits for them to finish with timeout protection.
         """
         if self.hash_worker and self.hash_worker.isRunning():
             logger.info("Stopping hash worker...")
             self.hash_worker.stop()
-            self.hash_worker.wait()
+            # Wait with 5 second timeout to prevent indefinite blocking
+            if not self.hash_worker.wait(5000):
+                logger.warning("Hash worker did not stop gracefully, forcing termination")
+                self.hash_worker.terminate()
             self.hash_worker = None
 
         if self.comparison_worker and self.comparison_worker.isRunning():
             logger.info("Stopping comparison worker...")
             self.comparison_worker.stop()
-            self.comparison_worker.wait()
+            # Wait with 5 second timeout to prevent indefinite blocking
+            if not self.comparison_worker.wait(5000):
+                logger.warning("Comparison worker did not stop gracefully, forcing termination")
+                self.comparison_worker.terminate()
             self.comparison_worker = None
 
         logger.info("Analysis stopped")
