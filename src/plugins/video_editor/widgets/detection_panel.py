@@ -2,7 +2,7 @@
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                             QPushButton, QSpinBox, QDoubleSpinBox,
-                            QGroupBox, QSlider)
+                            QGroupBox, QSlider, QProgressBar)
 from PyQt6.QtCore import Qt, pyqtSignal
 from src.core.logger import Logger
 
@@ -15,6 +15,7 @@ class DetectionPanel(QWidget):
     # Signals
     detect_black_frames_clicked = pyqtSignal(int, int)  # threshold, min_duration
     detect_scenes_clicked = pyqtSignal(float, int)  # threshold, min_scene_length
+    stop_scene_detection_clicked = pyqtSignal()  # stop scene detection
     split_n_parts_clicked = pyqtSignal()
     split_by_duration_clicked = pyqtSignal()
     merge_all_clicked = pyqtSignal()
@@ -118,7 +119,9 @@ class DetectionPanel(QWidget):
         min_scene_layout.addStretch()
         scene_layout.addLayout(min_scene_layout)
 
-        # Detect button
+        # Detect button and stop button
+        buttons_layout = QHBoxLayout()
+
         detect_scene_btn = QPushButton("🔍 Détecter Scènes")
         detect_scene_btn.setStyleSheet("""
             QPushButton {
@@ -133,7 +136,36 @@ class DetectionPanel(QWidget):
             }
         """)
         detect_scene_btn.clicked.connect(self._on_detect_scenes_clicked)
-        scene_layout.addWidget(detect_scene_btn)
+        buttons_layout.addWidget(detect_scene_btn)
+        self.detect_scene_btn = detect_scene_btn
+
+        self.stop_scene_btn = QPushButton("⏹️ Arrêter")
+        self.stop_scene_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                padding: 8px;
+                font-weight: bold;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+        """)
+        self.stop_scene_btn.clicked.connect(self.stop_scene_detection_clicked.emit)
+        self.stop_scene_btn.hide()  # Hidden by default
+        buttons_layout.addWidget(self.stop_scene_btn)
+
+        scene_layout.addLayout(buttons_layout)
+
+        # Progress bar for scene detection
+        self.scene_progress = QProgressBar()
+        self.scene_progress.setRange(0, 100)
+        self.scene_progress.setValue(0)
+        self.scene_progress.setTextVisible(True)
+        self.scene_progress.setFormat("Analyse: %p%")
+        self.scene_progress.hide()  # Hidden by default
+        scene_layout.addWidget(self.scene_progress)
 
         scene_group.setLayout(scene_layout)
         layout.addWidget(scene_group)
@@ -195,3 +227,20 @@ class DetectionPanel(QWidget):
         """Enable/disable detection buttons."""
         for widget in self.findChildren(QPushButton):
             widget.setEnabled(enabled)
+
+    def show_scene_progress(self):
+        """Show scene detection progress bar and stop button."""
+        self.detect_scene_btn.hide()
+        self.scene_progress.show()
+        self.stop_scene_btn.show()
+
+    def hide_scene_progress(self):
+        """Hide scene detection progress bar and stop button."""
+        self.scene_progress.hide()
+        self.stop_scene_btn.hide()
+        self.detect_scene_btn.show()
+        self.scene_progress.setValue(0)
+
+    def update_scene_progress(self, value: int):
+        """Update scene detection progress bar value."""
+        self.scene_progress.setValue(value)
