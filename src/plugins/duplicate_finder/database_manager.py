@@ -45,7 +45,8 @@ class VideoDatabase:
                 'comparisons': True,
                 'ignored_pairs': True,
                 'corrupted_files': True,
-                'found_duplicates': True
+                'found_duplicates': True,
+                'video_subsequences': True
             }
                 
         except Exception as e:
@@ -138,7 +139,26 @@ class VideoDatabase:
                         UNIQUE(file1_id, file2_id)
                     )
                 ''')
-                
+
+                # Table for subsequence detections
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS video_subsequences (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        short_video_id INTEGER,
+                        long_video_id INTEGER,
+                        match_ratio REAL,
+                        start_frame_idx INTEGER,
+                        confidence REAL,
+                        status TEXT DEFAULT 'pending',
+                        action_taken TEXT,
+                        detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        processed_at TIMESTAMP,
+                        FOREIGN KEY (short_video_id) REFERENCES video_files (id) ON DELETE CASCADE,
+                        FOREIGN KEY (long_video_id) REFERENCES video_files (id) ON DELETE CASCADE,
+                        UNIQUE(short_video_id, long_video_id)
+                    )
+                ''')
+
                 # ÉTAPE 3: Checks et ajoute la colonne ignore_type si nécessaire
                 cursor.execute("PRAGMA table_info(ignored_pairs)")
                 columns = [column[1] for column in cursor.fetchall()]
@@ -164,7 +184,10 @@ class VideoDatabase:
                     "CREATE INDEX IF NOT EXISTS idx_duplicates_status ON found_duplicates(status)",
                     "CREATE INDEX IF NOT EXISTS idx_duplicates_files ON found_duplicates(file1_id, file2_id)",
                     "CREATE INDEX IF NOT EXISTS idx_ignored_pairs ON ignored_pairs(file1_id, file2_id)",
-                    "CREATE INDEX IF NOT EXISTS idx_ignored_type ON ignored_pairs(ignore_type)"
+                    "CREATE INDEX IF NOT EXISTS idx_ignored_type ON ignored_pairs(ignore_type)",
+                    "CREATE INDEX IF NOT EXISTS idx_subsequences_status ON video_subsequences(status)",
+                    "CREATE INDEX IF NOT EXISTS idx_subsequences_files ON video_subsequences(short_video_id, long_video_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_subsequences_confidence ON video_subsequences(confidence)"
                 ]
                 
                 for cmd in index_commands:
@@ -642,21 +665,22 @@ class VideoDatabase:
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
+
                 # Transaction unique pour tout remove
                 cursor.executescript('''
                     DELETE FROM comparisons;
                     DELETE FROM ignored_pairs;
                     DELETE FROM corrupted_files;
                     DELETE FROM found_duplicates;
+                    DELETE FROM video_subsequences;
                     DELETE FROM video_files;
                     VACUUM;
                 ''')
-                
+
                 conn.commit()
                 logger.info("Base de données vidée et compactée")
                 return True
-                
+
         except Exception as e:
             logger.error(f"Error vidage base: {e}")
             return False
@@ -1011,7 +1035,7 @@ class VideoDatabase:
                     return False
                 
                 # Checks que toutes les tables existent
-                required_tables = ['video_files', 'comparisons', 'ignored_pairs', 'corrupted_files', 'found_duplicates']
+                required_tables = ['video_files', 'comparisons', 'ignored_pairs', 'corrupted_files', 'found_duplicates', 'video_subsequences']
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
                 existing_tables = [row[0] for row in cursor.fetchall()]
                 
@@ -1046,21 +1070,21 @@ class VideoDatabase:
                 'version': None,
                 'pragma_settings': {}
             }
-            
+
             if info['exists']:
                 info['size_bytes'] = os.path.getsize(self.db_path)
-                
+
                 with self.get_connection() as conn:
                     cursor = conn.cursor()
-                    
+
                     # Tables
                     cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
                     info['tables'] = [row[0] for row in cursor.fetchall()]
-                    
+
                     # Version SQLite
                     cursor.execute("SELECT sqlite_version()")
                     info['version'] = cursor.fetchone()[0]
-                    
+
                     # Settings PRAGMA
                     pragmas = ['journal_mode', 'synchronous', 'cache_size', 'temp_store', 'foreign_keys']
                     for pragma in pragmas:
@@ -1070,9 +1094,162 @@ class VideoDatabase:
                             info['pragma_settings'][pragma] = result[0] if result else None
                         except:
                             info['pragma_settings'][pragma] = 'error'
-            
+
             return info
-            
+
         except Exception as e:
             logger.error(f"Error récupération infos DB: {e}")
             return {'error': str(e)}
+
+    # Subsequence detection methods
+    def store_subsequence_detection(self, short_video_path, long_video_path,
+                                    match_ratio, start_frame_idx, confidence):
+        """Store a subsequence detection result.
+
+        Args:
+            short_video_path: Path to the shorter video
+            long_video_path: Path to the longer video
+            match_ratio: Match ratio (0.0-1.0)
+            start_frame_idx: Starting frame index in long video
+            confidence: Detection confidence (0.0-1.0)
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Get IDs
+                cursor.execute('''
+                    SELECT
+                        (SELECT id FROM video_files WHERE file_path = ?) as id1,
+                        (SELECT id FROM video_files WHERE file_path = ?) as id2
+                ''', (short_video_path, long_video_path))
+
+                result = cursor.fetchone()
+                if not result or not result[0] or not result[1]:
+                    logger.warning(f"Files not found in DB: {short_video_path}, {long_video_path}")
+                    return False
+
+                short_id, long_id = result
+
+                cursor.execute('''
+                    INSERT OR REPLACE INTO video_subsequences
+                    (short_video_id, long_video_id, match_ratio, start_frame_idx,
+                     confidence, status, detected_at)
+                    VALUES (?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
+                ''', (short_id, long_id, match_ratio, start_frame_idx, confidence))
+
+                conn.commit()
+                logger.info(f"Subsequence stored: {os.path.basename(short_video_path)} "
+                          f"in {os.path.basename(long_video_path)} ({match_ratio*100:.1f}%)")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error storing subsequence: {e}")
+            return False
+
+    def get_pending_subsequences(self):
+        """Get all pending subsequence detections.
+
+        Returns:
+            List of tuples: (short_path, long_path, match_ratio, start_frame, confidence, id)
+        """
+        try:
+            subsequences = []
+
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                    SELECT v1.file_path, v2.file_path, s.match_ratio,
+                           s.start_frame_idx, s.confidence, s.id
+                    FROM video_subsequences s
+                    JOIN video_files v1 ON s.short_video_id = v1.id
+                    JOIN video_files v2 ON s.long_video_id = v2.id
+                    WHERE s.status = 'pending'
+                    ORDER BY s.confidence DESC, s.detected_at DESC
+                ''')
+
+                for row in cursor.fetchall():
+                    short_path, long_path, match_ratio, start_frame, confidence, subseq_id = row
+                    # Check if files still exist
+                    if os.path.exists(short_path) and os.path.exists(long_path):
+                        subsequences.append((short_path, long_path, match_ratio,
+                                           start_frame, confidence, subseq_id))
+
+                return subsequences
+
+        except Exception as e:
+            logger.error(f"Error retrieving pending subsequences: {e}")
+            return []
+
+    def update_subsequence_status(self, subseq_id, status, action=None):
+        """Update the status of a subsequence detection.
+
+        Args:
+            subseq_id: Subsequence detection ID
+            status: New status
+            action: Action taken (optional)
+
+        Returns:
+            bool: True if successful
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                    UPDATE video_subsequences
+                    SET status = ?, action_taken = ?, processed_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (status, action, subseq_id))
+
+                conn.commit()
+                return True
+
+        except Exception as e:
+            logger.error(f"Error updating subsequence status: {e}")
+            return False
+
+    def get_subsequence_statistics(self):
+        """Get statistics about subsequence detections.
+
+        Returns:
+            dict: Statistics about detected subsequences
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                    SELECT
+                        COUNT(*) as total,
+                        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+                        SUM(CASE WHEN status = 'processed' THEN 1 ELSE 0 END) as processed,
+                        AVG(match_ratio) as avg_match_ratio,
+                        AVG(confidence) as avg_confidence
+                    FROM video_subsequences
+                ''')
+
+                result = cursor.fetchone()
+                if result:
+                    return {
+                        'total': result[0] or 0,
+                        'pending': result[1] or 0,
+                        'processed': result[2] or 0,
+                        'avg_match_ratio': result[3] or 0.0,
+                        'avg_confidence': result[4] or 0.0
+                    }
+
+        except Exception as e:
+            logger.error(f"Error retrieving subsequence stats: {e}")
+
+        return {
+            'total': 0,
+            'pending': 0,
+            'processed': 0,
+            'avg_match_ratio': 0.0,
+            'avg_confidence': 0.0
+        }

@@ -95,6 +95,26 @@ class SettingsManager(QObject):
 
             self.settings.endGroup()
 
+            # Load subsequence detection settings
+            self.settings.beginGroup("subsequence_detection")
+
+            self._load_widget_value(
+                widgets, 'subsequence_sample_interval_spin', 'sample_interval', 3.0, float
+            )
+            self._load_widget_value(
+                widgets, 'subsequence_min_match_spin', 'min_match_ratio', 80.0, float
+            )
+            self._load_widget_value(
+                widgets, 'subsequence_cache_memory_spin', 'cache_memory_mb', 500, int
+            )
+
+            # Load checkbox state for enable_subsequence
+            if 'enable_subsequence_check' in widgets and widgets['enable_subsequence_check'] is not None:
+                enabled = self.settings.value('enabled', False, type=bool)
+                widgets['enable_subsequence_check'].setChecked(enabled)
+
+            self.settings.endGroup()
+
             # Load window geometry if main window provided
             if main_window:
                 self._load_window_geometry(main_window)
@@ -125,6 +145,19 @@ class SettingsManager(QObject):
             self._save_widget_value(widgets, 'batch_size_spin', 'batch_size')
             self._save_widget_value(widgets, 'hash_timeout_spin', 'hash_timeout')
             self._save_widget_value(widgets, 'comparison_timeout_spin', 'comparison_timeout')
+
+            self.settings.endGroup()
+
+            # Subsequence detection settings
+            self.settings.beginGroup("subsequence_detection")
+
+            self._save_widget_value(widgets, 'subsequence_sample_interval_spin', 'sample_interval')
+            self._save_widget_value(widgets, 'subsequence_min_match_spin', 'min_match_ratio')
+            self._save_widget_value(widgets, 'subsequence_cache_memory_spin', 'cache_memory_mb')
+
+            # Save checkbox state for enable_subsequence
+            if 'enable_subsequence_check' in widgets and widgets['enable_subsequence_check'] is not None:
+                self.settings.setValue('enabled', widgets['enable_subsequence_check'].isChecked())
 
             self.settings.endGroup()
 
@@ -222,7 +255,9 @@ class SettingsManager(QObject):
         """
         widget_names = [
             'threshold_spin', 'hash_workers_spin', 'comparison_workers_spin',
-            'batch_size_spin', 'hash_timeout_spin', 'comparison_timeout_spin'
+            'batch_size_spin', 'hash_timeout_spin', 'comparison_timeout_spin',
+            'subsequence_sample_interval_spin', 'subsequence_min_match_spin',
+            'subsequence_cache_memory_spin', 'enable_subsequence_check'
         ]
 
         for widget_name in widget_names:
@@ -318,7 +353,7 @@ class SettingsManager(QObject):
         Returns:
             Dictionary with analysis configuration parameters.
         """
-        return {
+        config = {
             'threshold': widgets['threshold_spin'].value(),
             'hash_workers': widgets['hash_workers_spin'].value(),
             'comparison_workers': widgets['comparison_workers_spin'].value(),
@@ -326,6 +361,25 @@ class SettingsManager(QObject):
             'hash_timeout': widgets['hash_timeout_spin'].value(),
             'comparison_timeout': widgets['comparison_timeout_spin'].value()
         }
+
+        # Add subsequence detection config if widgets exist
+        if 'enable_subsequence_check' in widgets and widgets['enable_subsequence_check'] is not None:
+            config['subsequence_detection'] = {
+                'enabled': widgets['enable_subsequence_check'].isChecked(),
+                'sample_interval': widgets.get('subsequence_sample_interval_spin', {}).get('value', lambda: 3.0)() if 'subsequence_sample_interval_spin' in widgets else 3.0,
+                'min_match_ratio': widgets.get('subsequence_min_match_spin', {}).get('value', lambda: 80.0)() if 'subsequence_min_match_spin' in widgets else 80.0,
+                'cache_memory_mb': widgets.get('subsequence_cache_memory_spin', {}).get('value', lambda: 500)() if 'subsequence_cache_memory_spin' in widgets else 500
+            }
+
+            # Better handling for actual widget values
+            if 'subsequence_sample_interval_spin' in widgets and widgets['subsequence_sample_interval_spin'] is not None:
+                config['subsequence_detection']['sample_interval'] = widgets['subsequence_sample_interval_spin'].value()
+            if 'subsequence_min_match_spin' in widgets and widgets['subsequence_min_match_spin'] is not None:
+                config['subsequence_detection']['min_match_ratio'] = widgets['subsequence_min_match_spin'].value() / 100.0  # Convert percentage to ratio
+            if 'subsequence_cache_memory_spin' in widgets and widgets['subsequence_cache_memory_spin'] is not None:
+                config['subsequence_detection']['cache_memory_mb'] = widgets['subsequence_cache_memory_spin'].value()
+
+        return config
 
     def is_loading(self) -> bool:
         """
