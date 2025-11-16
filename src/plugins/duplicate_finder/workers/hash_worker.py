@@ -12,6 +12,11 @@ from PyQt6.QtCore import QThread, pyqtSignal, QMutex
 
 from src.core.logger import Logger
 
+try:
+    from ..validators import ConfigValidator, FileValidator
+except ImportError:
+    from validators import ConfigValidator, FileValidator
+
 logger = Logger.get_logger('DuplicateFinder.HashWorker')
 
 
@@ -67,8 +72,16 @@ class ParallelHashWorker(QThread):
         super().__init__()
         self.files = files
         self.video_hasher = video_hasher
-        self.max_workers = min(max_workers, len(files))
-        self.timeout = timeout
+
+        # Validate max_workers
+        validated_workers = ConfigValidator.validate_workers(max_workers, 'max_workers')
+        # Don't exceed number of files to process
+        self.max_workers = min(validated_workers, max(1, len(files)))
+        logger.info(f"Hash worker using {self.max_workers} workers for {len(files)} files")
+
+        # Validate timeout
+        self.timeout = ConfigValidator.validate_timeout(timeout, 'hash_timeout')
+
         self._stop = False
         self._mutex = QMutex()
         self.processed_count = 0
@@ -113,15 +126,8 @@ class ParallelHashWorker(QThread):
             if self.video_hasher.has_hash(file_path):
                 return file_path, True
 
-            # Validate file exists
-            if not os.path.exists(file_path):
-                logger.warning(f"File not found: {file_path}")
-                return file_path, False
-
-            # Validate file size (minimum 10KB)
-            file_size = os.path.getsize(file_path)
-            if file_size < 10240:
-                logger.warning(f"File too small ({file_size} bytes): {filename}")
+            # Validate file using centralized validator
+            if not FileValidator.validate_video_file(file_path):
                 return file_path, False
 
             # Compute the hash

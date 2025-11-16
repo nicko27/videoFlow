@@ -12,6 +12,7 @@ import time
 from datetime import datetime
 from enum import Enum
 from .database_manager import VideoDatabase
+from .lru_cache import LRUCache
 from src.core.logger import Logger
 
 logger = Logger.get_logger('DuplicateFinder.VideoHasher')
@@ -67,10 +68,13 @@ class VideoHasher:
         self.method = method if isinstance(method, str) else method.value
         self.plugin_dir = os.path.dirname(__file__)
         self.db = VideoDatabase()
-        
-        # Cache mémoire PERMANENT pour toute la session
+
+        # Memory cache PERMANENT for entire session
         self.hash_cache = {}  # file_path -> (hash, duration, mtime)
-        self.comparison_cache = {}  # (file1, file2) -> similarity
+
+        # LRU cache for comparisons (limited to 10000 most recent)
+        # Prevents unlimited memory growth while keeping hot comparisons fast
+        self.comparison_cache = LRUCache(max_size=10000)
         
         # Positions ABSOLUES fixes pour cohérence
         # Frame indices exacts pour toutes the videos
@@ -154,7 +158,7 @@ class VideoHasher:
                 for file1, file2, similarity in cursor.fetchall():
                     # OPTIMIZATION: Pre-compute cache key to avoid repeated sorting
                     cache_key = (file1, file2) if file1 < file2 else (file2, file1)
-                    self.comparison_cache[cache_key] = similarity
+                    self.comparison_cache.set(cache_key, similarity)
                     loaded_comparisons += 1
 
                 if loaded_hashes > 0 or loaded_comparisons > 0:
@@ -362,8 +366,9 @@ class VideoHasher:
         cache_key = (video1_path, video2_path) if video1_path < video2_path else (video2_path, video1_path)
 
         # 2. Check memory cache (instant)
-        if cache_key in self.comparison_cache:
-            return self.comparison_cache[cache_key]
+        cached_value = self.comparison_cache.get(cache_key)
+        if cached_value is not None:
+            return cached_value
 
         # 3. OPTIMIZATION: Early exit for same file
         if video1_path == video2_path:
@@ -470,6 +475,9 @@ class VideoHasher:
         return {
             'hash_cache_size': len(self.hash_cache),
             'comparison_cache_size': len(self.comparison_cache),
+            'comparison_cache_hits': self.comparison_cache.hits,
+            'comparison_cache_misses': self.comparison_cache.misses,
+            'comparison_cache_hit_rate': self.comparison_cache.get_stats()['hit_rate'],
             'total_memory_items': len(self.hash_cache) + len(self.comparison_cache)
         }
 
@@ -510,7 +518,7 @@ class VideoHasher:
                 if cache_key not in self.comparison_cache:
                     result = self.db.get_cached_comparison(file1, file2)
                     if result is not None:
-                        self.comparison_cache[cache_key] = result
+                        self.comparison_cache.set(cache_key, result)
                         loaded += 1
             
             if loaded > 0:
@@ -538,8 +546,9 @@ class VideoHasher:
     def get_cached_comparison(self, file1, file2):
         # Check mémoire d'abord
         cache_key = tuple(sorted([file1, file2]))
-        if cache_key in self.comparison_cache:
-            return self.comparison_cache[cache_key]
+        cached_value = self.comparison_cache.get(cache_key)
+        if cached_value is not None:
+            return cached_value
         return self.db.get_cached_comparison(file1, file2)
     
     def get_statistics(self):

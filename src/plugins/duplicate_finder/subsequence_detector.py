@@ -125,6 +125,7 @@ class SubsequenceDetector:
         self.dense_cache = LRUCache(max_memory_mb=max_cache_memory_mb)
         self.sample_interval_seconds = sample_interval_seconds
         self.min_match_ratio = min_match_ratio
+        self._cancelled = False  # Cancellation flag
 
         logger.info(f"SubsequenceDetector initialized: {sample_interval_seconds}s intervals, "
                    f"{max_cache_memory_mb}MB cache limit, {min_match_ratio*100}% min match")
@@ -356,7 +357,7 @@ class SubsequenceDetector:
         """Detect all subsequences in a list of videos.
 
         Compares all pairs where one video could be a subsequence of another
-        based on duration.
+        based on duration. Can be cancelled by calling cancel().
 
         Args:
             video_files: List of video file paths
@@ -364,12 +365,19 @@ class SubsequenceDetector:
 
         Returns:
             List of tuples: (short_video, long_video, detection_result)
+            Empty list if cancelled
         """
         results = []
+        self._cancelled = False  # Reset cancellation flag
 
         # First, get durations for all videos (using standard hash which is cached)
         video_durations = {}
         for video_path in video_files:
+            # Check for cancellation
+            if self._cancelled:
+                logger.info("Subsequence detection cancelled during duration gathering")
+                return results
+
             try:
                 if video_path in self.hasher.hash_cache:
                     video_durations[video_path] = self.hasher.hash_cache[video_path]['duration']
@@ -407,6 +415,11 @@ class SubsequenceDetector:
         total = len(pairs)
         matches_found = 0
         for idx, (short_video, long_video) in enumerate(pairs):
+            # Check for cancellation
+            if self._cancelled:
+                logger.info(f"Subsequence detection cancelled after {idx} of {total} pairs checked")
+                return results
+
             if progress_callback:
                 progress_callback(
                     idx + 1,
@@ -431,6 +444,24 @@ class SubsequenceDetector:
                            f"({stats['usage_percent']:.1f}% of limit)")
 
         return results
+
+    def cancel(self):
+        """Cancel the ongoing subsequence detection.
+
+        Sets the cancellation flag which will be checked during the next
+        iteration of detect_all_subsequences(). Safe to call from any thread.
+        """
+        self._cancelled = True
+        logger.info("Subsequence detection cancellation requested")
+
+    def is_cancelled(self) -> bool:
+        """
+        Check if detection has been cancelled.
+
+        Returns:
+            True if cancelled, False otherwise
+        """
+        return self._cancelled
 
     def clear_cache(self):
         """Clear dense hash cache to free memory."""
