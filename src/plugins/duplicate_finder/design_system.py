@@ -3,9 +3,14 @@ Unified design system for the duplicate finder plugin.
 
 This module centralizes all design constants (colors, spacing, fonts, etc.)
 to ensure visual consistency across the entire plugin.
+
+Supports multiple themes that can be switched at runtime.
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .themes import Theme
 
 
 class Colors:

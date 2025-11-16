@@ -366,7 +366,9 @@ class DuplicateFinderWindow(QMainWindow):
         """
         from PyQt6.QtWidgets import QFileDialog
 
-        if folder_path is None:
+        # Ignore button checked state (boolean from clicked signal)
+        # Only use folder_path if it's actually a string path
+        if not isinstance(folder_path, str):
             folder_path = QFileDialog.getExistingDirectory(self, "Select folder")
 
         if not folder_path:
