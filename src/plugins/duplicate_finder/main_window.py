@@ -100,6 +100,10 @@ class DuplicateFinderWindow(QMainWindow):
         self.batch_size_spin = None
         self.hash_timeout_spin = None
         self.comparison_timeout_spin = None
+        self.enable_subsequence_check = None
+        self.subsequence_sample_interval_spin = None
+        self.subsequence_min_match_spin = None
+        self.subsequence_cache_memory_spin = None
 
         # Initialize managers and handlers
         self.settings_manager = SettingsManager()
@@ -219,6 +223,10 @@ class DuplicateFinderWindow(QMainWindow):
             self.batch_size_spin = params_tab.batch_size_spin
             self.hash_timeout_spin = params_tab.hash_timeout_spin
             self.comparison_timeout_spin = params_tab.comparison_timeout_spin
+            self.enable_subsequence_check = params_tab.enable_subsequence_check
+            self.subsequence_sample_interval_spin = params_tab.subsequence_sample_interval_spin
+            self.subsequence_min_match_spin = params_tab.subsequence_min_match_spin
+            self.subsequence_cache_memory_spin = params_tab.subsequence_cache_memory_spin
 
         # Extract button references
         for child in panel.findChildren(QWidget):
@@ -245,12 +253,18 @@ class DuplicateFinderWindow(QMainWindow):
         widgets = [
             self.threshold_spin, self.hash_workers_spin,
             self.comparison_workers_spin, self.batch_size_spin,
-            self.hash_timeout_spin, self.comparison_timeout_spin
+            self.hash_timeout_spin, self.comparison_timeout_spin,
+            self.subsequence_sample_interval_spin, self.subsequence_min_match_spin,
+            self.subsequence_cache_memory_spin
         ]
 
         for widget in widgets:
             if widget:
                 widget.valueChanged.connect(self._on_settings_changed)
+
+        # Connect checkbox separately (uses different signal)
+        if self.enable_subsequence_check:
+            self.enable_subsequence_check.stateChanged.connect(self._on_settings_changed)
 
     def _load_settings(self) -> None:
         """
@@ -272,7 +286,11 @@ class DuplicateFinderWindow(QMainWindow):
             'comparison_workers_spin': self.comparison_workers_spin,
             'batch_size_spin': self.batch_size_spin,
             'hash_timeout_spin': self.hash_timeout_spin,
-            'comparison_timeout_spin': self.comparison_timeout_spin
+            'comparison_timeout_spin': self.comparison_timeout_spin,
+            'enable_subsequence_check': self.enable_subsequence_check,
+            'subsequence_sample_interval_spin': self.subsequence_sample_interval_spin,
+            'subsequence_min_match_spin': self.subsequence_min_match_spin,
+            'subsequence_cache_memory_spin': self.subsequence_cache_memory_spin
         }
 
     def _on_settings_changed(self) -> None:
