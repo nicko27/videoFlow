@@ -69,7 +69,8 @@ class AnalysisHandler(QObject):
         progress_callback: Optional[Callable] = None,
         file_processed_callback: Optional[Callable] = None,
         current_file_callback: Optional[Callable] = None,
-        progress_details_callback: Optional[Callable] = None
+        progress_details_callback: Optional[Callable] = None,
+        subsequence_detector = None
     ) -> None:
         """
         Start hash computation for video files.
@@ -81,6 +82,7 @@ class AnalysisHandler(QObject):
             file_processed_callback: Optional callback when a file is processed.
             current_file_callback: Optional callback for current file updates.
             progress_details_callback: Optional callback for detailed progress.
+            subsequence_detector: Optional SubsequenceDetector for pre-computing dense hashes.
         """
         self.start_time = time.time()
         self.failed_files = []
@@ -93,12 +95,13 @@ class AnalysisHandler(QObject):
             QTimer.singleShot(100, self.hash_finished.emit)
             return
 
-        # Create and configure worker
+        # Create and configure worker (with optional dense hash pre-computation)
         self.hash_worker = ParallelHashWorker(
             files,
             self.video_hasher,
             config['hash_workers'],
-            config['hash_timeout']
+            config['hash_timeout'],
+            subsequence_detector=subsequence_detector
         )
 
         # Connect signals

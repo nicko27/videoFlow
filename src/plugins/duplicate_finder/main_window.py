@@ -804,15 +804,37 @@ class DuplicateFinderWindow(QMainWindow):
             "#007BFF", "#CCE5FF", "#007BFF"
         )
 
-        # Start hash analysis
+        # Get analysis configuration
         config = self.get_analysis_config()
+
+        # Pre-create subsequence detector if enabled (for dense hash pre-computation)
+        subsequence_detector_for_precompute = None
+        subseq_config = config.get('subsequence_detection', {})
+        if subseq_config.get('enabled', False):
+            logger.info("Subsequence detection enabled - creating detector for hash pre-computation")
+            from .subsequence_detector import SubsequenceDetector
+
+            subsequence_detector_for_precompute = SubsequenceDetector(
+                self.video_hasher,
+                max_cache_memory_mb=subseq_config.get('cache_memory_mb', 500),
+                sample_interval_seconds=subseq_config.get('sample_interval', 0.75),
+                min_match_ratio=subseq_config.get('min_match_ratio', 0.80),
+                temporal_window_frames=subseq_config.get('temporal_window_frames', 5),
+                sliding_window_tolerance=subseq_config.get('sliding_window_tolerance', 3),
+                enable_adaptive_refinement=subseq_config.get('enable_adaptive_refinement', False)
+            )
+            # Store it for later use in subsequence detection
+            self.subsequence_detector = subsequence_detector_for_precompute
+
+        # Start hash analysis (with optional dense hash pre-computation)
         self.analysis_handler.start_hash_analysis(
             valid_files,
             config,
             progress_callback=self.update_file_progress,
             file_processed_callback=self.update_file_processed,
             current_file_callback=self.update_current_file_display,
-            progress_details_callback=self.update_hash_progress_details
+            progress_details_callback=self.update_hash_progress_details,
+            subsequence_detector=subsequence_detector_for_precompute
         )
 
         # Initialize progress display
