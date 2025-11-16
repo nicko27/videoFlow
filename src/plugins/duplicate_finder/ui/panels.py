@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
-from ..progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator
+from ..progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator, HashDebugger
 from ..themes import get_current_theme
 
 
@@ -277,6 +277,38 @@ class UIPanels:
 
         layout.addWidget(workers_group)
 
+        # Comparison algorithm group
+        algo_group = QGroupBox("🚀 Comparison Algorithm")
+        algo_layout = QGridLayout(algo_group)
+        algo_layout.setSpacing(10)
+
+        algo_layout.addWidget(QLabel("Algorithm:"), 0, 0)
+        comparison_algorithm_combo = QComboBox()
+        comparison_algorithm_combo.addItem("Naïve (All pairs - Slow, 100% accurate)", "naive")
+        comparison_algorithm_combo.addItem("Ball Tree (Fast, 100% accurate)", "balltree")
+        comparison_algorithm_combo.addItem("Annoy (Very fast, ~98% accurate)", "annoy")
+        comparison_algorithm_combo.addItem("FAISS (Ultra fast, ~95-99% accurate)", "faiss")
+        comparison_algorithm_combo.setCurrentIndex(1)  # Ball Tree by default for good balance
+        comparison_algorithm_combo.setToolTip(
+            "Naïve: Compare all pairs (slow for 1000+ files)\n"
+            "Ball Tree: Good for 100-2000 files, 50x faster\n"
+            "Annoy: Best for 1000-10000 files, 200x faster\n"
+            "FAISS: Best for 2000+ files, 100-1000x faster\n\n"
+            "For 2000+ files, use FAISS or Annoy!"
+        )
+        algo_layout.addWidget(comparison_algorithm_combo, 0, 1)
+
+        # Info label
+        algo_info = QLabel(
+            "ℹ️ Faster algorithms use approximate search.\n"
+            "Ball Tree is exact. Annoy/FAISS trade tiny precision for huge speed."
+        )
+        algo_info.setStyleSheet("QLabel { color: #6C757D; font-size: 9px; padding: 5px; }")
+        algo_info.setWordWrap(True)
+        algo_layout.addWidget(algo_info, 1, 0, 1, 2)
+
+        layout.addWidget(algo_group)
+
         # Timeouts group
         timeout_group = QGroupBox("⏱️ Timeouts")
         timeout_layout = QGridLayout(timeout_group)
@@ -367,6 +399,11 @@ class UIPanels:
         subsequence_layout.addWidget(info_label, 4, 0, 1, 2)
 
         layout.addWidget(subsequence_group)
+
+        # Hash Debugging Tool
+        hash_debugger = HashDebugger()
+        layout.addWidget(hash_debugger)
+
         layout.addStretch()
 
         # Store widget references in tab for later access
@@ -375,12 +412,14 @@ class UIPanels:
         tab.hash_workers_spin = hash_workers_spin
         tab.comparison_workers_spin = comparison_workers_spin
         tab.batch_size_spin = batch_size_spin
+        tab.comparison_algorithm_combo = comparison_algorithm_combo
         tab.hash_timeout_spin = hash_timeout_spin
         tab.comparison_timeout_spin = comparison_timeout_spin
         tab.enable_subsequence_check = enable_subsequence_check
         tab.subsequence_sample_interval_spin = subsequence_sample_interval_spin
         tab.subsequence_min_match_spin = subsequence_min_match_spin
         tab.subsequence_cache_memory_spin = subsequence_cache_memory_spin
+        tab.hash_debugger = hash_debugger
 
         return tab
 

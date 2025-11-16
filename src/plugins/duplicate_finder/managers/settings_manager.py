@@ -97,6 +97,16 @@ class SettingsManager(QObject):
             self._load_widget_value(
                 widgets, 'batch_size_spin', 'batch_size', 50, int
             )
+
+            # Load comparison algorithm (combobox)
+            if 'comparison_algorithm_combo' in widgets and widgets['comparison_algorithm_combo'] is not None:
+                algorithm = self.settings.value('comparison_algorithm', 'balltree', type=str)
+                combo = widgets['comparison_algorithm_combo']
+                for i in range(combo.count()):
+                    if combo.itemData(i) == algorithm:
+                        combo.setCurrentIndex(i)
+                        break
+
             self._load_widget_value(
                 widgets, 'hash_timeout_spin', 'hash_timeout', 120, int
             )
@@ -162,6 +172,14 @@ class SettingsManager(QObject):
             self._save_widget_value(widgets, 'hash_workers_spin', 'hash_workers')
             self._save_widget_value(widgets, 'comparison_workers_spin', 'comparison_workers')
             self._save_widget_value(widgets, 'batch_size_spin', 'batch_size')
+
+            # Save comparison algorithm (combobox)
+            if 'comparison_algorithm_combo' in widgets and widgets['comparison_algorithm_combo'] is not None:
+                combo = widgets['comparison_algorithm_combo']
+                algorithm = combo.currentData()
+                if algorithm:
+                    self.settings.setValue('comparison_algorithm', algorithm)
+
             self._save_widget_value(widgets, 'hash_timeout_spin', 'hash_timeout')
             self._save_widget_value(widgets, 'comparison_timeout_spin', 'comparison_timeout')
 
@@ -378,8 +396,15 @@ class SettingsManager(QObject):
             'comparison_workers': widgets['comparison_workers_spin'].value(),
             'batch_size': widgets['batch_size_spin'].value(),
             'hash_timeout': widgets['hash_timeout_spin'].value(),
-            'comparison_timeout': widgets['comparison_timeout_spin'].value()
+            'comparison_timeout': widgets['comparison_timeout_spin'].value(),
+            'comparison_algorithm': 'balltree'  # Default
         }
+
+        # Get comparison algorithm if widget exists
+        if 'comparison_algorithm_combo' in widgets and widgets['comparison_algorithm_combo'] is not None:
+            algorithm = widgets['comparison_algorithm_combo'].currentData()
+            if algorithm:
+                config['comparison_algorithm'] = algorithm
 
         # Add subsequence detection config if widgets exist
         if 'enable_subsequence_check' in widgets and widgets['enable_subsequence_check'] is not None:

@@ -110,12 +110,14 @@ class DuplicateFinderWindow(QMainWindow):
         self.hash_workers_spin = None
         self.comparison_workers_spin = None
         self.batch_size_spin = None
+        self.comparison_algorithm_combo = None
         self.hash_timeout_spin = None
         self.comparison_timeout_spin = None
         self.enable_subsequence_check = None
         self.subsequence_sample_interval_spin = None
         self.subsequence_min_match_spin = None
         self.subsequence_cache_memory_spin = None
+        self.hash_debugger = None
 
         # Initialize managers and handlers
         self.settings_manager = SettingsManager()
@@ -149,6 +151,10 @@ class DuplicateFinderWindow(QMainWindow):
         # Create video hasher with selected method
         hash_method = self.hash_method_combo.currentData() if self.hash_method_combo else 'pHash'
         self.video_hasher = VideoHasher(method=hash_method)
+
+        # Set video hasher on hash debugger widget
+        if self.hash_debugger:
+            self.hash_debugger.set_video_hasher(self.video_hasher)
 
         # Initialize handlers after video_hasher is created
         self.file_handler = FileHandler(self.file_list_widget)
@@ -438,12 +444,14 @@ class DuplicateFinderWindow(QMainWindow):
             self.hash_workers_spin = params_tab.hash_workers_spin
             self.comparison_workers_spin = params_tab.comparison_workers_spin
             self.batch_size_spin = params_tab.batch_size_spin
+            self.comparison_algorithm_combo = params_tab.comparison_algorithm_combo
             self.hash_timeout_spin = params_tab.hash_timeout_spin
             self.comparison_timeout_spin = params_tab.comparison_timeout_spin
             self.enable_subsequence_check = params_tab.enable_subsequence_check
             self.subsequence_sample_interval_spin = params_tab.subsequence_sample_interval_spin
             self.subsequence_min_match_spin = params_tab.subsequence_min_match_spin
             self.subsequence_cache_memory_spin = params_tab.subsequence_cache_memory_spin
+            self.hash_debugger = params_tab.hash_debugger
 
         # Extract button references
         for child in panel.findChildren(QWidget):
@@ -497,6 +505,9 @@ class DuplicateFinderWindow(QMainWindow):
         if self.hash_method_combo:
             self.hash_method_combo.currentIndexChanged.connect(self._on_settings_changed)
 
+        if self.comparison_algorithm_combo:
+            self.comparison_algorithm_combo.currentIndexChanged.connect(self._on_settings_changed)
+
     def _load_settings(self) -> None:
         """
         Load saved settings.
@@ -517,6 +528,7 @@ class DuplicateFinderWindow(QMainWindow):
             'hash_workers_spin': self.hash_workers_spin,
             'comparison_workers_spin': self.comparison_workers_spin,
             'batch_size_spin': self.batch_size_spin,
+            'comparison_algorithm_combo': self.comparison_algorithm_combo,
             'hash_timeout_spin': self.hash_timeout_spin,
             'comparison_timeout_spin': self.comparison_timeout_spin,
             'enable_subsequence_check': self.enable_subsequence_check,
