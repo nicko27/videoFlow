@@ -111,6 +111,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.file_handler: Optional[FileHandler] = None
         self.analysis_handler: Optional[AnalysisHandler] = None
         self.duplicate_handler: Optional[DuplicateHandler] = None
+        self.subsequence_detector = None  # Will be created on demand
 
         # UI update timer
         self.status_update_timer = QTimer()
@@ -593,6 +594,96 @@ class DuplicateFinderWindow(QMainWindow):
         Handle comparison analysis completion.
         """
         self.comparison_progress.set_status("Complete", "#28A745")
+
+        # Check if subsequence detection is enabled
+        config = self.get_analysis_config()
+        if config.get('subsequence_detection', {}).get('enabled', False):
+            # Start subsequence detection
+            self._start_subsequence_detection()
+        else:
+            # No subsequence detection, finish analysis
+            self._finish_analysis()
+
+    def _start_subsequence_detection(self) -> None:
+        """
+        Start subsequence detection analysis.
+        """
+        try:
+            from .subsequence_detector import SubsequenceDetector
+
+            config = self.get_analysis_config()
+            subseq_config = config.get('subsequence_detection', {})
+
+            # Create detector if needed
+            if self.subsequence_detector is None:
+                self.subsequence_detector = SubsequenceDetector(
+                    hasher=self.video_hasher,
+                    max_cache_memory_mb=subseq_config.get('cache_memory_mb', 500),
+                    sample_interval_seconds=subseq_config.get('sample_interval', 3.0),
+                    min_match_ratio=subseq_config.get('min_match_ratio', 0.80)
+                )
+
+            # Update UI
+            self.status_indicator.update_status(
+                "🎬", "Detecting subsequences...",
+                "#17A2B8", "#D1ECF1", "#17A2B8"
+            )
+
+            # Get all files
+            files = self.file_handler.get_all_files()
+
+            # Detect subsequences
+            logger.info(f"Starting subsequence detection on {len(files)} files")
+
+            def progress_callback(current, total, message):
+                """Update progress display."""
+                self.comparison_progress.update_progress(current, total, message)
+                self.force_ui_update()
+
+            subsequences = self.subsequence_detector.detect_all_subsequences(
+                files,
+                progress_callback=progress_callback
+            )
+
+            # Store results in database
+            for short_video, long_video, result in subsequences:
+                self.video_hasher.db.store_subsequence_detection(
+                    short_video,
+                    long_video,
+                    result['match_ratio'],
+                    result['start_frame_idx'],
+                    result['confidence']
+                )
+
+            logger.info(f"Subsequence detection complete: {len(subsequences)} found")
+
+            # Show results
+            if len(subsequences) > 0:
+                QMessageBox.information(
+                    self,
+                    "Subsequences Found",
+                    f"Found {len(subsequences)} video subsequence(s)!\n\n"
+                    f"These are shorter videos extracted from longer ones.\n"
+                    f"Check the database for details."
+                )
+
+            # Finish analysis
+            self._finish_analysis()
+
+        except Exception as e:
+            logger.error(f"Error during subsequence detection: {e}")
+            QMessageBox.warning(
+                self,
+                "Subsequence Detection Error",
+                f"An error occurred during subsequence detection:\n{str(e)}\n\n"
+                f"Continuing with duplicate results..."
+            )
+            self._finish_analysis()
+
+    def _finish_analysis(self) -> None:
+        """
+        Complete the analysis and show results.
+        """
         self.stop_ui_updates()
 
         duplicates_count = self.duplicate_handler.get_duplicate_count()
