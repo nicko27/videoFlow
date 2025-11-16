@@ -120,7 +120,7 @@ class SettingsManager(QObject):
             self.settings.beginGroup("subsequence_detection")
 
             self._load_widget_value(
-                widgets, 'subsequence_sample_interval_spin', 'sample_interval', 3.0, float
+                widgets, 'subsequence_sample_interval_spin', 'sample_interval', 0.75, float
             )
             self._load_widget_value(
                 widgets, 'subsequence_min_match_spin', 'min_match_ratio', 80.0, float

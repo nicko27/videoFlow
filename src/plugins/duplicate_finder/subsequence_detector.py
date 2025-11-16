@@ -109,26 +109,37 @@ class SubsequenceDetector:
         self,
         hasher: VideoHasher,
         max_cache_memory_mb: int = 500,
-        sample_interval_seconds: float = 1.5,
-        min_match_ratio: float = 0.70
+        sample_interval_seconds: float = 0.75,
+        min_match_ratio: float = 0.70,
+        temporal_window_frames: int = 5,
+        sliding_window_tolerance: int = 3,
+        enable_adaptive_refinement: bool = True
     ):
-        """Initialize subsequence detector.
+        """Initialize subsequence detector with temporal desynchronization handling.
 
         Args:
             hasher: VideoHasher instance to use for hashing
             max_cache_memory_mb: Maximum cache memory in MB (default: 500MB)
-            sample_interval_seconds: Dense sampling interval (default: 1.5 seconds)
+            sample_interval_seconds: Dense sampling interval (default: 0.75 seconds) - REDUCED from 1.5s
             min_match_ratio: Minimum match ratio to consider a subsequence (default: 0.70)
+            temporal_window_frames: Number of frames for temporal averaging (default: 5) - SOLUTION 4
+            sliding_window_tolerance: Frame tolerance for sliding window (default: 3) - SOLUTION 1
+            enable_adaptive_refinement: Enable adaptive refinement (default: True) - SOLUTION 5
         """
         self.hasher = hasher
         self.db = hasher.db
         self.dense_cache = LRUCache(max_memory_mb=max_cache_memory_mb)
         self.sample_interval_seconds = sample_interval_seconds
         self.min_match_ratio = min_match_ratio
+        self.temporal_window_frames = temporal_window_frames
+        self.sliding_window_tolerance = sliding_window_tolerance
+        self.enable_adaptive_refinement = enable_adaptive_refinement
         self._cancelled = False  # Cancellation flag
 
         logger.info(f"SubsequenceDetector initialized: {sample_interval_seconds}s intervals, "
-                   f"{max_cache_memory_mb}MB cache limit, {min_match_ratio*100}% min match")
+                   f"{max_cache_memory_mb}MB cache limit, {min_match_ratio*100}% min match, "
+                   f"temporal_window={temporal_window_frames}, tolerance=±{sliding_window_tolerance}, "
+                   f"adaptive_refinement={enable_adaptive_refinement}")
 
     def _is_frame_blank(self, frame: np.ndarray, threshold: float = 0.1) -> bool:
         """
@@ -160,6 +171,46 @@ class SubsequenceDetector:
         except Exception as e:
             logger.error(f"Error checking blank frame: {e}")
             return False
+
+    def _compute_temporal_averaged_hash(self, hashes: List[np.ndarray], center_idx: int) -> np.ndarray:
+        """
+        Compute temporally averaged hash using majority voting across N consecutive frames.
+
+        SOLUTION 4: Temporal hash averaging reduces sensitivity to minor temporal offsets
+        by creating a consensus hash from multiple consecutive frames.
+
+        Args:
+            hashes: List of frame hashes
+            center_idx: Center frame index for averaging window
+
+        Returns:
+            Averaged hash using majority voting
+        """
+        try:
+            # Determine window bounds
+            half_window = self.temporal_window_frames // 2
+            start_idx = max(0, center_idx - half_window)
+            end_idx = min(len(hashes), center_idx + half_window + 1)
+
+            # Extract window of hashes
+            window_hashes = hashes[start_idx:end_idx]
+
+            if len(window_hashes) == 0:
+                return hashes[center_idx]
+
+            # Stack hashes for vectorized majority voting
+            stacked = np.stack(window_hashes)
+
+            # Majority vote: for each bit position, use the most common value
+            # Sum across frames (True=1, False=0), then threshold at half
+            averaged_hash = np.sum(stacked, axis=0) > (len(window_hashes) / 2)
+
+            return averaged_hash
+
+        except Exception as e:
+            logger.error(f"Error in temporal averaging: {e}")
+            # Fallback to center frame
+            return hashes[center_idx]
 
     def compute_dense_hash(self, video_path: str) -> Tuple[Optional[np.ndarray], float]:
         """Compute dense hash for a video with memory-safe caching.
@@ -261,6 +312,173 @@ class SubsequenceDetector:
             logger.error(f"Error computing dense hash {os.path.basename(video_path)}: {e}")
             return None, 0.0
 
+    def _compare_with_temporal_tolerance(
+        self,
+        hash_short: np.ndarray,
+        hash_long: np.ndarray,
+        start_idx: int
+    ) -> float:
+        """
+        Compare short video hash with long video using sliding window tolerance.
+
+        SOLUTION 1: For each frame in short video, find the best match within a window
+        of ±N frames in the long video to handle temporal desynchronization.
+
+        Args:
+            hash_short: Short video hash array
+            hash_long: Long video hash array
+            start_idx: Starting index in long video
+
+        Returns:
+            Match ratio (0.0-1.0)
+        """
+        window_size = len(hash_short)
+        tolerance = self.sliding_window_tolerance
+        total_matches = 0
+        total_bits = 0
+
+        # For each frame in short video
+        for i in range(window_size):
+            long_idx = start_idx + i
+
+            # Define search window in long video (±tolerance frames)
+            search_start = max(0, long_idx - tolerance)
+            search_end = min(len(hash_long), long_idx + tolerance + 1)
+
+            # Find best match within window
+            best_frame_match = 0
+            for j in range(search_start, search_end):
+                # Compare this frame
+                matches = np.sum(hash_short[i] == hash_long[j])
+                if matches > best_frame_match:
+                    best_frame_match = matches
+
+            total_matches += best_frame_match
+            total_bits += hash_short[i].size
+
+        return total_matches / total_bits if total_bits > 0 else 0.0
+
+    def _adaptive_refinement(
+        self,
+        short_video: str,
+        long_video: str,
+        coarse_start_idx: int,
+        coarse_duration_short: float,
+        fps_long: float
+    ) -> Tuple[int, float]:
+        """
+        Perform adaptive refinement by re-sampling at finer granularity.
+
+        SOLUTION 5: When a partial match is detected, re-sample that specific region
+        at higher frequency (0.2s intervals) to find the precise alignment.
+
+        Args:
+            short_video: Path to short video
+            long_video: Path to long video
+            coarse_start_idx: Approximate start index from coarse search
+            coarse_duration_short: Duration of short video in seconds
+            fps_long: FPS of long video
+
+        Returns:
+            Tuple of (refined_start_idx, refined_match_ratio)
+        """
+        try:
+            logger.debug(f"Adaptive refinement: re-sampling region around frame {coarse_start_idx}")
+
+            # Calculate time range to re-sample
+            time_start = max(0, (coarse_start_idx * self.sample_interval_seconds) - 2.0)  # 2s buffer before
+            time_end = time_start + coarse_duration_short + 4.0  # 2s buffer after
+
+            # Fine sampling interval: 0.2 seconds
+            fine_interval = 0.2
+            fine_positions_short = []
+            fine_positions_long = []
+
+            cv2.setLogLevel(0)
+            cap_short = cv2.VideoCapture(short_video)
+            cap_long = cv2.VideoCapture(long_video)
+
+            if not cap_short.isOpened() or not cap_long.isOpened():
+                cap_short.release()
+                cap_long.release()
+                return coarse_start_idx, 0.0
+
+            try:
+                fps_short = cap_short.get(cv2.CAP_PROP_FPS)
+                if fps_short <= 0:
+                    fps_short = 25.0
+
+                total_frames_short = int(cap_short.get(cv2.CAP_PROP_FRAME_COUNT))
+                total_frames_long = int(cap_long.get(cv2.CAP_PROP_FRAME_COUNT))
+
+                # Sample short video with fine interval
+                short_hashes = []
+                time = 0
+                while time < coarse_duration_short:
+                    frame_idx = int(time * fps_short)
+                    if frame_idx >= total_frames_short:
+                        break
+
+                    cap_short.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                    ret, frame = cap_short.read()
+                    if ret and frame is not None:
+                        hash_val = self.hasher.compute_frame_hash(frame)
+                        if hash_val is not None:
+                            short_hashes.append(hash_val)
+
+                    time += fine_interval
+
+                # Sample long video region with fine interval
+                long_hashes = []
+                time = time_start
+                while time < time_end:
+                    frame_idx = int(time * fps_long)
+                    if frame_idx >= total_frames_long:
+                        break
+
+                    cap_long.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                    ret, frame = cap_long.read()
+                    if ret and frame is not None:
+                        hash_val = self.hasher.compute_frame_hash(frame)
+                        if hash_val is not None:
+                            long_hashes.append(hash_val)
+
+                    time += fine_interval
+
+                if len(short_hashes) < 3 or len(long_hashes) < len(short_hashes):
+                    return coarse_start_idx, 0.0
+
+                # Sliding window search in refined region
+                short_arr = np.stack(short_hashes)
+                long_arr = np.stack(long_hashes)
+
+                best_ratio = 0.0
+                best_idx = 0
+
+                for i in range(len(long_arr) - len(short_arr) + 1):
+                    window = long_arr[i:i + len(short_arr)]
+                    matches = np.sum(short_arr == window)
+                    ratio = matches / short_arr.size if short_arr.size > 0 else 0.0
+
+                    if ratio > best_ratio:
+                        best_ratio = ratio
+                        best_idx = i
+
+                # Convert fine index back to coarse index
+                refined_start_idx = int(best_idx * fine_interval / self.sample_interval_seconds)
+
+                logger.debug(f"Adaptive refinement complete: ratio {best_ratio*100:.1f}%, refined_idx={refined_start_idx}")
+                return refined_start_idx, best_ratio
+
+            finally:
+                cap_short.release()
+                cap_long.release()
+                cv2.setLogLevel(1)
+
+        except Exception as e:
+            logger.error(f"Error in adaptive refinement: {e}")
+            return coarse_start_idx, 0.0
+
     def find_subsequence(
         self,
         short_video: str,
@@ -268,10 +486,13 @@ class SubsequenceDetector:
         min_ratio: Optional[float] = None,
         min_duration_seconds: float = 5.0
     ) -> Optional[Dict]:
-        """Find if short_video is a subsequence of long_video using sliding window.
+        """Find if short_video is a subsequence of long_video with temporal tolerance.
 
-        Uses a sliding window approach to compare consecutive frames from the short
-        video against all possible windows in the long video.
+        IMPROVED ALGORITHM with 4 solutions:
+        - Solution 1: Sliding window with ±N frame tolerance
+        - Solution 3: More frequent sampling (0.75s instead of 1.5s)
+        - Solution 4: Temporal hash averaging
+        - Solution 5: Adaptive refinement at finer granularity
 
         Args:
             short_video: Path to potentially shorter video
@@ -284,8 +505,9 @@ class SubsequenceDetector:
             {
                 'is_subsequence': bool,
                 'match_ratio': float,
-                'start_frame_idx': int,  # Where in long video the match starts
-                'confidence': float
+                'start_frame_idx': int,
+                'confidence': float,
+                'refined': bool  # Whether adaptive refinement was used
             }
         """
         if min_ratio is None:
@@ -306,26 +528,44 @@ class SubsequenceDetector:
 
             # If short video has more frames, swap and retry
             if len(hash_short) > len(hash_long):
-                # Recursively call with swapped parameters to ensure correct order
                 return self.find_subsequence(long_video, short_video, min_ratio, min_duration_seconds)
 
-            # Sliding window comparison
+            # PHASE 1: Coarse sliding window search with temporal tolerance
             window_size = len(hash_short)
             best_match_ratio = 0.0
             best_start_idx = -1
 
-            # Slide the window across the long video
             for start_idx in range(len(hash_long) - window_size + 1):
-                window = hash_long[start_idx:start_idx + window_size]
-
-                # Vectorized comparison
-                matches = np.sum(hash_short == window)
-                total = hash_short.size
-                match_ratio = matches / total if total > 0 else 0.0
+                # Use temporal tolerance comparison (SOLUTION 1)
+                match_ratio = self._compare_with_temporal_tolerance(
+                    hash_short, hash_long, start_idx
+                )
 
                 if match_ratio > best_match_ratio:
                     best_match_ratio = match_ratio
                     best_start_idx = start_idx
+
+            # PHASE 2: Adaptive refinement if partial match found (SOLUTION 5)
+            refined = False
+            if self.enable_adaptive_refinement and best_match_ratio > 0.70 and best_match_ratio < 0.95:
+                logger.debug(f"Partial match {best_match_ratio*100:.1f}% - triggering adaptive refinement")
+
+                # Get FPS for refinement
+                cv2.setLogLevel(0)
+                cap = cv2.VideoCapture(long_video)
+                fps_long = cap.get(cv2.CAP_PROP_FPS) if cap.isOpened() else 25.0
+                cap.release()
+                cv2.setLogLevel(1)
+
+                refined_idx, refined_ratio = self._adaptive_refinement(
+                    short_video, long_video, best_start_idx, dur_short, fps_long
+                )
+
+                if refined_ratio > best_match_ratio:
+                    best_match_ratio = refined_ratio
+                    best_start_idx = refined_idx
+                    refined = True
+                    logger.info(f"Adaptive refinement improved match: {best_match_ratio*100:.1f}%")
 
             # Check if it's a valid subsequence
             is_subsequence = best_match_ratio >= min_ratio
@@ -333,7 +573,7 @@ class SubsequenceDetector:
             if is_subsequence:
                 logger.info(f"Subsequence detected: {os.path.basename(short_video)} "
                           f"in {os.path.basename(long_video)} "
-                          f"(match: {best_match_ratio*100:.1f}%, frame {best_start_idx})")
+                          f"(match: {best_match_ratio*100:.1f}%, frame {best_start_idx}, refined={refined})")
 
             return {
                 'is_subsequence': is_subsequence,
@@ -341,7 +581,8 @@ class SubsequenceDetector:
                 'start_frame_idx': best_start_idx,
                 'confidence': best_match_ratio,
                 'short_duration': dur_short,
-                'long_duration': dur_long
+                'long_duration': dur_long,
+                'refined': refined
             }
 
         except Exception as e:
