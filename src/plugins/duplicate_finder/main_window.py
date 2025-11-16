@@ -819,10 +819,18 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Check if subsequence detection is enabled
         config = self.get_analysis_config()
-        if config.get('subsequence_detection', {}).get('enabled', False):
+        subseq_config = config.get('subsequence_detection', {})
+        is_enabled = subseq_config.get('enabled', False)
+
+        logger.info(f"Subsequence detection enabled: {is_enabled}")
+        if is_enabled:
+            logger.info(f"Subsequence parameters: sample_interval={subseq_config.get('sample_interval')}s, "
+                       f"min_match_ratio={subseq_config.get('min_match_ratio', 0)*100:.1f}%, "
+                       f"cache_memory={subseq_config.get('cache_memory_mb')}MB")
             # Start subsequence detection
             self._start_subsequence_detection()
         else:
+            logger.info("Subsequence detection skipped (not enabled)")
             # No subsequence detection, finish analysis
             self._finish_analysis()
 
@@ -841,8 +849,8 @@ class DuplicateFinderWindow(QMainWindow):
                 self.subsequence_detector = SubsequenceDetector(
                     hasher=self.video_hasher,
                     max_cache_memory_mb=subseq_config.get('cache_memory_mb', 500),
-                    sample_interval_seconds=subseq_config.get('sample_interval', 1.5),
-                    min_match_ratio=subseq_config.get('min_match_ratio', 0.70)
+                    sample_interval_seconds=subseq_config.get('sample_interval', 3.0),
+                    min_match_ratio=subseq_config.get('min_match_ratio', 0.80)
                 )
 
             # Update UI

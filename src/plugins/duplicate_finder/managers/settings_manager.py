@@ -110,10 +110,10 @@ class SettingsManager(QObject):
             self.settings.beginGroup("subsequence_detection")
 
             self._load_widget_value(
-                widgets, 'subsequence_sample_interval_spin', 'sample_interval', 1.5, float
+                widgets, 'subsequence_sample_interval_spin', 'sample_interval', 3.0, float
             )
             self._load_widget_value(
-                widgets, 'subsequence_min_match_spin', 'min_match_ratio', 70.0, float
+                widgets, 'subsequence_min_match_spin', 'min_match_ratio', 80.0, float
             )
             self._load_widget_value(
                 widgets, 'subsequence_cache_memory_spin', 'cache_memory_mb', 500, int
@@ -383,21 +383,30 @@ class SettingsManager(QObject):
 
         # Add subsequence detection config if widgets exist
         if 'enable_subsequence_check' in widgets and widgets['enable_subsequence_check'] is not None:
-            # Initialize with defaults
-            config['subsequence_detection'] = {
-                'enabled': widgets['enable_subsequence_check'].isChecked(),
-                'sample_interval': 1.5,
-                'min_match_ratio': 0.70,
-                'cache_memory_mb': 500
-            }
+            # Get enabled status
+            enabled = widgets['enable_subsequence_check'].isChecked()
+
+            # Get actual widget values (with defaults matching UI)
+            sample_interval = 3.0  # Default from UI
+            min_match_ratio = 0.80  # Default 80% from UI, converted to ratio
+            cache_memory_mb = 500  # Default from UI
 
             # Override with actual widget values if available
             if 'subsequence_sample_interval_spin' in widgets and widgets['subsequence_sample_interval_spin'] is not None:
-                config['subsequence_detection']['sample_interval'] = widgets['subsequence_sample_interval_spin'].value()
+                sample_interval = widgets['subsequence_sample_interval_spin'].value()
+
             if 'subsequence_min_match_spin' in widgets and widgets['subsequence_min_match_spin'] is not None:
-                config['subsequence_detection']['min_match_ratio'] = widgets['subsequence_min_match_spin'].value() / 100.0  # Convert percentage to ratio
+                min_match_ratio = widgets['subsequence_min_match_spin'].value() / 100.0  # Convert percentage to ratio
+
             if 'subsequence_cache_memory_spin' in widgets and widgets['subsequence_cache_memory_spin'] is not None:
-                config['subsequence_detection']['cache_memory_mb'] = widgets['subsequence_cache_memory_spin'].value()
+                cache_memory_mb = widgets['subsequence_cache_memory_spin'].value()
+
+            config['subsequence_detection'] = {
+                'enabled': enabled,
+                'sample_interval': sample_interval,
+                'min_match_ratio': min_match_ratio,
+                'cache_memory_mb': cache_memory_mb
+            }
 
         return config
 
