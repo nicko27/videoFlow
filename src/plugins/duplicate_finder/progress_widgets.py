@@ -3,7 +3,7 @@ Widgets de progression modernes - Version with TEXTE NOIR VISIBLE
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame, QScrollArea
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QPalette, QColor
 
 try:

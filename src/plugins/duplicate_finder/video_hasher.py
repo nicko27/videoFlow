@@ -9,7 +9,6 @@ import cv2
 import numpy as np
 import os
 import time
-from datetime import datetime
 from enum import Enum
 from .database_manager import VideoDatabase
 from .lru_cache import LRUCache
@@ -99,7 +98,7 @@ class VideoHasher:
         else:
             logger.debug("Cache preloading disabled")
 
-        logger.debug(f"VideoHasher initialized with permanent memory cache")
+        logger.debug("VideoHasher initialized with permanent memory cache")
 
     def _preload_cache(self, max_items=1000, progress_callback=None):
         """Smart cache preloading with limits and file existence checks.

@@ -77,6 +77,17 @@ class SettingsManager(QObject):
             self._load_widget_value(
                 widgets, 'threshold_spin', 'threshold', 90.0, float
             )
+
+            # Load hash method (combobox)
+            if 'hash_method_combo' in widgets and widgets['hash_method_combo'] is not None:
+                hash_method = self.settings.value('hash_method', 'pHash', type=str)
+                combo = widgets['hash_method_combo']
+                # Find and set the index for the saved method
+                for i in range(combo.count()):
+                    if combo.itemData(i) == hash_method:
+                        combo.setCurrentIndex(i)
+                        break
+
             self._load_widget_value(
                 widgets, 'hash_workers_spin', 'hash_workers', 2, int
             )
@@ -140,6 +151,14 @@ class SettingsManager(QObject):
             self.settings.beginGroup("parameters")
 
             self._save_widget_value(widgets, 'threshold_spin', 'threshold')
+
+            # Save hash method (combobox)
+            if 'hash_method_combo' in widgets and widgets['hash_method_combo'] is not None:
+                combo = widgets['hash_method_combo']
+                hash_method = combo.currentData()
+                if hash_method:
+                    self.settings.setValue('hash_method', hash_method)
+
             self._save_widget_value(widgets, 'hash_workers_spin', 'hash_workers')
             self._save_widget_value(widgets, 'comparison_workers_spin', 'comparison_workers')
             self._save_widget_value(widgets, 'batch_size_spin', 'batch_size')

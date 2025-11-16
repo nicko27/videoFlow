@@ -5,7 +5,7 @@ This module handles all file-related operations including adding files,
 managing file lists, and validating file paths.
 """
 import os
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 from PyQt6.QtWidgets import QFileDialog
 
 from src.core.logger import Logger
