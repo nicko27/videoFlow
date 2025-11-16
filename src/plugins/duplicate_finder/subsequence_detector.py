@@ -143,14 +143,15 @@ class SubsequenceDetector:
             # Fallback to center frame
             return hashes[center_idx]
 
-    def compute_dense_hash(self, video_path: str) -> Tuple[Optional[np.ndarray], float]:
-        """Compute dense hash for a video with memory-safe caching.
+    def compute_dense_hash(self, video_path: str, progress_callback=None) -> Tuple[Optional[np.ndarray], float]:
+        """Compute dense hash for a video with memory-safe caching and progress feedback.
 
         Samples frames at regular intervals (default: every 3 seconds) for better
         subsequence detection. Results are cached in memory-bounded LRU cache.
 
         Args:
             video_path: Path to video file
+            progress_callback: Optional callback(current, total, message) for progress updates
 
         Returns:
             Tuple of (hash_array, duration) or (None, 0.0) on error
@@ -158,6 +159,8 @@ class SubsequenceDetector:
         # Check LRU cache first
         cached = self.dense_cache.get(video_path)
         if cached is not None:
+            if progress_callback:
+                progress_callback(1, 1, "Loaded from cache")
             return cached['hash'], cached['duration']
 
         try:
@@ -201,7 +204,12 @@ class SubsequenceDetector:
                     positions = [p for p in positions if p < total_frames]
 
                 hashes = []
-                for frame_idx in positions:
+                total_positions = len(positions)
+                for idx, frame_idx in enumerate(positions):
+                    # Progress callback every 10 frames or on first/last frame
+                    if progress_callback and (idx % 10 == 0 or idx == 0 or idx == total_positions - 1):
+                        progress_callback(idx + 1, total_positions, f"Sampling frame {idx + 1}/{total_positions}")
+
                     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
                     ret, frame = cap.read()
 

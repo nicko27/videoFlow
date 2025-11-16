@@ -32,6 +32,11 @@ class KeyboardShortcuts:
     # Space for play/pause (future feature)
     NAV_PLAY_PAUSE = Qt.Key.Key_Space
 
+    # Video synchronization shortcuts
+    SYNC_PLAY_BOTH = Qt.Key.Key_P
+    SYNC_PAUSE_BOTH = Qt.Key.Key_Pause
+    SYNC_RESYNC = Qt.Key.Key_R
+
     @staticmethod
     def get_comparison_shortcuts_help() -> str:
         """Get help text for comparison dialog shortcuts.
