@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
-from ..progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator
+from ..progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator, HashDebugger
 from ..themes import get_current_theme
 
 
@@ -399,6 +399,11 @@ class UIPanels:
         subsequence_layout.addWidget(info_label, 4, 0, 1, 2)
 
         layout.addWidget(subsequence_group)
+
+        # Hash Debugging Tool
+        hash_debugger = HashDebugger()
+        layout.addWidget(hash_debugger)
+
         layout.addStretch()
 
         # Store widget references in tab for later access
@@ -414,6 +419,7 @@ class UIPanels:
         tab.subsequence_sample_interval_spin = subsequence_sample_interval_spin
         tab.subsequence_min_match_spin = subsequence_min_match_spin
         tab.subsequence_cache_memory_spin = subsequence_cache_memory_spin
+        tab.hash_debugger = hash_debugger
 
         return tab
 

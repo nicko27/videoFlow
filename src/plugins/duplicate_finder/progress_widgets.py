@@ -2,7 +2,9 @@
 Widgets de progression modernes - Version with TEXTE NOIR VISIBLE
 """
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame, QScrollArea
+import os
+import numpy as np
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame, QScrollArea, QPushButton, QTextEdit
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QPalette, QColor
 
@@ -612,3 +614,301 @@ class StatsCounter(QFrame):
         """Reset all counters to zero."""
         self.update_duplicates(0)
         self.update_subsequences(0)
+
+
+class HashDebugger(QFrame):
+    """Widget for manual hash calculation and debugging."""
+
+    def __init__(self, video_hasher=None, parent=None):
+        super().__init__(parent)
+        self.video_hasher = video_hasher
+        self.selected_files = []
+        self.hash_results = {}
+        self.setup_ui()
+
+    def setup_ui(self):
+        """Configure the hash debugger UI."""
+        self.setStyleSheet("""
+            QFrame {
+                background-color: #FFF8DC;
+                border: 2px solid #FFD700;
+                border-radius: 8px;
+                padding: 12px;
+            }
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
+
+        # Title
+        title_label = QLabel("🔬 Hash Debugging Tool")
+        title_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: #B8860B; border: none; padding: 0;")
+        layout.addWidget(title_label)
+
+        # Description
+        desc_label = QLabel("Manually calculate and compare video hashes for debugging")
+        desc_label.setFont(QFont("Arial", 9))
+        desc_label.setStyleSheet("color: #666; border: none; padding: 0;")
+        desc_label.setWordWrap(True)
+        layout.addWidget(desc_label)
+
+        # File selection area
+        file_selection_layout = QHBoxLayout()
+
+        self.select_btn = QPushButton("📁 Select Video(s)")
+        self.select_btn.setMinimumHeight(32)
+        self.select_btn.clicked.connect(self._select_files)
+        self.select_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        file_selection_layout.addWidget(self.select_btn)
+
+        self.clear_btn = QPushButton("🗑️ Clear")
+        self.clear_btn.setMinimumHeight(32)
+        self.clear_btn.clicked.connect(self._clear_files)
+        self.clear_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #da190b;
+            }
+        """)
+        file_selection_layout.addWidget(self.clear_btn)
+
+        file_selection_layout.addStretch()
+        layout.addLayout(file_selection_layout)
+
+        # Selected files display
+        self.files_text = QTextEdit()
+        self.files_text.setReadOnly(True)
+        self.files_text.setMaximumHeight(80)
+        self.files_text.setPlaceholderText("No files selected")
+        self.files_text.setStyleSheet("""
+            QTextEdit {
+                background-color: white;
+                border: 1px solid #DDD;
+                border-radius: 4px;
+                padding: 6px;
+                font-family: monospace;
+                font-size: 9pt;
+            }
+        """)
+        layout.addWidget(self.files_text)
+
+        # Calculate button
+        self.calculate_btn = QPushButton("⚡ Calculate Hashes")
+        self.calculate_btn.setMinimumHeight(36)
+        self.calculate_btn.clicked.connect(self._calculate_hashes)
+        self.calculate_btn.setEnabled(False)
+        self.calculate_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+                font-size: 11pt;
+            }
+            QPushButton:hover:enabled {
+                background-color: #0b7dda;
+            }
+            QPushButton:disabled {
+                background-color: #CCC;
+            }
+        """)
+        layout.addWidget(self.calculate_btn)
+
+        # Results display
+        results_label = QLabel("Results:")
+        results_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        results_label.setStyleSheet("color: #333; border: none; padding: 0;")
+        layout.addWidget(results_label)
+
+        self.results_text = QTextEdit()
+        self.results_text.setReadOnly(True)
+        self.results_text.setMinimumHeight(200)
+        self.results_text.setPlaceholderText("Hash results will appear here")
+        self.results_text.setStyleSheet("""
+            QTextEdit {
+                background-color: white;
+                border: 1px solid #DDD;
+                border-radius: 4px;
+                padding: 8px;
+                font-family: monospace;
+                font-size: 9pt;
+            }
+        """)
+        layout.addWidget(self.results_text)
+
+    def set_video_hasher(self, video_hasher):
+        """Set the video hasher instance."""
+        self.video_hasher = video_hasher
+
+    def _select_files(self):
+        """Open file dialog to select video files."""
+        from PyQt6.QtWidgets import QFileDialog
+
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Select Video Files (1-2 videos)",
+            "",
+            "Video Files (*.mp4 *.avi *.mkv *.mov *.wmv *.flv *.webm);;All Files (*.*)"
+        )
+
+        if files:
+            # Limit to 2 files for comparison
+            self.selected_files = files[:2]
+            self._update_files_display()
+            self.calculate_btn.setEnabled(True)
+
+    def _clear_files(self):
+        """Clear selected files and results."""
+        self.selected_files = []
+        self.hash_results = {}
+        self.files_text.clear()
+        self.results_text.clear()
+        self.calculate_btn.setEnabled(False)
+
+    def _update_files_display(self):
+        """Update the files display."""
+        if self.selected_files:
+            text = "\n".join([f"{i+1}. {os.path.basename(f)}" for i, f in enumerate(self.selected_files)])
+            self.files_text.setPlainText(text)
+        else:
+            self.files_text.clear()
+
+    def _calculate_hashes(self):
+        """Calculate hashes for selected files."""
+        if not self.video_hasher:
+            self.results_text.setPlainText("ERROR: No video hasher available")
+            return
+
+        if not self.selected_files:
+            return
+
+        from src.core.logger import Logger
+        logger = Logger.get_logger('DuplicateFinder.HashDebugger')
+
+        self.results_text.clear()
+        self.hash_results = {}
+        results = []
+
+        results.append("=" * 70)
+        results.append("HASH CALCULATION RESULTS")
+        results.append("=" * 70)
+        results.append(f"Hash Method: {self.video_hasher.method}")
+        results.append("")
+
+        # Calculate hash for each file
+        for i, file_path in enumerate(self.selected_files):
+            results.append(f"\n{'─' * 70}")
+            results.append(f"File {i+1}: {os.path.basename(file_path)}")
+            results.append(f"Path: {file_path}")
+            results.append(f"{'─' * 70}")
+
+            try:
+                # Calculate hash
+                import time
+                start_time = time.time()
+                video_hash, duration = self.video_hasher.compute_video_hash(file_path)
+                calc_time = time.time() - start_time
+
+                if video_hash is not None:
+                    self.hash_results[file_path] = video_hash
+
+                    results.append(f"✓ Hash calculated successfully")
+                    results.append(f"  Duration: {duration:.2f}s")
+                    results.append(f"  Calculation time: {calc_time:.3f}s")
+                    results.append(f"  Hash shape: {video_hash.shape}")
+                    results.append(f"  Hash dtype: {video_hash.dtype}")
+                    results.append(f"")
+                    results.append(f"  Hash values (first 10 frames):")
+
+                    # Show first 10 frame hashes
+                    for j, frame_hash in enumerate(video_hash[:10]):
+                        # Convert to binary string for better visualization
+                        if hasattr(frame_hash, 'flatten'):
+                            flat_hash = frame_hash.flatten()
+                            # Show first 64 bits
+                            bits = ''.join(['1' if b else '0' for b in flat_hash[:64]])
+                            results.append(f"    Frame {j:2d}: {bits[:32]} {bits[32:64]}")
+                        else:
+                            results.append(f"    Frame {j:2d}: {frame_hash}")
+                else:
+                    results.append(f"✗ Failed to calculate hash")
+                    logger.error(f"Hash calculation failed for {file_path}")
+
+            except Exception as e:
+                results.append(f"✗ ERROR: {str(e)}")
+                logger.error(f"Error calculating hash for {file_path}: {e}")
+
+        # If we have 2 files, compare them
+        if len(self.selected_files) == 2 and len(self.hash_results) == 2:
+            results.append(f"\n{'=' * 70}")
+            results.append("COMPARISON RESULTS")
+            results.append(f"{'=' * 70}")
+
+            try:
+                file1, file2 = self.selected_files
+                similarity = self.video_hasher.compare_videos(file1, file2)
+
+                results.append(f"")
+                results.append(f"File 1: {os.path.basename(file1)}")
+                results.append(f"File 2: {os.path.basename(file2)}")
+                results.append(f"")
+                results.append(f"Similarity: {similarity:.2f}%")
+                results.append(f"")
+
+                if similarity >= 90:
+                    results.append("🔴 VERY HIGH similarity - Likely duplicates")
+                elif similarity >= 70:
+                    results.append("🟡 MEDIUM similarity - Possible related content")
+                else:
+                    results.append("🟢 LOW similarity - Different videos")
+
+                # Frame-by-frame comparison
+                hash1 = self.hash_results[file1]
+                hash2 = self.hash_results[file2]
+
+                results.append(f"\n{'─' * 70}")
+                results.append("FRAME-BY-FRAME COMPARISON (first 10 frames)")
+                results.append(f"{'─' * 70}")
+
+                min_frames = min(len(hash1), len(hash2))
+                for j in range(min(10, min_frames)):
+                    # Calculate hamming distance for this frame
+                    frame_diff = np.sum(hash1[j] != hash2[j])
+                    frame_total = hash1[j].size
+                    frame_similarity = (1 - frame_diff / frame_total) * 100
+
+                    status = "✓" if frame_similarity > 80 else "✗"
+                    results.append(f"  Frame {j:2d}: {frame_similarity:5.1f}% similarity {status}")
+
+            except Exception as e:
+                results.append(f"✗ ERROR during comparison: {str(e)}")
+                logger.error(f"Error comparing videos: {e}")
+
+        results.append(f"\n{'=' * 70}")
+        results.append("END OF RESULTS")
+        results.append(f"{'=' * 70}")
+
+        self.results_text.setPlainText("\n".join(results))
