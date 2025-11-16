@@ -249,6 +249,14 @@ class ShazamAudioFingerprint:
         freq_bins, time_frames = spectrogram.shape
         half_nbh = self.peak_neighborhood_size // 2
 
+        # FIXED: Use adaptive threshold based on spectrogram values
+        # Spectrogram is in dB (negative values), so we need a threshold relative to max
+        max_amplitude = np.max(spectrogram)
+        # Threshold: peaks must be within 20 dB of maximum
+        adaptive_threshold = max_amplitude - 20.0
+
+        logger.debug(f"Peak detection: max_amplitude={max_amplitude:.1f}dB, threshold={adaptive_threshold:.1f}dB")
+
         for t in range(half_nbh, time_frames - half_nbh):
             for f in range(half_nbh, freq_bins - half_nbh):
                 # Get neighborhood
@@ -259,8 +267,8 @@ class ShazamAudioFingerprint:
 
                 center_value = spectrogram[f, t]
 
-                # Check if center is maximum AND above threshold
-                if center_value >= self.min_peak_amplitude and center_value == np.max(neighborhood):
+                # Check if center is maximum AND above adaptive threshold
+                if center_value >= adaptive_threshold and center_value == np.max(neighborhood):
                     # Convert indices to actual time/frequency
                     peak_time = times[t]
                     peak_freq = frequencies[f]
