@@ -426,7 +426,7 @@ class VideoHasher:
 
         # 3. OPTIMIZATION: Early exit for same file
         if video1_path == video2_path:
-            self.comparison_cache[cache_key] = 100.0
+            self.comparison_cache.set(cache_key, 100.0)
             return 100.0
 
         # 4. OPTIMIZATION: Early exit based on file size/duration
@@ -442,7 +442,7 @@ class VideoHasher:
                 if size1 > 0 and size2 > 0:
                     size_ratio = min(size1, size2) / max(size1, size2)
                     if size_ratio < 0.90:  # 10% tolerance
-                        self.comparison_cache[cache_key] = 0.0
+                        self.comparison_cache.set(cache_key, 0.0)
                         return 0.0
 
                 # If durations differ by more than 5%, likely not duplicates
@@ -451,7 +451,7 @@ class VideoHasher:
                 if dur1 > 0 and dur2 > 0:
                     dur_ratio = min(dur1, dur2) / max(dur1, dur2)
                     if dur_ratio < 0.95:  # 5% tolerance
-                        self.comparison_cache[cache_key] = 0.0
+                        self.comparison_cache.set(cache_key, 0.0)
                         return 0.0
         except Exception:
             pass  # Continue with full comparison
@@ -459,7 +459,7 @@ class VideoHasher:
         # 5. Check database cache
         cached_result = self.db.get_cached_comparison(video1_path, video2_path)
         if cached_result is not None:
-            self.comparison_cache[cache_key] = cached_result
+            self.comparison_cache.set(cache_key, cached_result)
             return cached_result
 
         # 6. Perform actual comparison
@@ -490,7 +490,7 @@ class VideoHasher:
             computation_time = time.time() - start_time
 
             # Memory cache
-            self.comparison_cache[cache_key] = similarity
+            self.comparison_cache.set(cache_key, similarity)
 
             # Database cache
             self.db.store_comparison(
@@ -506,7 +506,7 @@ class VideoHasher:
         except Exception as e:
             logger.error(f"Error comparison: {e}")
             # Cache the failure too
-            self.comparison_cache[cache_key] = 0.0
+            self.comparison_cache.set(cache_key, 0.0)
             return 0.0
 
     def compare_videos_optimized(self, video1_path: str, video2_path: str) -> float:

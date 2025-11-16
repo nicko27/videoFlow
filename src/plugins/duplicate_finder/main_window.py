@@ -722,8 +722,8 @@ class DuplicateFinderWindow(QMainWindow):
                 self.subsequence_detector = SubsequenceDetector(
                     hasher=self.video_hasher,
                     max_cache_memory_mb=subseq_config.get('cache_memory_mb', 500),
-                    sample_interval_seconds=subseq_config.get('sample_interval', 3.0),
-                    min_match_ratio=subseq_config.get('min_match_ratio', 0.80)
+                    sample_interval_seconds=subseq_config.get('sample_interval', 1.5),
+                    min_match_ratio=subseq_config.get('min_match_ratio', 0.70)
                 )
 
             # Update UI

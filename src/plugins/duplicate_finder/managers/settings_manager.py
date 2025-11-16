@@ -99,10 +99,10 @@ class SettingsManager(QObject):
             self.settings.beginGroup("subsequence_detection")
 
             self._load_widget_value(
-                widgets, 'subsequence_sample_interval_spin', 'sample_interval', 3.0, float
+                widgets, 'subsequence_sample_interval_spin', 'sample_interval', 1.5, float
             )
             self._load_widget_value(
-                widgets, 'subsequence_min_match_spin', 'min_match_ratio', 80.0, float
+                widgets, 'subsequence_min_match_spin', 'min_match_ratio', 70.0, float
             )
             self._load_widget_value(
                 widgets, 'subsequence_cache_memory_spin', 'cache_memory_mb', 500, int
@@ -367,8 +367,8 @@ class SettingsManager(QObject):
             # Initialize with defaults
             config['subsequence_detection'] = {
                 'enabled': widgets['enable_subsequence_check'].isChecked(),
-                'sample_interval': 3.0,
-                'min_match_ratio': 0.80,
+                'sample_interval': 1.5,
+                'min_match_ratio': 0.70,
                 'cache_memory_mb': 500
             }
 

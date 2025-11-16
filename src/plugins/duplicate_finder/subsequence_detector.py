@@ -109,16 +109,16 @@ class SubsequenceDetector:
         self,
         hasher: VideoHasher,
         max_cache_memory_mb: int = 500,
-        sample_interval_seconds: float = 3.0,
-        min_match_ratio: float = 0.80
+        sample_interval_seconds: float = 1.5,
+        min_match_ratio: float = 0.70
     ):
         """Initialize subsequence detector.
 
         Args:
             hasher: VideoHasher instance to use for hashing
             max_cache_memory_mb: Maximum cache memory in MB (default: 500MB)
-            sample_interval_seconds: Dense sampling interval (default: 3.0 seconds)
-            min_match_ratio: Minimum match ratio to consider a subsequence (default: 0.80)
+            sample_interval_seconds: Dense sampling interval (default: 1.5 seconds)
+            min_match_ratio: Minimum match ratio to consider a subsequence (default: 0.70)
         """
         self.hasher = hasher
         self.db = hasher.db
@@ -206,11 +206,11 @@ class SubsequenceDetector:
                 positions = list(range(0, total_frames, frame_interval))
 
                 # Limit to reasonable number of frames to prevent memory issues
-                max_frames = 200  # Max ~200 frames even for very long videos
+                max_frames = 400  # Max ~400 frames even for very long videos (increased for better detection)
                 if len(positions) > max_frames:
                     step = len(positions) // max_frames
                     positions = positions[::step]
-                    logger.debug(f"Long video detected, sampling optimized to {len(positions)} frames for efficient processing")
+                    logger.debug(f"Long video: sampling {len(positions)} frames (interval: {self.sample_interval_seconds}s)")
 
                 # Ensure we have at least a few frames
                 if len(positions) < 5:
