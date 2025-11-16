@@ -141,7 +141,7 @@ class SettingsManager(QObject):
                 widgets['enable_subsequence_check'].setChecked(enabled)
 
             if 'subsequence_adaptive_refinement_check' in widgets and widgets['subsequence_adaptive_refinement_check'] is not None:
-                adaptive = self.settings.value('enable_adaptive_refinement', True, type=bool)
+                adaptive = self.settings.value('enable_adaptive_refinement', False, type=bool)  # Default FALSE - can be VERY slow
                 widgets['subsequence_adaptive_refinement_check'].setChecked(adaptive)
 
             self.settings.endGroup()
@@ -434,7 +434,7 @@ class SettingsManager(QObject):
             cache_memory_mb = 500  # Default from UI
             sliding_window_tolerance = 3  # Default from UI (SOLUTION 1)
             temporal_window_frames = 5  # Default from UI (SOLUTION 4)
-            enable_adaptive_refinement = True  # Default from UI (SOLUTION 5)
+            enable_adaptive_refinement = False  # Default from UI (SOLUTION 5) - DISABLED by default, can be VERY slow
 
             # Override with actual widget values if available
             if 'subsequence_sample_interval_spin' in widgets and widgets['subsequence_sample_interval_spin'] is not None:

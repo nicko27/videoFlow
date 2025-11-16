@@ -113,7 +113,7 @@ class SubsequenceDetector:
         min_match_ratio: float = 0.70,
         temporal_window_frames: int = 5,
         sliding_window_tolerance: int = 3,
-        enable_adaptive_refinement: bool = True
+        enable_adaptive_refinement: bool = False  # DISABLED by default - can be VERY slow
     ):
         """Initialize subsequence detector with temporal desynchronization handling.
 
@@ -547,8 +547,10 @@ class SubsequenceDetector:
 
             # PHASE 2: Adaptive refinement if partial match found (SOLUTION 5)
             refined = False
-            if self.enable_adaptive_refinement and best_match_ratio > 0.70 and best_match_ratio < 0.95:
-                logger.debug(f"Partial match {best_match_ratio*100:.1f}% - triggering adaptive refinement")
+            if self.enable_adaptive_refinement and best_match_ratio > 0.80 and best_match_ratio < 0.95:
+                import time
+                logger.warning(f"⚠️  Partial match {best_match_ratio*100:.1f}% - triggering SLOW adaptive refinement...")
+                refinement_start = time.time()
 
                 # Get FPS for refinement
                 cv2.setLogLevel(0)
@@ -561,11 +563,16 @@ class SubsequenceDetector:
                     short_video, long_video, best_start_idx, dur_short, fps_long
                 )
 
+                refinement_time = time.time() - refinement_start
+                logger.warning(f"⏱️  Adaptive refinement took {refinement_time:.1f}s")
+
                 if refined_ratio > best_match_ratio:
                     best_match_ratio = refined_ratio
                     best_start_idx = refined_idx
                     refined = True
                     logger.info(f"Adaptive refinement improved match: {best_match_ratio*100:.1f}%")
+                else:
+                    logger.info(f"Adaptive refinement did not improve match (stayed at {best_match_ratio*100:.1f}%)")
 
             # Check if it's a valid subsequence
             is_subsequence = best_match_ratio >= min_ratio

@@ -432,9 +432,9 @@ class UIPanels:
         subsequence_layout.addWidget(subsequence_temporal_window_spin, 5, 1)
 
         # Adaptive refinement (SOLUTION 5)
-        subsequence_adaptive_refinement_check = QCheckBox("Enable adaptive refinement")
-        subsequence_adaptive_refinement_check.setChecked(True)
-        subsequence_adaptive_refinement_check.setToolTip("Automatically re-sample at 0.2s intervals for 70-95% matches (default: enabled)")
+        subsequence_adaptive_refinement_check = QCheckBox("Enable adaptive refinement (⚠️ SLOW)")
+        subsequence_adaptive_refinement_check.setChecked(False)
+        subsequence_adaptive_refinement_check.setToolTip("Automatically re-sample at 0.2s intervals for 80-95% matches.\n⚠️ WARNING: Can be VERY slow (minutes per comparison) with H.264/H.265 codecs.\nOnly enable if you need the extra 5-10% accuracy for borderline matches.")
         subsequence_layout.addWidget(subsequence_adaptive_refinement_check, 6, 0, 1, 2)
 
         # Info label
