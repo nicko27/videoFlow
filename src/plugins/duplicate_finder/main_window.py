@@ -117,6 +117,9 @@ class DuplicateFinderWindow(QMainWindow):
         self.subsequence_sample_interval_spin = None
         self.subsequence_min_match_spin = None
         self.subsequence_cache_memory_spin = None
+        self.subsequence_sliding_tolerance_spin = None
+        self.subsequence_temporal_window_spin = None
+        self.subsequence_adaptive_refinement_check = None
         self.hash_debugger = None
         self.hash_debugger_v2 = None
 
@@ -458,6 +461,9 @@ class DuplicateFinderWindow(QMainWindow):
             self.subsequence_sample_interval_spin = params_tab.subsequence_sample_interval_spin
             self.subsequence_min_match_spin = params_tab.subsequence_min_match_spin
             self.subsequence_cache_memory_spin = params_tab.subsequence_cache_memory_spin
+            self.subsequence_sliding_tolerance_spin = params_tab.subsequence_sliding_tolerance_spin
+            self.subsequence_temporal_window_spin = params_tab.subsequence_temporal_window_spin
+            self.subsequence_adaptive_refinement_check = params_tab.subsequence_adaptive_refinement_check
             self.hash_debugger = params_tab.hash_debugger
 
         if debug_tab:
@@ -544,7 +550,10 @@ class DuplicateFinderWindow(QMainWindow):
             'enable_subsequence_check': self.enable_subsequence_check,
             'subsequence_sample_interval_spin': self.subsequence_sample_interval_spin,
             'subsequence_min_match_spin': self.subsequence_min_match_spin,
-            'subsequence_cache_memory_spin': self.subsequence_cache_memory_spin
+            'subsequence_cache_memory_spin': self.subsequence_cache_memory_spin,
+            'subsequence_sliding_tolerance_spin': self.subsequence_sliding_tolerance_spin,
+            'subsequence_temporal_window_spin': self.subsequence_temporal_window_spin,
+            'subsequence_adaptive_refinement_check': self.subsequence_adaptive_refinement_check
         }
 
     def _on_settings_changed(self) -> None:

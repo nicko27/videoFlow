@@ -128,11 +128,21 @@ class SettingsManager(QObject):
             self._load_widget_value(
                 widgets, 'subsequence_cache_memory_spin', 'cache_memory_mb', 500, int
             )
+            self._load_widget_value(
+                widgets, 'subsequence_sliding_tolerance_spin', 'sliding_window_tolerance', 3, int
+            )
+            self._load_widget_value(
+                widgets, 'subsequence_temporal_window_spin', 'temporal_window_frames', 5, int
+            )
 
-            # Load checkbox state for enable_subsequence
+            # Load checkbox states
             if 'enable_subsequence_check' in widgets and widgets['enable_subsequence_check'] is not None:
                 enabled = self.settings.value('enabled', False, type=bool)
                 widgets['enable_subsequence_check'].setChecked(enabled)
+
+            if 'subsequence_adaptive_refinement_check' in widgets and widgets['subsequence_adaptive_refinement_check'] is not None:
+                adaptive = self.settings.value('enable_adaptive_refinement', True, type=bool)
+                widgets['subsequence_adaptive_refinement_check'].setChecked(adaptive)
 
             self.settings.endGroup()
 
@@ -191,10 +201,15 @@ class SettingsManager(QObject):
             self._save_widget_value(widgets, 'subsequence_sample_interval_spin', 'sample_interval')
             self._save_widget_value(widgets, 'subsequence_min_match_spin', 'min_match_ratio')
             self._save_widget_value(widgets, 'subsequence_cache_memory_spin', 'cache_memory_mb')
+            self._save_widget_value(widgets, 'subsequence_sliding_tolerance_spin', 'sliding_window_tolerance')
+            self._save_widget_value(widgets, 'subsequence_temporal_window_spin', 'temporal_window_frames')
 
-            # Save checkbox state for enable_subsequence
+            # Save checkbox states
             if 'enable_subsequence_check' in widgets and widgets['enable_subsequence_check'] is not None:
                 self.settings.setValue('enabled', widgets['enable_subsequence_check'].isChecked())
+
+            if 'subsequence_adaptive_refinement_check' in widgets and widgets['subsequence_adaptive_refinement_check'] is not None:
+                self.settings.setValue('enable_adaptive_refinement', widgets['subsequence_adaptive_refinement_check'].isChecked())
 
             self.settings.endGroup()
 
@@ -294,7 +309,9 @@ class SettingsManager(QObject):
             'threshold_spin', 'hash_workers_spin', 'comparison_workers_spin',
             'batch_size_spin', 'hash_timeout_spin', 'comparison_timeout_spin',
             'subsequence_sample_interval_spin', 'subsequence_min_match_spin',
-            'subsequence_cache_memory_spin', 'enable_subsequence_check'
+            'subsequence_cache_memory_spin', 'subsequence_sliding_tolerance_spin',
+            'subsequence_temporal_window_spin', 'enable_subsequence_check',
+            'subsequence_adaptive_refinement_check'
         ]
 
         for widget_name in widget_names:
@@ -412,9 +429,12 @@ class SettingsManager(QObject):
             enabled = widgets['enable_subsequence_check'].isChecked()
 
             # Get actual widget values (with defaults matching UI)
-            sample_interval = 3.0  # Default from UI
+            sample_interval = 0.75  # Default from UI (changed from 3.0)
             min_match_ratio = 0.80  # Default 80% from UI, converted to ratio
             cache_memory_mb = 500  # Default from UI
+            sliding_window_tolerance = 3  # Default from UI (SOLUTION 1)
+            temporal_window_frames = 5  # Default from UI (SOLUTION 4)
+            enable_adaptive_refinement = True  # Default from UI (SOLUTION 5)
 
             # Override with actual widget values if available
             if 'subsequence_sample_interval_spin' in widgets and widgets['subsequence_sample_interval_spin'] is not None:
@@ -426,11 +446,23 @@ class SettingsManager(QObject):
             if 'subsequence_cache_memory_spin' in widgets and widgets['subsequence_cache_memory_spin'] is not None:
                 cache_memory_mb = widgets['subsequence_cache_memory_spin'].value()
 
+            if 'subsequence_sliding_tolerance_spin' in widgets and widgets['subsequence_sliding_tolerance_spin'] is not None:
+                sliding_window_tolerance = widgets['subsequence_sliding_tolerance_spin'].value()
+
+            if 'subsequence_temporal_window_spin' in widgets and widgets['subsequence_temporal_window_spin'] is not None:
+                temporal_window_frames = widgets['subsequence_temporal_window_spin'].value()
+
+            if 'subsequence_adaptive_refinement_check' in widgets and widgets['subsequence_adaptive_refinement_check'] is not None:
+                enable_adaptive_refinement = widgets['subsequence_adaptive_refinement_check'].isChecked()
+
             config['subsequence_detection'] = {
                 'enabled': enabled,
                 'sample_interval': sample_interval,
                 'min_match_ratio': min_match_ratio,
-                'cache_memory_mb': cache_memory_mb
+                'cache_memory_mb': cache_memory_mb,
+                'sliding_window_tolerance': sliding_window_tolerance,
+                'temporal_window_frames': temporal_window_frames,
+                'enable_adaptive_refinement': enable_adaptive_refinement
             }
 
         return config
