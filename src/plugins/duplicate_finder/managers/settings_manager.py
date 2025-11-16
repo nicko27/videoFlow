@@ -4,7 +4,7 @@ Settings management for the duplicate finder application.
 This module handles loading, saving, and managing application settings
 using Qt's QSettings for persistent storage.
 """
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from PyQt6.QtCore import QSettings, QObject, pyqtSignal
 from PyQt6.QtWidgets import QSpinBox, QDoubleSpinBox
 
@@ -390,3 +390,35 @@ class SettingsManager(QObject):
             True if loading is in progress, False otherwise.
         """
         return self._loading
+
+    def save_last_folder(self, folder_path: str) -> None:
+        """
+        Save the last opened folder path.
+
+        Args:
+            folder_path: Path to the folder to save.
+        """
+        try:
+            self.settings.beginGroup("recent")
+            self.settings.setValue("last_folder", folder_path)
+            self.settings.endGroup()
+            self.settings.sync()
+            logger.debug(f"Last folder saved: {folder_path}")
+        except Exception as e:
+            logger.error(f"Error saving last folder: {e}")
+
+    def get_last_folder(self) -> Optional[str]:
+        """
+        Get the last opened folder path.
+
+        Returns:
+            Path to the last folder, or None if not set.
+        """
+        try:
+            self.settings.beginGroup("recent")
+            last_folder = self.settings.value("last_folder", None, type=str)
+            self.settings.endGroup()
+            return last_folder
+        except Exception as e:
+            logger.error(f"Error getting last folder: {e}")
+            return None

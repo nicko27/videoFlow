@@ -92,6 +92,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.config_tabs = None
         self.analyze_btn = None
         self.stop_btn = None
+        self.reload_last_folder_btn = None
 
         # Initialize parameter widgets (will be set in setup_ui)
         self.threshold_spin = None
@@ -135,6 +136,9 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Auto cleanup database
         self.auto_cleanup_database()
+
+        # Check and show last folder button if available
+        self.check_and_show_last_folder_button()
 
         logger.info("Main window initialized successfully")
 
@@ -194,6 +198,7 @@ class DuplicateFinderWindow(QMainWindow):
         callbacks = {
             'add_files': self.add_files,
             'add_folder': self.add_folder,
+            'reload_last_folder': self.reload_last_folder,
             'clear_list': self.clear_list,
             'clear_cache': self.clear_cache,
             'apply_preset': self.apply_preset,
@@ -234,6 +239,8 @@ class DuplicateFinderWindow(QMainWindow):
                 self.analyze_btn = child.analyze_btn
                 self.stop_btn = child.stop_btn
                 break
+            if hasattr(child, 'reload_last_folder_btn'):
+                self.reload_last_folder_btn = child.reload_last_folder_btn
 
         return panel
 
@@ -336,13 +343,27 @@ class DuplicateFinderWindow(QMainWindow):
                 "#28A745", "#D4EDDA", "#28A745"
             )
 
-    def add_folder(self) -> None:
+    def add_folder(self, folder_path: str = None) -> None:
         """
         Add all video files from a folder.
+
+        Args:
+            folder_path: Path to folder. If None, shows dialog.
         """
-        count = self.file_handler.add_folder_dialog(self)
+        from PyQt6.QtWidgets import QFileDialog
+
+        if folder_path is None:
+            folder_path = QFileDialog.getExistingDirectory(self, "Select folder")
+
+        if not folder_path:
+            return
+
+        count = self.file_handler.add_folder(folder_path)
 
         if count > 0:
+            # Save last folder
+            self.settings_manager.save_last_folder(folder_path)
+
             # Update cache status
             files = self.file_handler.get_all_files()
             self.file_handler.batch_update_cache_status(files, self.video_hasher)
@@ -355,6 +376,46 @@ class DuplicateFinderWindow(QMainWindow):
                 "📂", f"{count} file(s) found in folder",
                 "#28A745", "#D4EDDA", "#28A745"
             )
+
+    def reload_last_folder(self) -> None:
+        """
+        Reload the last opened folder.
+        """
+        last_folder = self.settings_manager.get_last_folder()
+
+        if last_folder and os.path.exists(last_folder):
+            self.add_folder(last_folder)
+            # Hide the reload button after use
+            if self.reload_last_folder_btn:
+                self.reload_last_folder_btn.setVisible(False)
+        else:
+            QMessageBox.warning(
+                self,
+                "Folder not found",
+                f"The last folder no longer exists:\n{last_folder}"
+            )
+            # Clear invalid last folder
+            self.settings_manager.save_last_folder("")
+            if self.reload_last_folder_btn:
+                self.reload_last_folder_btn.setVisible(False)
+
+    def check_and_show_last_folder_button(self) -> None:
+        """
+        Check if there's a last folder and show reload button if it exists.
+        """
+        last_folder = self.settings_manager.get_last_folder()
+
+        if last_folder and os.path.exists(last_folder) and self.reload_last_folder_btn:
+            # Update button text with folder name
+            folder_name = os.path.basename(last_folder)
+            if len(folder_name) > 25:
+                folder_name = folder_name[:22] + "..."
+            self.reload_last_folder_btn.setText(f"🔄 Reload: {folder_name}")
+            self.reload_last_folder_btn.setToolTip(f"Reload last folder:\n{last_folder}")
+            self.reload_last_folder_btn.setVisible(True)
+            logger.info(f"Last folder available: {last_folder}")
+        elif self.reload_last_folder_btn:
+            self.reload_last_folder_btn.setVisible(False)
 
     def clear_list(self) -> None:
         """
