@@ -320,11 +320,11 @@ class SubsequenceComparisonDialog(QDialog):
             long_frame = self.start_frame_idx + short_frame
 
             # Update videos
-            self.short_video_widget.show_frame_at_position(short_position)
+            self.short_video_widget.seek_to_position(short_position)
 
             # Calculate position in long video (as percentage)
             long_position = long_frame / self.long_total_frames if self.long_total_frames > 0 else 0
-            self.long_video_widget.show_frame_at_position(long_position)
+            self.long_video_widget.seek_to_position(long_position)
 
             # Update timecodes
             short_time = short_frame / self.short_fps if self.short_fps > 0 else 0
