@@ -8,8 +8,10 @@ from PyQt6.QtGui import QFont, QPalette, QColor
 
 try:
     from .design_system import Colors, Spacing, Typography, Styles, get_status_colors
+    from .themes import get_current_theme
 except ImportError:
     from design_system import Colors, Spacing, Typography, Styles, get_status_colors
+    from themes import get_current_theme
 
 
 class ModernProgressWidget(QWidget):
@@ -23,9 +25,12 @@ class ModernProgressWidget(QWidget):
         
     def setup_ui(self):
         """Configure l'interface"""
+        theme = get_current_theme()
+        spacing = theme.get_spacing()
+
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
-        layout.setSpacing(Spacing.SM)
+        layout.setContentsMargins(spacing['padding'], spacing['padding'], spacing['padding'], spacing['padding'])
+        layout.setSpacing(spacing['gap'])
 
         # En-tête with titre et statut
         header_layout = QHBoxLayout()
@@ -38,7 +43,7 @@ class ModernProgressWidget(QWidget):
             bold=True
         ))
 
-        self.status_label = QLabel("Pending...")
+        self.status_label = QLabel("En attente...")
         self.status_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
         self.status_label.setStyleSheet(Styles.label(
             color=Colors.BLACK,
@@ -52,31 +57,65 @@ class ModernProgressWidget(QWidget):
 
         layout.addLayout(header_layout)
 
-        # Barre de progression moderne
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setMinimumHeight(Spacing.PROGRESS_BAR_HEIGHT)
-        self.progress_bar.setTextVisible(True)
-        self.progress_bar.setFormat("0/0")
-        self.progress_bar.setStyleSheet(Styles.progress_bar())
-        layout.addWidget(self.progress_bar)
+        # Zone de progression avec stats à côté
+        progress_layout = QHBoxLayout()
+        progress_layout.setSpacing(spacing['gap'])
 
-        # Information détaillées
+        # Barre de progression (sans texte, propre et clean)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setTextVisible(False)  # Pas de texte dans la barre
+        self.progress_bar.setStyleSheet(theme.get_progress_style())
+        progress_layout.addWidget(self.progress_bar, 1)
+
+        # Stats box à côté
+        stats_frame = QFrame()
+        stats_frame.setMaximumWidth(120)
+        stats_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {Colors.GRAY_50};
+                border: 1px solid {Colors.BORDER_LIGHT};
+                border-radius: {spacing['radius']}px;
+                padding: {spacing['gap']}px;
+            }}
+        """)
+        stats_layout = QVBoxLayout(stats_frame)
+        stats_layout.setContentsMargins(spacing['gap'], spacing['gap'], spacing['gap'], spacing['gap'])
+        stats_layout.setSpacing(2)
+
+        # Nombre actuel/total
+        self.count_label = QLabel("0/0")
+        self.count_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD, QFont.Weight.Bold))
+        self.count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.count_label.setStyleSheet(f"color: {Colors.PRIMARY};")
+        stats_layout.addWidget(self.count_label)
+
+        # Pourcentage
+        self.percent_label = QLabel("0%")
+        self.percent_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
+        self.percent_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.percent_label.setStyleSheet(f"color: {Colors.GRAY_600};")
+        stats_layout.addWidget(self.percent_label)
+
+        progress_layout.addWidget(stats_frame)
+        layout.addLayout(progress_layout)
+
+        # Information détaillées (temps et vitesse)
         details_layout = QHBoxLayout()
 
-        self.time_label = QLabel("Time: --:--")
+        self.time_label = QLabel("⏱️ --:--")
         self.time_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XXS))
         self.time_label.setStyleSheet(Styles.label(
-            color=Colors.BLACK,
+            color=Colors.GRAY_600,
             font_size=Typography.FONT_XXS,
-            bold=True
+            bold=False
         ))
 
-        self.speed_label = QLabel("Speed: --")
+        self.speed_label = QLabel("⚡ --")
         self.speed_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XXS))
         self.speed_label.setStyleSheet(Styles.label(
-            color=Colors.BLACK,
+            color=Colors.GRAY_600,
             font_size=Typography.FONT_XXS,
-            bold=True
+            bold=False
         ))
 
         details_layout.addWidget(self.time_label)
@@ -89,11 +128,16 @@ class ModernProgressWidget(QWidget):
         """Met à jour la progression"""
         self.progress_bar.setMaximum(maximum)
         self.progress_bar.setValue(current)
-        
-        if custom_text:
-            self.progress_bar.setFormat(custom_text)
+
+        # Mise à jour des stats à côté
+        self.count_label.setText(f"{current:,}/{maximum:,}")
+
+        # Calcul et affichage du pourcentage
+        if maximum > 0:
+            percent = (current / maximum) * 100
+            self.percent_label.setText(f"{percent:.0f}%")
         else:
-            self.progress_bar.setFormat(f"{current:,}/{maximum:,}")
+            self.percent_label.setText("0%")
             
     def set_status(self, status, color="black"):
         """Change le statut with couleur"""
