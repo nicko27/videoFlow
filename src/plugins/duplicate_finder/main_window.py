@@ -1095,10 +1095,13 @@ class DuplicateFinderWindow(QMainWindow):
                 "#28A745", "#D4EDDA", "#28A745"
             )
 
-            threshold = self.threshold_spin.value()
+            threshold_duplicates = self.threshold_spin.value()
+            threshold_subsequences = self.subsequence_min_match_spin.value() if self.subsequence_min_match_spin else 80.0
             QMessageBox.information(
                 self, "Analysis complete",
-                f"No duplicates or subsequences detected with {threshold}% threshold\n\n"
+                f"No duplicates or subsequences detected\n\n"
+                f"Duplicate threshold: {threshold_duplicates}%\n"
+                f"Subsequence threshold: {threshold_subsequences}%\n"
                 f"Total time: {elapsed:.1f} seconds"
             )
 
