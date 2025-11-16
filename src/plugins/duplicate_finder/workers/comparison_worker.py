@@ -227,8 +227,9 @@ class OptimizedComparisonWorker(QThread):
                         if dur_ratio < 0.95:
                             skipped_early_exit += 1
                             continue
-            except Exception:
-                pass  # Continue with comparison
+            except (KeyError, AttributeError, TypeError, ValueError) as e:
+                # Metadata not available or invalid, continue with comparison
+                logger.debug(f"Could not get metadata for early exit check ({file1}, {file2}): {e}")
 
             # Add to pairs needing comparison
             pairs.append((file1, file2))

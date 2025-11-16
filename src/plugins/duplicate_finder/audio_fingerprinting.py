@@ -49,7 +49,7 @@ import sys
 import subprocess
 import numpy as np
 from typing import Optional, Tuple, List, Dict, Any
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 import hashlib
 import json
 
@@ -450,6 +450,257 @@ class AudioFingerprintDetector:
 
         return similarity
 
+    def _create_fingerprint_index(
+        self,
+        raw_fp: List[int],
+        segment_size: int = 16,
+        step: int = 1
+    ) -> Dict[int, List[int]]:
+        """Create hash index from raw fingerprint for fast lookup.
+
+        OPTION B: Hash-based index for O(1) lookup instead of O(n) sliding window.
+        Inspired by Shazam algorithm but using Chromaprint fingerprints.
+
+        Args:
+            raw_fp: Raw fingerprint array (list of 32-bit integers)
+            segment_size: Size of segments to hash (default: 16 samples = ~2 seconds)
+            step: Step between segments (default: 1 for overlapping segments)
+
+        Returns:
+            Dictionary mapping segment_hash -> [positions in fingerprint]
+        """
+        index = defaultdict(list)
+
+        if raw_fp is None or len(raw_fp) < segment_size:
+            return index
+
+        # Create overlapping segments
+        for i in range(0, len(raw_fp) - segment_size + 1, step):
+            segment = raw_fp[i:i + segment_size]
+
+            # Hash the segment using first, middle, and last values for speed
+            # This creates a lightweight hash while maintaining discrimination
+            segment_hash = (
+                (segment[0] & 0xFFFFFFFF) ^
+                (segment[segment_size // 2] << 8) ^
+                (segment[-1] << 16)
+            )
+
+            # Store position (sample index) for this hash
+            index[segment_hash].append(i)
+
+        logger.debug(f"Created fingerprint index: {len(index)} unique segments from {len(raw_fp)} samples")
+        return index
+
+    def _find_best_cluster(
+        self,
+        matches: List[Tuple[int, int]],
+        min_cluster_size: int = 5
+    ) -> Optional[Tuple[int, float]]:
+        """Find best cluster of matching segments with consistent temporal alignment.
+
+        OPTION B: Cluster detection to find the actual scene position from hash matches.
+        Looks for sequences of matches with consistent time deltas.
+
+        Args:
+            matches: List of (short_pos, long_pos) tuples
+            min_cluster_size: Minimum number of matches to form valid cluster
+
+        Returns:
+            Tuple of (best_start_position, confidence) or None
+        """
+        if len(matches) < min_cluster_size:
+            return None
+
+        # Group matches by their delta (long_pos - short_pos)
+        # Matches from the same scene will have similar deltas
+        delta_groups = defaultdict(list)
+
+        for short_pos, long_pos in matches:
+            delta = long_pos - short_pos
+            # Group deltas within ±3 samples (temporal tolerance)
+            delta_bucket = delta // 3 * 3
+            delta_groups[delta_bucket].append((short_pos, long_pos, delta))
+
+        # Find largest cluster
+        best_cluster = None
+        best_size = 0
+
+        for delta_bucket, group in delta_groups.items():
+            if len(group) > best_size:
+                best_size = len(group)
+                best_cluster = group
+
+        if best_cluster is None or len(best_cluster) < min_cluster_size:
+            return None
+
+        # Calculate average position and confidence
+        avg_delta = np.mean([delta for _, _, delta in best_cluster])
+        start_position = int(avg_delta)
+
+        # Confidence based on cluster size and consistency
+        delta_std = np.std([delta for _, _, delta in best_cluster])
+        size_confidence = min(1.0, len(best_cluster) / 50.0)  # 50+ matches = 100%
+        consistency_confidence = max(0.0, 1.0 - delta_std / 10.0)  # Low std = high confidence
+        confidence = (size_confidence + consistency_confidence) / 2.0
+
+        logger.debug(f"Best cluster: {len(best_cluster)} matches at position {start_position} "
+                    f"(confidence: {confidence*100:.1f}%, std: {delta_std:.1f})")
+
+        return start_position, confidence
+
+    def find_scene_with_index(
+        self,
+        short_video: str,
+        long_video: str,
+        min_ratio: Optional[float] = None,
+        min_duration_seconds: float = 10.0
+    ) -> Optional[Dict[str, Any]]:
+        """Find scene using hash-based index for 10-100x faster detection.
+
+        OPTION B: Fast hash-based search instead of sliding window.
+
+        Args:
+            short_video: Path to potentially shorter video (scene)
+            long_video: Path to potentially longer video
+            min_ratio: Minimum match ratio (overrides instance default)
+            min_duration_seconds: Minimum scene duration (default: 10s)
+
+        Returns:
+            Detection result dict or None
+        """
+        if min_ratio is None:
+            min_ratio = self.min_match_ratio
+
+        try:
+            # Extract fingerprints
+            fp_short, dur_short, raw_short = self._extract_audio_fingerprint(short_video)
+            fp_long, dur_long, raw_long = self._extract_audio_fingerprint(long_video)
+
+            if not fp_short or not fp_long:
+                logger.warning(f"Could not extract fingerprints for comparison")
+                return None
+
+            # Check minimum duration
+            if dur_short < min_duration_seconds:
+                logger.debug(f"Scene too short: {dur_short:.1f}s < {min_duration_seconds}s")
+                return None
+
+            # Short video must be shorter than long video
+            if dur_short >= dur_long:
+                # Try swapping
+                return self.find_scene_with_index(long_video, short_video, min_ratio, min_duration_seconds)
+
+            # Check if we have raw fingerprints (required for this method)
+            if raw_short is None or raw_long is None or len(raw_short) == 0 or len(raw_long) == 0:
+                logger.warning("Raw fingerprints not available, falling back to standard method")
+                return self.find_scene(short_video, long_video, min_ratio, min_duration_seconds)
+
+            import time
+            start_time = time.time()
+
+            # PHASE 1: Create index from long video (one-time cost)
+            logger.debug(f"Creating index from long video ({len(raw_long)} samples)...")
+            segment_size = 16  # ~2 seconds at 0.128s per sample
+            long_index = self._create_fingerprint_index(raw_long, segment_size=segment_size)
+
+            # PHASE 2: Query index with short video segments
+            logger.debug(f"Querying index with short video ({len(raw_short)} samples)...")
+            matches = []
+
+            for i in range(0, len(raw_short) - segment_size + 1):
+                segment = raw_short[i:i + segment_size]
+
+                # Hash segment (same method as index creation)
+                segment_hash = (
+                    (segment[0] & 0xFFFFFFFF) ^
+                    (segment[segment_size // 2] << 8) ^
+                    (segment[-1] << 16)
+                )
+
+                # O(1) lookup in index
+                if segment_hash in long_index:
+                    for long_pos in long_index[segment_hash]:
+                        matches.append((i, long_pos))
+
+            elapsed = time.time() - start_time
+            logger.info(f"⚡ Index search completed in {elapsed:.2f}s: {len(matches)} segment matches found")
+
+            if len(matches) == 0:
+                logger.debug("No matching segments found")
+                return {
+                    'is_scene': False,
+                    'match_ratio': 0.0,
+                    'start_time_seconds': 0.0,
+                    'confidence': 0.0,
+                    'short_duration': dur_short,
+                    'long_duration': dur_long
+                }
+
+            # PHASE 3: Find best cluster of matches
+            cluster_result = self._find_best_cluster(matches, min_cluster_size=5)
+
+            if cluster_result is None:
+                logger.debug("No consistent cluster found")
+                return {
+                    'is_scene': False,
+                    'match_ratio': 0.0,
+                    'start_time_seconds': 0.0,
+                    'confidence': 0.0,
+                    'short_duration': dur_short,
+                    'long_duration': dur_long
+                }
+
+            start_position, confidence = cluster_result
+
+            # PHASE 4: Verify with detailed comparison at detected position
+            # Extract windows for precise comparison
+            window_size = len(raw_short)
+            if start_position < 0 or start_position + window_size > len(raw_long):
+                logger.warning(f"Invalid start position: {start_position}")
+                return None
+
+            window = raw_long[start_position:start_position + window_size]
+
+            # Compute precise similarity
+            match_ratio = self._compute_similarity(
+                fp_short, fp_long,
+                raw_short, window
+            )
+
+            # Combine hash-based confidence with similarity score
+            final_confidence = (confidence + match_ratio) / 2.0
+
+            # Convert position to time
+            seconds_per_sample = 0.128
+            start_time_seconds = start_position * seconds_per_sample
+
+            is_scene = match_ratio >= min_ratio
+
+            if is_scene:
+                logger.info(f"✅ Scene detected (INDEX): {os.path.basename(short_video)} "
+                          f"in {os.path.basename(long_video)} "
+                          f"(match: {match_ratio*100:.1f}%, confidence: {final_confidence*100:.1f}%, "
+                          f"start: {start_time_seconds:.1f}s, search_time: {elapsed:.2f}s)")
+            else:
+                logger.debug(f"No scene match: {match_ratio*100:.1f}% < {min_ratio*100:.1f}%")
+
+            return {
+                'is_scene': is_scene,
+                'match_ratio': match_ratio,
+                'start_time_seconds': start_time_seconds,
+                'confidence': final_confidence,
+                'short_duration': dur_short,
+                'long_duration': dur_long,
+                'method': 'hash_index',
+                'search_time_seconds': elapsed,
+                'num_matches': len(matches)
+            }
+
+        except Exception as e:
+            logger.error(f"Error in indexed scene detection: {e}", exc_info=True)
+            return None
+
     def find_scene(
         self,
         short_video: str,
@@ -504,11 +755,22 @@ class AudioFingerprintDetector:
             start_time = 0.0
 
             if raw_short is not None and raw_long is not None and len(raw_short) > 0 and len(raw_long) > 0:
-                # ACCURATE METHOD: Use raw fingerprint sliding window
+                # ACCURATE METHOD: Use raw fingerprint sliding window with adaptive step size
                 logger.debug(f"Using raw fingerprint sliding window search")
 
                 window_size = len(raw_short)
-                step_size = max(1, window_size // 20)  # 5% steps for efficiency
+
+                # IMPROVED STEP SIZE: Maximum 3 seconds between tests (instead of 5% which could be 45+ seconds!)
+                # Each sample = 0.128 seconds, so 3 seconds = ~23 samples
+                seconds_per_sample = 0.128
+                max_step_seconds = 3.0
+                max_step_samples = int(max_step_seconds / seconds_per_sample)
+
+                # Use smaller of: 5% of window or max_step_samples
+                step_size = max(1, min(window_size // 20, max_step_samples))
+
+                logger.debug(f"Sliding window: window_size={window_size}, step_size={step_size} "
+                           f"({step_size * seconds_per_sample:.1f}s between tests)")
 
                 best_similarity = 0.0
                 best_idx = 0
@@ -529,10 +791,6 @@ class AudioFingerprintDetector:
                         best_idx = i
 
                 match_ratio = best_similarity
-
-                # Each raw fingerprint sample represents ~0.125 seconds (128ms)
-                # This is Chromaprint's frame size at 11025 Hz
-                seconds_per_sample = 0.128
                 start_time = best_idx * seconds_per_sample
 
                 logger.debug(f"Raw fingerprint match: {match_ratio*100:.1f}% at position {best_idx} "

@@ -1,355 +1,476 @@
-# 🔍 Analyse du Duplicate Finder - Problèmes & Optimisations
+# Duplicate Finder Plugin - Comprehensive Code Analysis Report
 
-**Date:** 2025-11-16
-**Analysé par:** Claude Code
-**Module:** src/plugins/duplicate_finder/
-
----
-
-## 📋 Table des matières
-1. [Fonctionnalités cachées (non exposées dans l'UI)](#1-fonctionnalités-cachées)
-2. [Problèmes détectés](#2-problèmes-détectés)
-3. [Optimisations possibles](#3-optimisations-possibles)
-4. [Recommandations prioritaires](#4-recommandations-prioritaires)
+## Executive Summary
+The duplicate_finder plugin is a well-structured, modular application with good separation of concerns. However, there are several critical issues including duplicate function definitions, race conditions, resource management problems, and inconsistent error handling that need to be addressed.
 
 ---
 
-## 1. Fonctionnalités cachées (non exposées dans l'UI)
+## 1. ERRORS AND BUGS (Critical/High Severity)
 
-### 🎯 **Méthodes de hashing alternatives**
-**Localisation:** `video_hasher.py:20-30`
+### 1.1 DUPLICATE FUNCTION DEFINITIONS - **CRITICAL**
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/managers/settings_manager.py`
+**Lines:** 467-497 & 531-584
+**Issue:** The methods `save_last_folder()` and `get_last_folder()` are defined TWICE with conflicting implementations:
 
-```python
-class HashMethod(Enum):
-    PHASH = "pHash"  # Utilisé actuellement
-    DHASH = "dHash"  # Plus rapide - NON ACCESSIBLE
-    AHASH = "aHash"  # Le plus rapide - NON ACCESSIBLE
+```
+save_last_folder defined at lines: 467, 531
+get_last_folder defined at lines: 483, 547
 ```
 
-**État:** Implémentée mais pas d'UI pour choisir
-**Impact:** Les utilisateurs ne peuvent pas optimiser la vitesse vs précision
-**Solution:** Ajouter un sélecteur dans l'onglet Settings
+**First version (lines 467-497):**
+- Stores in settings group "recent"
+- Returns `Optional[str]`
+
+**Second version (lines 531-584):**
+- Stores in settings group "ui"
+- Returns `str`
+- Includes folder existence check
+- Calls `reset_last_folder()` on missing folder
+
+**Impact:** The second definition overrides the first. Any code relying on the first implementation will silently break. Settings stored in "recent" group will never be read.
+
+**Recommendation:** Remove the first version (lines 467-497) or merge both implementations into a single, comprehensive version.
 
 ---
 
-### 🔄 **Cache preloading configurable**
-**Localisation:** `video_hasher.py:61`
+### 1.2 MISSING WORKER CLASSES IN EXPORTS - **HIGH**
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/workers/__init__.py`
+**Issue:** Workers `SceneDetectionWorker` and `SubsequenceDetectionWorker` are used in main_window.py but not exported:
 
 ```python
-def __init__(self, method=HashMethod.PHASH.value,
-             enable_preload=True,      # Hardcodé à True
-             max_preload_items=1000):  # Hardcodé à 1000
+# Current exports (lines 7-10)
+from .hash_worker import ParallelHashWorker
+from .comparison_worker import OptimizedComparisonWorker
+__all__ = ['ParallelHashWorker', 'OptimizedComparisonWorker']
+
+# Missing exports:
+# SceneDetectionWorker (used in main_window.py:928)
+# SubsequenceDetectionWorker (used elsewhere)
 ```
 
-**État:** Paramètres hardcodés
-**Impact:** Utilisateurs avec de grandes bases ne peuvent pas ajuster
-**Solution:** Exposer dans Settings avancés
+**Impact:** External code cannot import these workers via the package interface. Import must use full path.
 
 ---
 
-### 💾 **Connection pool size**
-**Localisation:** `database_manager.py:158`
+### 1.3 MISSING CLASSES IN PACKAGE __init__.py - **MEDIUM**
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/__init__.py`
+**Lines:** 16-27
+**Issue:** The `__all__` list references classes that don't exist:
 
 ```python
-self.connection_pool = ConnectionPool(db_path, pool_size=5)  # Hardcodé
-```
-
-**État:** Taille fixe à 5 connexions
-**Impact:** Peut limiter les performances sur machines puissantes
-**Solution:** Rendre configurable selon CPU count
-
----
-
-### 📊 **Statistiques d'early-exit**
-**Localisation:** `database_manager.py:729`
-
-```python
-'early_exit_percentage': (early_exits / comparisons_count * 100)
-```
-
-**État:** Collectées mais PAS affichées dans l'UI
-**Impact:** Info de performance utile cachée
-**Solution:** Ajouter dans le dialogue de statistiques
-
----
-
-### 🎬 **Play/Pause dans le comparateur vidéo**
-**Localisation:** `keyboard_shortcuts.py:33`
-
-```python
-# Space for play/pause (future feature)
-NAV_PLAY_PAUSE = Qt.Key.Key_Space
-```
-
-**État:** Défini mais jamais implémenté
-**Impact:** Fonctionnalité attendue manquante
-**Solution:** Implémenter la lecture/pause ou retirer le commentaire
-
----
-
-### 🗂️ **Validation de taille de fichier**
-**Localisation:** `validators.py:245`
-
-```python
-MIN_FILE_SIZE_BYTES = 10240  # 10KB minimum
-```
-
-**État:** Validateur existe mais pas utilisé partout
-**Impact:** Fichiers corrompus peuvent être traités
-**Solution:** Appliquer systématiquement avant analyse
-
----
-
-### 🎨 **Taille du cache de comparaison LRU**
-**Localisation:** `video_hasher.py:81`
-
-```python
-self.comparison_cache = LRUCache(max_size=10000)  # Hardcodé
-```
-
-**État:** Non configurable
-**Impact:** Trop grand = RAM, trop petit = lent
-**Solution:** Rendre ajustable dans Settings
-
----
-
-## 2. Problèmes détectés
-
-### ❌ **Imports inutilisés (26 warnings F401)**
-**Impact:** Code mort, confusion
-**Fichiers affectés:**
-- `database_manager.py`: hashlib, datetime, numpy
-- `design_system.py`: Theme
-- `handlers/duplicate_handler.py`: QMessageBox
-- `keyboard_shortcuts.py`: QKeySequence
-- `progress_widgets.py`: ~~QTimer, pyqtSignal~~ ✅ CORRIGÉ
-- `video_preview_widget.py`: numpy, QHBoxLayout, QTimer
-- Et 8+ autres fichiers...
-
-**Solution:** Nettoyage imports (non-critique)
-
----
-
-### ⚠️ **Code mort dans database_manager.py**
-**Localisation:** `database_manager.py:698-712`
-
-```python
-# Legacy compatibility removed - ignore_type always exists after migration
-if False:  # <- CODE MORT
-    # Version without ignore_type (compatibility - DEPRECATED)
+__all__ = [
     ...
+    'CompactVideoCard',        # Not imported (never used?)
+    'SimilarityIndicator',     # Not imported (never used?)
+    'NavigationControls',      # Not imported (never used?)
+    ...
+]
 ```
 
-**Impact:** Code mort confusant
-**Solution:** Supprimer le bloc entier
+**Impact:** ImportError if external code tries to import these non-existent classes.
 
 ---
 
-### 🔄 **Gestion inefficace de la taille du pool SQLite**
-**Localisation:** `database_manager.py:30-49`
+### 1.4 LATE INITIALIZATION OF video_hasher - **MEDIUM**
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/main_window.py`
+**Lines:** 95 (init), 157 (creation)
 
-**Problème:** Pool size fixe de 5 ne s'adapte pas au nombre de CPU
-**Impact:** Sous-utilisation sur machines puissantes
-**Solution:**
+**Issue:** `self.video_hasher` is initialized to None and only created later:
+
 ```python
-optimal_pool_size = min(multiprocessing.cpu_count() + 2, 10)
+# Line 95
+self.video_hasher = None
+
+# Line 157 (in setup_ui)
+self.video_hasher = VideoHasher(method=hash_method)
 ```
 
----
-
-### 📝 **Logs en français dans du code**
-**Impact:** Inconsistance, problèmes i18n
-**Exemples:**
-- `database_manager.py:747`: "Nettoie la base des files"
-- `database_manager.py:762`: "Removes en une seule transaction"
-
-**Solution:** Uniformiser en anglais ou externaliser
+**Impact:** Any code called between __init__ and setup_ui that accesses video_hasher will crash with AttributeError. This creates a window of vulnerability.
 
 ---
 
-## 3. Optimisations possibles
+## 2. PROBLEMS (High/Medium Severity)
 
-### ⚡ **#1 - Preload cache intelligent par défaut**
-**Localisation:** `video_hasher.py:104-223`
+### 2.1 BARE EXCEPTION HANDLING WITH PASS - **HIGH**
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/workers/comparison_worker.py`
+**Lines:** 230
+**Issue:**
 
-**État actuel:**
-- Charge TOUS les hash (limité à 1000)
-- Pas de priorisation
-
-**Optimisation:**
 ```python
-def _preload_cache_intelligent(self, max_items=1000):
-    """Preload only files that still exist AND were accessed recently"""
-    # ORDER BY last_accessed DESC, updated_at DESC
-    # WHERE file_exists = TRUE
+try:
+    meta1 = self.video_hasher.hash_cache.get(file1)
+    meta2 = self.video_hasher.hash_cache.get(file2)
+    # ... size and duration checks ...
+except Exception:
+    pass  # Continue with comparison
 ```
 
-**Gain estimé:** 30-50% temps de démarrage
+**Problems:**
+- Silently swallows ALL exceptions (AttributeError, KeyError, TypeError, etc.)
+- Makes debugging impossible
+- May hide actual bugs
 
----
-
-### ⚡ **#2 - Batch size adaptatif**
-**Localisation:** `workers/comparison_worker.py:232`
-
-**État actuel:** Batch size fixe (50 par défaut)
-
-**Optimisation:**
+**Better approach:**
 ```python
-adaptive_batch_size = min(
-    len(pairs) // worker_count,
-    max(50, worker_count * 10)
-)
+except (KeyError, AttributeError, TypeError) as e:
+    logger.debug(f"Could not get metadata for {file1}/{file2}: {e}")
+    # Continue with comparison
 ```
-
-**Gain estimé:** 15-25% performances sur grands datasets
 
 ---
 
-### ⚡ **#3 - Cache de frames pour SubsequenceDetector**
-**Localisation:** `subsequence_detector.py:33`
+### 2.2 RACE CONDITION IN SETTINGS MANAGER - **HIGH**
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/managers/settings_manager.py`
+**Lines:** 144, 556
 
-**Problème actuel:** Pas de réutilisation des frames entre comparaisons
+**Issue:** The settings manager uses a `_loading` flag to prevent recursive saves, but it's only used in one place:
 
-**Optimisation:**
 ```python
-# Ajouter un cache temporal pour les frames récemment lus
-self.frame_cache = LRUCache(max_memory_mb=200)
+# Line 71-72
+self._loading = True
+self._block_widget_signals(widgets, True)
+
+# Line 52 _loading flag is referenced but only in load_settings
+self._loading = False
 ```
 
-**Gain estimé:** 40-60% sur détection de sous-séquences
+The `is_loading()` method exists (line 458) but is never called. If multiple threads try to save settings simultaneously, race condition could occur.
 
 ---
 
-### ⚡ **#4 - Index manquant sur comparisons**
-**Localisation:** `database_manager.py:231`
+### 2.3 MISSING RESOURCE CLEANUP - **HIGH**
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/main_window.py`
+**Issue:** Workers and database connections are never explicitly cleaned up when window closes.
 
-**Problème:** Requêtes sur `is_early_exit` sans index
-
-**Optimisation:**
-```sql
-CREATE INDEX IF NOT EXISTS idx_comparisons_early_exit
-ON comparisons(is_early_exit) WHERE is_early_exit = 1;
-```
-
-**Gain estimé:** 2-5x vitesse requêtes statistiques
-
----
-
-### ⚡ **#5 - Parallélisation du cleanup**
-**Localisation:** `database_manager.py:746-789`
-
-**Problème:** Vérifie existence fichiers séquentiellement
-
-**Optimisation:**
 ```python
-from concurrent.futures import ThreadPoolExecutor
-
-with ThreadPoolExecutor(max_workers=4) as executor:
-    missing_checks = executor.map(os.path.exists, file_paths)
+def closeEvent(self, event):
+    # Not implemented - workers continue running in background
+    # Database connections not closed
 ```
 
-**Gain estimé:** 3-10x vitesse cleanup
+**Impact:** 
+- Orphaned threads continue running after window closes
+- Database locks remain held
+- Memory leaks
 
 ---
 
-### ⚡ **#6 - Hash method switcher dynamique**
-**Localisation:** `video_hasher.py:240-261`
+### 2.4 EXCEPTION RAISING WITHOUT MESSAGE - **MEDIUM**
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/handlers/duplicate_handler.py`
+**Lines:** 264
 
-**Idée:** Détecter vidéos similaires et switcher auto sur aHash pour vitesse
-
-**Optimisation:**
 ```python
-if detected_duplicates_rate > 0.3:
-    self.method = HashMethod.AHASH.value  # Plus rapide
+except Exception as e:
+    logger.error(f"Error handling duplicate choice: {e}")
+    raise  # Re-raises but doesn't provide context
 ```
 
-**Gain estimé:** 20-40% sur datasets avec beaucoup de doublons
+The exception is logged, so re-raising without additional context is redundant.
 
 ---
 
-## 4. Recommandations prioritaires
+### 2.5 UNPROTECTED LIST MODIFICATIONS - **MEDIUM**
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/handlers/duplicate_handler.py`
+**Lines:** 164-165, 187
 
-### 🔴 **PRIORITÉ HAUTE**
+```python
+# Line 164-165 (in _process_next_duplicate)
+self.potential_duplicates.pop(0)  # Not thread-safe!
+self._process_next_duplicate(parent_window, comparison_dialog_class)
+```
 
-1. **Exposer les méthodes de hashing dans l'UI**
-   - Fichier: `ui/panels.py` ligne ~287
-   - Ajouter QComboBox avec PHASH/DHASH/AHASH
-   - Impact: Énorme gain de temps utilisateur
+**Issue:** If `potential_duplicates` is accessed from multiple threads, `.pop(0)` is not thread-safe.
 
-2. **Afficher statistiques early-exit**
-   - Fichier: `main_window.py` ligne ~1070
-   - Ajouter ligne dans `show_statistics()`
-   - Impact: Transparence performance
-
-3. **Supprimer code mort**
-   - `database_manager.py:698-712`
-   - Impact: Maintenance
+**Recommendation:** Use a lock or `queue.Queue` instead of `list`.
 
 ---
 
-### 🟡 **PRIORITÉ MOYENNE**
+## 3. INCONSISTENCIES (Code Quality Issues)
 
-4. **Rendre configurable:**
-   - Cache preload items (Settings)
-   - Pool size (auto-détection CPU)
-   - LRU cache size (Settings avancés)
+### 3.1 DUPLICATE get_last_folder IMPLEMENTATIONS - **HIGH**
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/managers/settings_manager.py`
+**Lines:** 483-497 vs 547-571
 
-5. **Ajouter index database**
-   - `idx_comparisons_early_exit`
-   - `idx_video_files_mtime`
+**First version:**
+- Group: "recent"
+- Returns: `Optional[str]`
+- Validation: None
 
-6. **Batch size adaptatif**
-   - Auto-ajustement selon worker count
+**Second version:**
+- Group: "ui"
+- Returns: `str` (never None)
+- Validation: Checks if folder exists
 
----
-
-### 🟢 **PRIORITÉ BASSE**
-
-7. **Nettoyage imports inutilisés**
-   - Amélioration qualité code
-   - Pas d'impact fonctionnel
-
-8. **Uniformiser langue logs**
-   - Anglais partout ou i18n
-
-9. **Implémenter Play/Pause**
-   - Ou retirer commentaire "future feature"
+**Recommendation:** Consolidate into one implementation with proper validation.
 
 ---
 
-## 📈 Impact estimé global
+### 3.2 INCONSISTENT RETURN TYPES - **MEDIUM**
 
-Si TOUTES les optimisations sont appliquées:
-
-| Métrique | Amélioration estimée |
-|----------|---------------------|
-| **Vitesse analyse** | +30-50% |
-| **Temps démarrage** | +40-60% |
-| **Utilisation RAM** | Configurable (±20%) |
-| **Détection sous-séquences** | +50-70% |
-| **Expérience utilisateur** | Significative ⭐⭐⭐⭐⭐ |
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/handlers/file_handler.py`
+- `add_files()` returns `int` count
+- `add_files_dialog()` returns `int` count
+- But the returned count may not accurately reflect duplicates filtered
 
 ---
 
-## 🛠️ Plan d'action suggéré
+### 3.3 INCONSISTENT SIGNAL DEFINITIONS - **MEDIUM**
 
-### Phase 1 (1-2 jours)
-- [ ] Ajouter sélecteur méthode hashing dans UI
-- [ ] Exposer statistiques early-exit
-- [ ] Supprimer code mort
-- [ ] Ajouter index database
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/handlers/duplicate_handler.py`
+**Lines:** 39-42
 
-### Phase 2 (2-3 jours)
-- [ ] Implémenter batch size adaptatif
-- [ ] Rendre configurables: preload, pool size, cache
-- [ ] Paralléliser cleanup
+```python
+duplicate_processed = pyqtSignal(str, str, str)  # file1, file2, action
+all_duplicates_processed = pyqtSignal()
+subsequence_processed = pyqtSignal(str, str, str)  # short_video, long_video, action
+all_subsequences_processed = pyqtSignal()
+```
 
-### Phase 3 (optionnel)
-- [ ] Nettoyer imports
-- [ ] Uniformiser logs
-- [ ] Hash method switcher auto
+Related methods (handle_duplicate_choice, handle_subsequence_choice) don't document what "action" values are passed.
 
 ---
 
-**Généré automatiquement par analyse statique du code**
-**Fichiers analysés:** 30+ fichiers Python (~11,000 lignes)
+### 3.4 MIXED SETTINGS STORAGE LOCATIONS - **MEDIUM**
+
+The settings manager stores some things in multiple places:
+- Window geometry: "window" group
+- Parameters: "parameters" group  
+- Scene detection: "scene_detection" group
+- Recent folder: "recent" group (line 475) AND "ui" group (line 539)
+- Layout preference: "ui" group
+
+This creates potential confusion and migration issues.
+
+---
+
+## 4. CODE SMELLS (Maintainability Issues)
+
+### 4.1 LONG TRY-EXCEPT BLOCKS - **MEDIUM**
+
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/managers/settings_manager.py`
+**Lines:** 55-159 (load_settings)
+
+104 line try-except block with multiple unrelated operations:
+```python
+try:
+    # ... 100+ lines ...
+    self._load_widget_value(...)
+    self.settings.endGroup()
+    if main_window:
+        self._load_window_geometry(main_window)
+except Exception as e:  # Catches ANY exception from ANY operation
+```
+
+**Problem:** If any operation fails, all settings fail to load.
+
+**Recommendation:** Wrap each logical section in its own try-except.
+
+---
+
+### 4.2 MISSING DOCSTRING FOR SIGNAL PARAMETERS - **LOW**
+
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/workers/comparison_worker.py`
+**Lines:** 51-58
+
+```python
+progress = pyqtSignal(int)  # What int? Current? Max?
+duplicate_found = pyqtSignal(str, str, float)  # file1, file2, similarity
+comparison_details = pyqtSignal(int, int, str, str)  # What order? Docs missing
+```
+
+**Recommendation:** Add clear docstring explaining each signal parameter.
+
+---
+
+### 4.3 UNUSED ATTRIBUTES - **LOW**
+
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/audio_fingerprinting.py`
+**Lines:** 106-107
+
+```python
+self._lock = None  # Initialized but conditionally set
+# Later: if self._lock: with self._lock:
+```
+
+If threading import fails, `_lock` remains None and thread-safety is lost silently.
+
+---
+
+## 5. MISSING FUNCTIONALITY / INCOMPLETE IMPLEMENTATIONS
+
+### 5.1 NO CLOSEVENT HANDLER - **MEDIUM**
+
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/main_window.py`
+
+The main window doesn't implement `closeEvent()`. This means:
+- Workers don't stop when window closes
+- Database connections aren't closed
+- Threads run in background indefinitely
+
+**Recommended implementation:**
+```python
+def closeEvent(self, event):
+    """Clean up resources when window closes."""
+    if self.analysis_handler:
+        self.analysis_handler.cleanup()
+    if self.scene_worker and self.scene_worker.isRunning():
+        self.scene_worker.stop()
+        self.scene_worker.wait(5000)
+    if self.video_hasher:
+        self.video_hasher.db.close()
+    event.accept()
+```
+
+---
+
+### 5.2 NO THREAD SAFETY IN COMPARISON WORKER - **MEDIUM**
+
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/workers/comparison_worker.py`
+**Lines:** 92-94
+
+Thread safety uses QMutex for `_stop` flag but NOT for:
+- `processed_count` (updated without lock on line 384)
+- `cached_pairs` list (modified without lock on line 237)
+- `total_comparisons` (updated without lock on line 238)
+
+---
+
+### 5.3 NO VALIDATION OF THEME FILES - **LOW**
+
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/themes.py`
+
+No validation that theme files exist or are valid before using them.
+
+---
+
+## 6. SECURITY ISSUES
+
+### 6.1 UNRESTRICTED FILE OPERATIONS - **MEDIUM**
+
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/handlers/file_handler.py`
+**Lines:** 127-132
+
+```python
+for root, _, files in os.walk(folder_path):
+    for file in files:
+        if file.lower().endswith(self.VIDEO_EXTENSIONS):
+            file_path = os.path.join(root, file)
+            if file_path not in existing_files:
+                found_files.append(file_path)
+```
+
+No symlink or path traversal protection. Could be exploited to process files outside intended directory.
+
+**Recommendation:** Add `os.path.realpath()` check and symlink validation.
+
+---
+
+### 6.2 UNVALIDATED SUBPROCESS CALLS - **MEDIUM**
+
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/audio_fingerprinting.py`
+
+If fpcalc is called via subprocess, should validate command and arguments to prevent injection.
+
+---
+
+## 7. PERFORMANCE ISSUES
+
+### 7.1 PAIR GENERATION INEFFICIENCY - **MEDIUM**
+
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/workers/comparison_worker.py`
+**Lines:** 177-234
+
+```python
+all_possible_pairs = [
+    (files[i], files[j])
+    for i in range(len(files))
+    for j in range(i + 1, len(files))
+]
+# ... then iterates through all_possible_pairs AND filtered ignored set
+
+# Then iterates through them again for cache checks
+for file1, file2 in all_possible_pairs:
+    cache_key = (file1, file2) if file1 < file2 else (file2, file1)
+```
+
+**Problem:** Generating all O(n²) pairs upfront uses O(n²) memory. For 10,000 files = 50M pairs = 500MB+ memory just for the list.
+
+**Recommendation:** Use generator or lazy evaluation:
+```python
+def generate_pairs_lazy(files):
+    for i in range(len(files)):
+        for j in range(i + 1, len(files)):
+            yield (files[i], files[j])
+```
+
+---
+
+### 7.2 REDUNDANT METADATA LOOKUPS - **LOW**
+
+**File:** `/home/user/videoFlow/src/plugins/duplicate_finder/workers/comparison_worker.py`
+**Lines:** 209-210
+
+```python
+meta1 = self.video_hasher.hash_cache.get(file1)
+meta2 = self.video_hasher.hash_cache.get(file2)
+```
+
+These metadata lookups happen for EVERY pair generation, even though metadata is static per file. Should be cached/precomputed once.
+
+---
+
+## 8. DOCUMENTATION GAPS
+
+### 8.1 INCOMPLETE SIGNAL DOCUMENTATION - **MEDIUM**
+
+Many Qt signals lack clear documentation of parameters:
+- `comparison_details(int, int, str, str)` - what order?
+- `progress_details(int, int, str)` - current, total, filename?
+- Signal parameter types documented but not semantics
+
+---
+
+### 8.2 MISSING ERROR HANDLING DOCUMENTATION - **LOW**
+
+No documented expected exceptions for public methods. Developers don't know what to catch.
+
+---
+
+## 9. SUMMARY BY SEVERITY
+
+### Critical (Fix Immediately)
+1. Duplicate function definitions in settings_manager.py
+2. Missing video_hasher initialization check
+
+### High Priority
+1. Bare exception handling in comparison_worker.py
+2. Missing resource cleanup on window close
+3. Race conditions in settings and duplicate handling
+4. Missing worker exports
+
+### Medium Priority
+1. Unvalidated file operations (security)
+2. Pair generation inefficiency (O(n²) memory)
+3. Inconsistent error handling patterns
+4. Missing closeEvent handler
+
+### Low Priority
+1. Code documentation gaps
+2. Unused/redundant code
+3. Performance micro-optimizations
+
+---
+
+## 10. RECOMMENDED FIXES (Priority Order)
+
+1. **Remove duplicate methods** in settings_manager.py
+2. **Add closeEvent handler** to main_window.py for proper cleanup
+3. **Fix bare except** in comparison_worker.py to log specific exception types
+4. **Export missing workers** in workers/__init__.py
+5. **Add path validation** in file_handler.py (symlink check)
+6. **Consolidate settings storage** to single locations
+7. **Add thread-safe lock** for list modifications
+8. **Implement pair generation** as generator for memory efficiency
+9. **Add docstring examples** for all Qt signals
+10. **Add integration tests** for resource cleanup
+
