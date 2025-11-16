@@ -87,8 +87,8 @@ class DuplicateFinderWindow(QMainWindow):
         self.setWindowTitle("🔍 Video Duplicate Detector")
         self.setMinimumSize(1000, 800)
 
-        # Initialize core components
-        self.video_hasher = VideoHasher()
+        # Initialize core components (video_hasher will be created after settings load)
+        self.video_hasher = None
 
         # Initialize UI components (will be set in setup_ui)
         self.file_list_widget: Optional[FileListWidget] = None
@@ -102,6 +102,7 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Initialize parameter widgets (will be set in setup_ui)
         self.threshold_spin = None
+        self.hash_method_combo = None
         self.hash_workers_spin = None
         self.comparison_workers_spin = None
         self.batch_size_spin = None
@@ -127,7 +128,14 @@ class DuplicateFinderWindow(QMainWindow):
         # Setup UI
         self.setup_ui()
 
-        # Initialize handlers after UI is ready
+        # Load settings first (to get hash method)
+        self._load_settings()
+
+        # Create video hasher with selected method
+        hash_method = self.hash_method_combo.currentData() if self.hash_method_combo else 'pHash'
+        self.video_hasher = VideoHasher(method=hash_method)
+
+        # Initialize handlers after video_hasher is created
         self.file_handler = FileHandler(self.file_list_widget)
         self.analysis_handler = AnalysisHandler(self.video_hasher)
         self.duplicate_handler = DuplicateHandler(self.video_hasher, self.file_handler)
@@ -137,9 +145,6 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Connect duplicate handler signals
         self._connect_duplicate_handler_signals()
-
-        # Load settings
-        self._load_settings()
 
         # Connect settings change signals
         self._connect_settings_signals()
@@ -315,6 +320,7 @@ class DuplicateFinderWindow(QMainWindow):
 
         if params_tab:
             self.threshold_spin = params_tab.threshold_spin
+            self.hash_method_combo = params_tab.hash_method_combo
             self.hash_workers_spin = params_tab.hash_workers_spin
             self.comparison_workers_spin = params_tab.comparison_workers_spin
             self.batch_size_spin = params_tab.batch_size_spin
@@ -373,6 +379,10 @@ class DuplicateFinderWindow(QMainWindow):
         if self.enable_subsequence_check:
             self.enable_subsequence_check.stateChanged.connect(self._on_settings_changed)
 
+        # Connect combobox separately (uses different signal)
+        if self.hash_method_combo:
+            self.hash_method_combo.currentIndexChanged.connect(self._on_settings_changed)
+
     def _load_settings(self) -> None:
         """
         Load saved settings.
@@ -389,6 +399,7 @@ class DuplicateFinderWindow(QMainWindow):
         """
         return {
             'threshold_spin': self.threshold_spin,
+            'hash_method_combo': self.hash_method_combo,
             'hash_workers_spin': self.hash_workers_spin,
             'comparison_workers_spin': self.comparison_workers_spin,
             'batch_size_spin': self.batch_size_spin,

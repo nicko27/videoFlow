@@ -2,7 +2,7 @@ import sqlite3
 import os
 import json
 import pickle
-import hashlib
+import multiprocessing
 from datetime import datetime
 from contextlib import contextmanager
 from queue import Queue, Empty
@@ -27,26 +27,39 @@ class ConnectionPool:
         lock: Thread lock for pool operations
     """
 
-    def __init__(self, db_path: str, pool_size: int = 5):
+    def __init__(self, db_path: str, pool_size: int = None):
         """
-        Initialize the connection pool.
+        Initialize the connection pool with auto-detected optimal size.
 
         Args:
             db_path: Path to SQLite database
-            pool_size: Maximum number of connections (default: 5)
+            pool_size: Maximum number of connections (default: auto-detect based on CPU)
         """
         self.db_path = db_path
-        self.pool_size = pool_size
-        self.pool = Queue(maxsize=pool_size)
+
+        # AUTO-DETECT optimal pool size based on CPU count
+        if pool_size is None:
+            cpu_count = multiprocessing.cpu_count()
+            # Formula: min(CPU_count + 2, 10) for balanced concurrency
+            # SQLite handles writes sequentially, so too many connections don't help
+            self.pool_size = min(cpu_count + 2, 10)
+            logger.info(
+                f"Auto-detected pool_size={self.pool_size} based on {cpu_count} CPUs"
+            )
+        else:
+            self.pool_size = max(1, min(pool_size, 20))  # Clamp between 1-20
+            logger.debug(f"Using configured pool_size={self.pool_size}")
+
+        self.pool = Queue(maxsize=self.pool_size)
         self.lock = Lock()
         self._closed = False
 
         # Create initial connections
-        for _ in range(pool_size):
+        for _ in range(self.pool_size):
             conn = self._create_connection()
             self.pool.put(conn)
 
-        logger.debug(f"Connection pool created with {pool_size} connections")
+        logger.debug(f"Connection pool created with {self.pool_size} connections")
 
     def _create_connection(self) -> sqlite3.Connection:
         """
@@ -154,8 +167,8 @@ class VideoDatabase:
         self._tables_exist = {}  # Cache for table existence
         self._ignore_type_exists = False  # Flag for ignore_type column (set after migration)
 
-        # Create connection pool (5 connections)
-        self.connection_pool = ConnectionPool(db_path, pool_size=5)
+        # Create connection pool with auto-detected optimal size
+        self.connection_pool = ConnectionPool(db_path, pool_size=None)
 
         self._ensure_database_exists()
         logger.info(f"Database initialized with connection pool: {self.db_path}")
@@ -319,6 +332,7 @@ class VideoDatabase:
                     "CREATE INDEX IF NOT EXISTS idx_modification_time ON video_files(modification_time)",
                     "CREATE INDEX IF NOT EXISTS idx_comparison_files ON comparisons(file1_id, file2_id)",
                     "CREATE INDEX IF NOT EXISTS idx_similarity ON comparisons(similarity)",
+                    "CREATE INDEX IF NOT EXISTS idx_early_exit ON comparisons(is_early_exit)",
                     "CREATE INDEX IF NOT EXISTS idx_corrupted_path ON corrupted_files(file_path)",
                     "CREATE INDEX IF NOT EXISTS idx_duplicates_status ON found_duplicates(status)",
                     "CREATE INDEX IF NOT EXISTS idx_duplicates_files ON found_duplicates(file1_id, file2_id)",

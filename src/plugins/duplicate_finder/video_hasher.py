@@ -9,7 +9,6 @@ import cv2
 import numpy as np
 import os
 import time
-from datetime import datetime
 from enum import Enum
 from .database_manager import VideoDatabase
 from .lru_cache import LRUCache

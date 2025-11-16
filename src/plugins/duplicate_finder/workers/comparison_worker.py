@@ -93,6 +93,50 @@ class OptimizedComparisonWorker(QThread):
         self.cached_pairs: List[Tuple[str, str, float]] = []
         self.total_comparisons = 0
 
+    def _calculate_adaptive_batch_size(
+        self,
+        total_pairs: int,
+        worker_count: int,
+        configured_size: int
+    ) -> int:
+        """
+        Calculate optimal batch size based on workload and worker count.
+
+        Adaptive strategy:
+        - Small datasets (<100 pairs): Use smaller batches for quick feedback
+        - Medium datasets (100-1000): Balance batch size with worker count
+        - Large datasets (>1000): Use larger batches to reduce overhead
+
+        Args:
+            total_pairs: Total number of comparison pairs
+            worker_count: Number of parallel workers
+            configured_size: User-configured batch size (max limit)
+
+        Returns:
+            Optimal batch size
+        """
+        if total_pairs < 100:
+            # Small dataset: keep batches small for responsive UI
+            optimal_size = min(max(10, total_pairs // worker_count), configured_size)
+        elif total_pairs < 1000:
+            # Medium dataset: balance between throughput and responsiveness
+            optimal_size = min(
+                max(50, total_pairs // (worker_count * 2)),
+                configured_size
+            )
+        else:
+            # Large dataset: optimize for throughput
+            optimal_size = min(
+                max(100, total_pairs // (worker_count * 4)),
+                configured_size
+            )
+
+        logger.info(
+            f"Adaptive batch size: {optimal_size} "
+            f"(pairs={total_pairs}, workers={worker_count}, configured={configured_size})"
+        )
+        return optimal_size
+
     def generate_pairs(self, files: List[str]) -> List[Tuple[str, str]]:
         """
         Generate pairs of files to compare, optimized with caching.
@@ -229,7 +273,15 @@ class OptimizedComparisonWorker(QThread):
 
             # Process pairs in batches (config already validated in __init__)
             comparison_workers = self.config['comparison_workers']
-            batch_size = self.config['batch_size']
+            configured_batch_size = self.config['batch_size']
+
+            # ADAPTIVE BATCH SIZE: Calculate optimal batch size based on workload
+            adaptive_batch_size = self._calculate_adaptive_batch_size(
+                total_pairs=len(pairs),
+                worker_count=comparison_workers,
+                configured_size=configured_batch_size
+            )
+            batch_size = adaptive_batch_size
 
             # Additional runtime validation
             if batch_size <= 0:

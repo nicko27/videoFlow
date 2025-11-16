@@ -8,7 +8,7 @@ from typing import Callable, Dict
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox,
     QGridLayout, QDoubleSpinBox, QSpinBox, QFrame, QLabel, QTabWidget,
-    QCheckBox
+    QCheckBox, QComboBox
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -236,6 +236,20 @@ class UIPanels:
         threshold_spin.setDecimals(1)
         essential_layout.addWidget(threshold_spin, 0, 1)
 
+        # Hash method selector
+        essential_layout.addWidget(QLabel("Hash method:"), 1, 0)
+        hash_method_combo = QComboBox()
+        hash_method_combo.addItem("pHash (Precise - Slower)", "pHash")
+        hash_method_combo.addItem("dHash (Balanced)", "dHash")
+        hash_method_combo.addItem("aHash (Fast - Less Precise)", "aHash")
+        hash_method_combo.setToolTip(
+            "pHash: Most accurate, slower\n"
+            "dHash: Good balance of speed/accuracy\n"
+            "aHash: Fastest, less accurate"
+        )
+        hash_method_combo.setCurrentIndex(0)  # Default to pHash
+        essential_layout.addWidget(hash_method_combo, 1, 1)
+
         layout.addWidget(essential_group)
 
         # Parallelization group
@@ -357,6 +371,7 @@ class UIPanels:
 
         # Store widget references in tab for later access
         tab.threshold_spin = threshold_spin
+        tab.hash_method_combo = hash_method_combo
         tab.hash_workers_spin = hash_workers_spin
         tab.comparison_workers_spin = comparison_workers_spin
         tab.batch_size_spin = batch_size_spin
