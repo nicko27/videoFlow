@@ -120,7 +120,6 @@ class DuplicateFinderWindow(QMainWindow):
         self.subsequence_sliding_tolerance_spin = None
         self.subsequence_temporal_window_spin = None
         self.subsequence_adaptive_refinement_check = None
-        self.hash_debugger = None
         self.hash_debugger_v2 = None
 
         # Initialize managers and handlers
@@ -156,9 +155,7 @@ class DuplicateFinderWindow(QMainWindow):
         hash_method = self.hash_method_combo.currentData() if self.hash_method_combo else 'pHash'
         self.video_hasher = VideoHasher(method=hash_method)
 
-        # Set video hasher on hash debugger widgets
-        if self.hash_debugger:
-            self.hash_debugger.set_video_hasher(self.video_hasher)
+        # Set video hasher on hash debugger widget
         if self.hash_debugger_v2:
             self.hash_debugger_v2.set_video_hasher(self.video_hasher)
             self.hash_debugger_v2.settings_manager = self.settings_manager
@@ -464,7 +461,6 @@ class DuplicateFinderWindow(QMainWindow):
             self.subsequence_sliding_tolerance_spin = params_tab.subsequence_sliding_tolerance_spin
             self.subsequence_temporal_window_spin = params_tab.subsequence_temporal_window_spin
             self.subsequence_adaptive_refinement_check = params_tab.subsequence_adaptive_refinement_check
-            self.hash_debugger = params_tab.hash_debugger
 
         if debug_tab:
             self.hash_debugger_v2 = debug_tab.hash_debugger_v2
@@ -506,16 +502,20 @@ class DuplicateFinderWindow(QMainWindow):
             self.comparison_workers_spin, self.batch_size_spin,
             self.hash_timeout_spin, self.comparison_timeout_spin,
             self.subsequence_sample_interval_spin, self.subsequence_min_match_spin,
-            self.subsequence_cache_memory_spin
+            self.subsequence_cache_memory_spin, self.subsequence_sliding_tolerance_spin,
+            self.subsequence_temporal_window_spin
         ]
 
         for widget in widgets:
             if widget:
                 widget.valueChanged.connect(self._on_settings_changed)
 
-        # Connect checkbox separately (uses different signal)
+        # Connect checkboxes separately (uses different signal)
         if self.enable_subsequence_check:
             self.enable_subsequence_check.stateChanged.connect(self._on_settings_changed)
+
+        if self.subsequence_adaptive_refinement_check:
+            self.subsequence_adaptive_refinement_check.stateChanged.connect(self._on_settings_changed)
 
         # Connect combobox separately (uses different signal)
         if self.hash_method_combo:
