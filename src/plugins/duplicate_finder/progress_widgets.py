@@ -340,11 +340,17 @@ class FileListWidget(QWidget):
         item_frame.status_label = status_label
         item_frame.name_label = name_label
         item_frame.size_label = size_label
-        
-        # Insertion avant le stretch
-        insert_position = self.files_layout.count() - 1
-        self.files_layout.insertWidget(insert_position, item_frame)
-        
+
+        # Insertion avant le stretch - with safety check
+        try:
+            if self.files_layout is not None:
+                insert_position = self.files_layout.count() - 1
+                self.files_layout.insertWidget(insert_position, item_frame)
+        except RuntimeError as e:
+            # Layout has been deleted, widget cleanup in progress
+            logger.warning(f"Cannot insert file item, layout deleted: {e}")
+            return None
+
         return item_frame
         
     def update_file_status(self, file_path, status):

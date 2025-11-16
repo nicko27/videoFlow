@@ -441,3 +441,35 @@ class SettingsManager(QObject):
         except Exception as e:
             logger.error(f"Error getting last folder: {e}")
             return None
+
+    def save_layout_preference(self, layout_key: str) -> None:
+        """
+        Save the selected layout preference.
+
+        Args:
+            layout_key: Key of the selected layout (e.g., 'classic', 'vertical', 'dashboard').
+        """
+        try:
+            self.settings.beginGroup("ui")
+            self.settings.setValue("layout", layout_key)
+            self.settings.endGroup()
+            self.settings.sync()
+            logger.debug(f"Layout preference saved: {layout_key}")
+        except Exception as e:
+            logger.error(f"Error saving layout preference: {e}")
+
+    def get_layout_preference(self) -> str:
+        """
+        Get the saved layout preference.
+
+        Returns:
+            Layout key string, defaults to 'classic' if not set.
+        """
+        try:
+            self.settings.beginGroup("ui")
+            layout = self.settings.value("layout", "classic", type=str)
+            self.settings.endGroup()
+            return layout
+        except Exception as e:
+            logger.error(f"Error getting layout preference: {e}")
+            return "classic"

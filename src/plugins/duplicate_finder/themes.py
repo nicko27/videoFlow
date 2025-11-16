@@ -218,8 +218,6 @@ class MaterialTheme(Theme):
                 font-size: {Typography.FONT_XXL}px;
                 font-weight: 500;
                 max-height: {spacing['title_height']}px;
-                /* Material elevation */
-                qproperty-shadowColor: rgba(0, 0, 0, 0.2);
             }}
         """
 
