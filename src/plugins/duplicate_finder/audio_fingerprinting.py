@@ -556,9 +556,12 @@ class AudioFingerprintDetector:
         min_ratio: Optional[float] = None,
         min_duration_seconds: float = 10.0
     ) -> Optional[Dict[str, Any]]:
-        """Find scene using hash-based index for 10-100x faster detection.
+        """Find scene using improved sliding window with smaller step size.
 
-        OPTION B: Fast hash-based search instead of sliding window.
+        OPTION B IMPROVED: Instead of hash matching (too fragile for re-encoded videos),
+        use DIRECT bit comparison with adaptive step size.
+
+        This is more robust than exact hash matching but faster than full sliding window.
 
         Args:
             short_video: Path to potentially shorter video (scene)
@@ -599,102 +602,91 @@ class AudioFingerprintDetector:
             import time
             start_time = time.time()
 
-            # PHASE 1: Create index from long video (one-time cost)
-            logger.debug(f"Creating index from long video ({len(raw_long)} samples)...")
-            segment_size = 16  # ~2 seconds at 0.128s per sample
-            long_index = self._create_fingerprint_index(raw_long, segment_size=segment_size)
+            # IMPROVED ALGORITHM: Two-phase search
+            # Phase 1: Coarse search with large step (every ~10 seconds)
+            # Phase 2: Fine search around best candidates (every 0.5 seconds)
 
-            # PHASE 2: Query index with short video segments
-            logger.debug(f"Querying index with short video ({len(raw_short)} samples)...")
-            matches = []
+            logger.debug(f"Starting two-phase search: {len(raw_short)} vs {len(raw_long)} samples")
 
-            for i in range(0, len(raw_short) - segment_size + 1):
-                segment = raw_short[i:i + segment_size]
+            seconds_per_sample = 0.128
+            window_size = len(raw_short)
 
-                # Hash segment (same method as index creation)
-                segment_hash = (
-                    (segment[0] & 0xFFFFFFFF) ^
-                    (segment[segment_size // 2] << 8) ^
-                    (segment[-1] << 16)
-                )
+            # PHASE 1: Coarse search (every ~10 seconds = ~78 samples)
+            coarse_step = max(10, int(10.0 / seconds_per_sample))  # ~10 second steps
+            coarse_candidates = []
 
-                # O(1) lookup in index
-                if segment_hash in long_index:
-                    for long_pos in long_index[segment_hash]:
-                        matches.append((i, long_pos))
+            logger.debug(f"Phase 1: Coarse search with step={coarse_step} ({coarse_step*seconds_per_sample:.1f}s)")
+
+            for i in range(0, len(raw_long) - window_size + 1, coarse_step):
+                window = raw_long[i:i + window_size]
+                similarity = self._compute_similarity(fp_short, fp_long, raw_short, window)
+
+                if similarity > 0.5:  # Only keep candidates above 50%
+                    coarse_candidates.append((i, similarity))
+
+            logger.debug(f"Phase 1 complete: {len(coarse_candidates)} candidates above 50%")
+
+            if len(coarse_candidates) == 0:
+                logger.debug("No candidates found in coarse search")
+                elapsed = time.time() - start_time
+                return {
+                    'is_scene': False,
+                    'match_ratio': 0.0,
+                    'start_time_seconds': 0.0,
+                    'confidence': 0.0,
+                    'short_duration': dur_short,
+                    'long_duration': dur_long,
+                    'method': 'two_phase',
+                    'search_time_seconds': elapsed
+                }
+
+            # PHASE 2: Fine search around best candidates (every 0.5 seconds)
+            fine_step = max(1, int(0.5 / seconds_per_sample))  # ~0.5 second steps
+            best_match_ratio = 0.0
+            best_start_idx = -1
+
+            logger.debug(f"Phase 2: Fine search around {len(coarse_candidates)} candidates with step={fine_step}")
+
+            # For each candidate, do fine search in a window around it
+            search_radius = coarse_step  # Search ±coarse_step around each candidate
+
+            for candidate_pos, candidate_sim in coarse_candidates:
+                # Define search window
+                search_start = max(0, candidate_pos - search_radius)
+                search_end = min(len(raw_long) - window_size + 1, candidate_pos + search_radius)
+
+                # Fine search in this window
+                for i in range(search_start, search_end, fine_step):
+                    window = raw_long[i:i + window_size]
+                    similarity = self._compute_similarity(fp_short, fp_long, raw_short, window)
+
+                    if similarity > best_match_ratio:
+                        best_match_ratio = similarity
+                        best_start_idx = i
 
             elapsed = time.time() - start_time
-            logger.info(f"⚡ Index search completed in {elapsed:.2f}s: {len(matches)} segment matches found")
+            start_time_seconds = best_start_idx * seconds_per_sample
 
-            if len(matches) == 0:
-                logger.debug("No matching segments found")
-                return {
-                    'is_scene': False,
-                    'match_ratio': 0.0,
-                    'start_time_seconds': 0.0,
-                    'confidence': 0.0,
-                    'short_duration': dur_short,
-                    'long_duration': dur_long
-                }
-
-            # PHASE 3: Find best cluster of matches
-            cluster_result = self._find_best_cluster(matches, min_cluster_size=5)
-
-            if cluster_result is None:
-                logger.debug("No consistent cluster found")
-                return {
-                    'is_scene': False,
-                    'match_ratio': 0.0,
-                    'start_time_seconds': 0.0,
-                    'confidence': 0.0,
-                    'short_duration': dur_short,
-                    'long_duration': dur_long
-                }
-
-            start_position, confidence = cluster_result
-
-            # PHASE 4: Verify with detailed comparison at detected position
-            # Extract windows for precise comparison
-            window_size = len(raw_short)
-            if start_position < 0 or start_position + window_size > len(raw_long):
-                logger.warning(f"Invalid start position: {start_position}")
-                return None
-
-            window = raw_long[start_position:start_position + window_size]
-
-            # Compute precise similarity
-            match_ratio = self._compute_similarity(
-                fp_short, fp_long,
-                raw_short, window
-            )
-
-            # Combine hash-based confidence with similarity score
-            final_confidence = (confidence + match_ratio) / 2.0
-
-            # Convert position to time
-            seconds_per_sample = 0.128
-            start_time_seconds = start_position * seconds_per_sample
-
-            is_scene = match_ratio >= min_ratio
+            is_scene = best_match_ratio >= min_ratio
 
             if is_scene:
-                logger.info(f"✅ Scene detected (INDEX): {os.path.basename(short_video)} "
+                logger.info(f"✅ Scene detected (TWO-PHASE): {os.path.basename(short_video)} "
                           f"in {os.path.basename(long_video)} "
-                          f"(match: {match_ratio*100:.1f}%, confidence: {final_confidence*100:.1f}%, "
-                          f"start: {start_time_seconds:.1f}s, search_time: {elapsed:.2f}s)")
+                          f"(match: {best_match_ratio*100:.1f}%, start: {start_time_seconds:.1f}s, "
+                          f"search_time: {elapsed:.2f}s)")
             else:
-                logger.debug(f"No scene match: {match_ratio*100:.1f}% < {min_ratio*100:.1f}%")
+                logger.debug(f"No scene match: {best_match_ratio*100:.1f}% < {min_ratio*100:.1f}%")
 
             return {
                 'is_scene': is_scene,
-                'match_ratio': match_ratio,
+                'match_ratio': best_match_ratio,
                 'start_time_seconds': start_time_seconds,
-                'confidence': final_confidence,
+                'confidence': best_match_ratio,
                 'short_duration': dur_short,
                 'long_duration': dur_long,
-                'method': 'hash_index',
+                'method': 'two_phase',
                 'search_time_seconds': elapsed,
-                'num_matches': len(matches)
+                'num_candidates': len(coarse_candidates)
             }
 
         except Exception as e:
