@@ -17,8 +17,12 @@ from PyQt6.QtGui import QFont
 
 try:
     from .video_preview_widget import VideoPreviewWidget
+    from .design_system import Colors, Spacing, Typography, Styles
+    from .keyboard_shortcuts import KeyboardShortcuts
 except ImportError:
     from video_preview_widget import VideoPreviewWidget
+    from design_system import Colors, Spacing, Typography, Styles
+    from keyboard_shortcuts import KeyboardShortcuts
 
 from src.core.logger import Logger
 
@@ -377,21 +381,34 @@ class SubsequenceComparisonDialog(QDialog):
         """Handle keyboard shortcuts."""
         key = event.key()
 
-        if key == Qt.Key.Key_Left:
-            # Move slider left
+        # Action shortcuts
+        if key == KeyboardShortcuts.COMPARISON_KEEP_LEFT:
+            self.set_result("keep_short")
+        elif key == KeyboardShortcuts.COMPARISON_KEEP_RIGHT:
+            self.set_result("keep_long")
+        elif key == KeyboardShortcuts.COMPARISON_KEEP_BOTH:
+            self.set_result("keep_both")
+        elif key == KeyboardShortcuts.COMPARISON_QUIT:
+            self.set_result("skip")
+
+        # Navigation shortcuts - position in short video
+        elif key == KeyboardShortcuts.NAV_START:
+            self.position_slider.setValue(0)
+        elif key == KeyboardShortcuts.NAV_END:
+            self.position_slider.setValue(100)
+        elif key == KeyboardShortcuts.NAV_QUARTER:
+            self.position_slider.setValue(25)
+        elif key == KeyboardShortcuts.NAV_HALF:
+            self.position_slider.setValue(50)
+        elif key == KeyboardShortcuts.NAV_THREE_QUARTERS:
+            self.position_slider.setValue(75)
+        elif key == KeyboardShortcuts.NAV_PREV:
+            # Move back 5%
             new_value = max(0, self.position_slider.value() - 5)
             self.position_slider.setValue(new_value)
-        elif key == Qt.Key.Key_Right:
-            # Move slider right
+        elif key == KeyboardShortcuts.NAV_NEXT:
+            # Move forward 5%
             new_value = min(100, self.position_slider.value() + 5)
             self.position_slider.setValue(new_value)
-        elif key == Qt.Key.Key_1:
-            self.set_result("keep_short")
-        elif key == Qt.Key.Key_2:
-            self.set_result("keep_long")
-        elif key == Qt.Key.Key_3:
-            self.set_result("keep_both")
-        elif key == Qt.Key.Key_Escape:
-            self.set_result("skip")
         else:
             super().keyPressEvent(event)
