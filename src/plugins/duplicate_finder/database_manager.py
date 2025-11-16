@@ -4,10 +4,141 @@ import json
 import pickle
 import hashlib
 from datetime import datetime
+from contextlib import contextmanager
+from queue import Queue, Empty
+from threading import Lock
 import numpy as np
 from src.core.logger import Logger
 
 logger = Logger.get_logger('DuplicateFinder.DatabaseManager')
+
+
+class ConnectionPool:
+    """Thread-safe SQLite connection pool.
+
+    Manages a pool of SQLite connections to avoid the overhead of creating
+    new connections for each operation. Designed for SQLite's single-writer
+    limitation with a small pool size.
+
+    Attributes:
+        db_path: Path to the SQLite database file
+        pool_size: Maximum number of connections (default: 5)
+        pool: Queue containing available connections
+        lock: Thread lock for pool operations
+    """
+
+    def __init__(self, db_path: str, pool_size: int = 5):
+        """
+        Initialize the connection pool.
+
+        Args:
+            db_path: Path to SQLite database
+            pool_size: Maximum number of connections (default: 5)
+        """
+        self.db_path = db_path
+        self.pool_size = pool_size
+        self.pool = Queue(maxsize=pool_size)
+        self.lock = Lock()
+        self._closed = False
+
+        # Create initial connections
+        for _ in range(pool_size):
+            conn = self._create_connection()
+            self.pool.put(conn)
+
+        logger.debug(f"Connection pool created with {pool_size} connections")
+
+    def _create_connection(self) -> sqlite3.Connection:
+        """
+        Create a new optimized SQLite connection.
+
+        Returns:
+            Configured SQLite connection
+        """
+        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        # Apply optimizations
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA cache_size=10000")
+        conn.execute("PRAGMA temp_store=MEMORY")
+        return conn
+
+    @contextmanager
+    def get_connection(self):
+        """
+        Get a connection from the pool (context manager).
+
+        Yields:
+            SQLite connection from the pool
+
+        Example:
+            with pool.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT ...")
+        """
+        if self._closed:
+            raise RuntimeError("Connection pool is closed")
+
+        conn = None
+        try:
+            # Get connection from pool (timeout 30 seconds)
+            conn = self.pool.get(timeout=30)
+            yield conn
+        except Empty:
+            # Pool exhausted - create temporary connection
+            logger.warning("Connection pool exhausted, creating temporary connection")
+            temp_conn = self._create_connection()
+            try:
+                yield temp_conn
+            finally:
+                temp_conn.close()
+        finally:
+            # Return connection to pool
+            if conn is not None:
+                try:
+                    # Rollback any uncommitted transaction
+                    conn.rollback()
+                    self.pool.put(conn, block=False)
+                except Exception as e:
+                    logger.error(f"Error returning connection to pool: {e}")
+                    # Connection might be broken, create a new one
+                    try:
+                        conn.close()
+                    except:
+                        pass
+                    new_conn = self._create_connection()
+                    self.pool.put(new_conn, block=False)
+
+    def close_all(self):
+        """
+        Close all connections in the pool.
+
+        Should be called when shutting down the application.
+        """
+        with self.lock:
+            if self._closed:
+                return
+
+            self._closed = True
+            closed_count = 0
+
+            # Close all connections in pool
+            while not self.pool.empty():
+                try:
+                    conn = self.pool.get(block=False)
+                    conn.close()
+                    closed_count += 1
+                except Empty:
+                    break
+                except Exception as e:
+                    logger.error(f"Error closing connection: {e}")
+
+            logger.info(f"Connection pool closed ({closed_count} connections)")
+
+    def __del__(self):
+        """Destructor to ensure connections are closed."""
+        self.close_all()
+
 
 class VideoDatabase:
     """Optimized database manager for video hashes and comparisons - With proper migration"""
@@ -22,8 +153,12 @@ class VideoDatabase:
         self._initialized = False  # Flag to avoid repeated checks
         self._tables_exist = {}  # Cache for table existence
         self._ignore_type_exists = False  # Flag for ignore_type column (set after migration)
+
+        # Create connection pool (5 connections)
+        self.connection_pool = ConnectionPool(db_path, pool_size=5)
+
         self._ensure_database_exists()
-        logger.info(f"Database initialized: {self.db_path}")
+        logger.info(f"Database initialized with connection pool: {self.db_path}")
     
     def _ensure_database_exists(self):
         """S'asone que la base de données et ses tables existent - UNE SEULE FOIS"""
@@ -224,15 +359,30 @@ class VideoDatabase:
         except Exception:
             return False
     
+    @contextmanager
     def get_connection(self):
-        """Returns une connexion à la base optimisée"""
-        conn = sqlite3.connect(self.db_path)
-        # Active les optimisations pour cette connexion
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA cache_size=10000")
-        conn.execute("PRAGMA temp_store=MEMORY")
-        return conn
+        """
+        Get an optimized database connection from the pool (context manager).
+
+        Yields:
+            SQLite connection from the connection pool
+
+        Example:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT ...")
+        """
+        with self.connection_pool.get_connection() as conn:
+            yield conn
+
+    def close(self):
+        """
+        Close all database connections.
+
+        Should be called when shutting down.
+        """
+        self.connection_pool.close_all()
+        logger.info("Database connections closed")
     
     def file_needs_reanalysis(self, file_path):
         """Checks si un file a été modifié - OPTIMISÉ"""

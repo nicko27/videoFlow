@@ -58,12 +58,16 @@ class VideoHasher:
         similarity = hasher.compare_videos('video1.mp4', 'video2.mp4')
     """
 
-    def __init__(self, method=HashMethod.PHASH.value):
+    def __init__(self, method=HashMethod.PHASH.value, enable_preload=True, max_preload_items=1000):
         """Initialize the VideoHasher with specified hashing method.
 
         Args:
             method (str, optional): Hash method to use ('pHash', 'dHash', or 'aHash').
                 Defaults to HashMethod.PHASH.value.
+            enable_preload (bool, optional): Enable cache preloading at startup.
+                Defaults to True.
+            max_preload_items (int, optional): Maximum number of hashes to preload.
+                Defaults to 1000. Set to 0 for unlimited (not recommended).
         """
         self.method = method if isinstance(method, str) else method.value
         self.plugin_dir = os.path.dirname(__file__)
@@ -75,53 +79,85 @@ class VideoHasher:
         # LRU cache for comparisons (limited to 10000 most recent)
         # Prevents unlimited memory growth while keeping hot comparisons fast
         self.comparison_cache = LRUCache(max_size=10000)
-        
-        # Positions ABSOLUES fixes pour cohérence
-        # Frame indices exacts pour toutes the videos
+
+        # Fixed absolute positions for consistency
+        # Exact frame indices for all videos
         self.absolute_positions = [
-            30,    # 1 seconde à 30fps
-            150,   # 5 secondes
-            300,   # 10 secondes
-            600,   # 20 secondes
-            900,   # 30 secondes
-            1500,  # 50 secondes
-            2100,  # 70 secondes
-            3000   # 100 secondes
+            30,    # 1 second at 30fps
+            150,   # 5 seconds
+            300,   # 10 seconds
+            600,   # 20 seconds
+            900,   # 30 seconds
+            1500,  # 50 seconds
+            2100,  # 70 seconds
+            3000   # 100 seconds
         ]
-        
-        # Précharge tous les hashs existants en mémoire au démarrage
-        self._preload_cache()
-        
-        logger.debug(f"VideoHasher initialisé with cache mémoire permanent")
 
-    def _preload_cache(self):
-        """Preload all hashes from the database into memory at startup.
+        # Smart preload: only recent hashes with file existence check
+        if enable_preload:
+            self._preload_cache(max_items=max_preload_items)
+        else:
+            logger.debug("Cache preloading disabled")
 
-        Loads both video hashes and recent comparison results (limited to 50k)
-        into memory caches for instant access. Only loads hashes for files
-        that still exist on disk.
+        logger.debug(f"VideoHasher initialized with permanent memory cache")
 
-        **OPTIMIZED**: Uses JSON instead of pickle for security and speed.
+    def _preload_cache(self, max_items=1000, progress_callback=None):
+        """Smart cache preloading with limits and file existence checks.
+
+        Loads only the most recently updated hashes (not all hashes) for files
+        that still exist on disk. This prevents slow startup with large databases.
+
+        Args:
+            max_items (int): Maximum number of hashes to preload (default: 1000).
+                Set to 0 for unlimited (not recommended for large databases).
+            progress_callback (callable, optional): Callback for progress updates.
+                Called with (current, total, message).
+
+        **OPTIMIZED**:
+        - Loads only recent items (ORDER BY updated_at DESC LIMIT)
+        - Checks file existence BEFORE loading hash data
+        - Uses JSON deserialization (faster and safer than pickle)
+        - Limits comparison cache to most recent 5000 items
         """
         try:
             from src.core.serialization import deserialize_numpy_from_json
 
+            start_time = time.time()
+
             with self.db.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # Load hashes - OPTIMIZED: Batch check file existence
-                cursor.execute('''
-                    SELECT file_path, hash_data, duration, modification_time, file_size
-                    FROM video_files
-                ''')
+                # Load hashes - SMART: Only most recent items
+                if max_items > 0:
+                    query = '''
+                        SELECT file_path, hash_data, duration, modification_time, file_size
+                        FROM video_files
+                        ORDER BY updated_at DESC
+                        LIMIT ?
+                    '''
+                    cursor.execute(query, (max_items,))
+                else:
+                    # Unlimited - use with caution
+                    query = '''
+                        SELECT file_path, hash_data, duration, modification_time, file_size
+                        FROM video_files
+                        ORDER BY updated_at DESC
+                    '''
+                    cursor.execute(query)
 
                 loaded_hashes = 0
+                skipped_missing = 0
+                skipped_errors = 0
                 rows = cursor.fetchall()
+                total_rows = len(rows)
 
-                # Batch existence check (faster than individual os.path.exists)
-                for row in rows:
+                # Process rows with optional progress tracking
+                for idx, row in enumerate(rows):
                     file_path, hash_blob, duration, mtime, file_size = row
+
+                    # OPTIMIZATION: Skip if file no longer exists (don't waste time deserializing)
                     if not os.path.exists(file_path):
+                        skipped_missing += 1
                         continue
 
                     try:
@@ -137,35 +173,53 @@ class VideoHasher:
                             'hash': hash_data,
                             'duration': duration,
                             'mtime': mtime,
-                            'file_size': file_size  # OPTIMIZATION: Cache file size for early exit
+                            'file_size': file_size
                         }
                         loaded_hashes += 1
+
+                        # Progress callback every 100 items
+                        if progress_callback and (idx + 1) % 100 == 0:
+                            progress_callback(idx + 1, total_rows, f"Loading cache ({loaded_hashes} loaded)")
+
                     except Exception as e:
-                        logger.debug(f"Failed to load hash for {file_path}: {e}")
+                        logger.debug(f"Failed to load hash for {os.path.basename(file_path)}: {e}")
+                        skipped_errors += 1
                         continue
 
-                # Load comparisons - OPTIMIZED: Limit to most recent
+                # Load comparisons - SMART: Limit to most recent 5000 (reduced from 50k)
                 cursor.execute('''
                     SELECT v1.file_path, v2.file_path, c.similarity
                     FROM comparisons c
                     JOIN video_files v1 ON c.file1_id = v1.id
                     JOIN video_files v2 ON c.file2_id = v2.id
                     ORDER BY c.created_at DESC
-                    LIMIT 50000
+                    LIMIT 5000
                 ''')
 
                 loaded_comparisons = 0
                 for file1, file2, similarity in cursor.fetchall():
-                    # OPTIMIZATION: Pre-compute cache key to avoid repeated sorting
+                    # Pre-compute cache key to avoid repeated sorting
                     cache_key = (file1, file2) if file1 < file2 else (file2, file1)
                     self.comparison_cache.set(cache_key, similarity)
                     loaded_comparisons += 1
 
-                if loaded_hashes > 0 or loaded_comparisons > 0:
-                    logger.info(f"Cache preloaded: {loaded_hashes} hashes, {loaded_comparisons} comparisons")
+                elapsed = time.time() - start_time
+
+                # Summary log
+                summary = f"Cache preload completed in {elapsed:.2f}s: "
+                summary += f"{loaded_hashes} hashes, {loaded_comparisons} comparisons"
+                if skipped_missing > 0:
+                    summary += f" ({skipped_missing} missing files skipped)"
+                if skipped_errors > 0:
+                    summary += f" ({skipped_errors} errors)"
+
+                logger.info(summary)
+
+                if progress_callback:
+                    progress_callback(total_rows, total_rows, "Cache preload complete")
 
         except Exception as e:
-            logger.debug(f"Cache preload: {e}")
+            logger.error(f"Error during cache preload: {e}")
 
     def compute_frame_hash(self, frame):
         """Calculate the perceptual hash of a single video frame.
