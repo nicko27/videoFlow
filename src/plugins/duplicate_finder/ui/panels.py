@@ -201,10 +201,17 @@ class UIPanels:
         clear_cache_btn.setStyleSheet(UIPanels._get_button_style("#6F42C1", "#59359A"))
         clear_cache_btn.clicked.connect(callbacks['clear_cache'])
 
+        # Reset folder button
+        reset_folder_btn = QPushButton("🔄 Reset folder")
+        reset_folder_btn.setMinimumHeight(40)
+        reset_folder_btn.setStyleSheet(UIPanels._get_button_style("#DC3545", "#C82333"))
+        reset_folder_btn.clicked.connect(callbacks.get('reset_folder', lambda: None))
+
         buttons_layout.addWidget(add_files_btn, 0, 0)
         buttons_layout.addWidget(add_folder_btn, 0, 1)
         buttons_layout.addWidget(clear_btn, 1, 0)
         buttons_layout.addWidget(clear_cache_btn, 1, 1)
+        buttons_layout.addWidget(reset_folder_btn, 2, 0, 1, 2)  # Span both columns
 
         layout.addLayout(buttons_layout)
         layout.addWidget(file_list_widget)

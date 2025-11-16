@@ -158,6 +158,7 @@ class DuplicateFinderWindow(QMainWindow):
             self.hash_debugger.set_video_hasher(self.video_hasher)
         if self.hash_debugger_v2:
             self.hash_debugger_v2.set_video_hasher(self.video_hasher)
+            self.hash_debugger_v2.settings_manager = self.settings_manager
 
         # Initialize handlers after video_hasher is created
         self.file_handler = FileHandler(self.file_list_widget)
@@ -421,6 +422,7 @@ class DuplicateFinderWindow(QMainWindow):
             'reload_last_folder': self.reload_last_folder,
             'clear_list': self.clear_list,
             'clear_cache': self.clear_cache,
+            'reset_folder': self.reset_folder,
             'apply_preset': self.apply_preset,
             'analyze': self.start_analysis,
             'stop': self.stop_analysis,
@@ -572,12 +574,33 @@ class DuplicateFinderWindow(QMainWindow):
         """
         Add video files through file dialog.
         """
-        count = self.file_handler.add_files_dialog(self)
+        from PyQt6.QtWidgets import QFileDialog
+        import os
+
+        # Get last used folder
+        last_folder = self.settings_manager.get_last_folder()
+
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Select video files",
+            last_folder,
+            "Videos (*.mp4 *.avi *.mkv *.mov *.wmv *.flv *.m4v);;All files (*.*)"
+        )
+
+        if not files:
+            return
+
+        # Save the folder of the first selected file
+        if files:
+            folder = os.path.dirname(files[0])
+            self.settings_manager.save_last_folder(folder)
+
+        count = self.file_handler.add_files(files)
 
         if count > 0:
             # Update cache status for new files
-            files = self.file_handler.get_all_files()
-            self.file_handler.batch_update_cache_status(files, self.video_hasher)
+            all_files = self.file_handler.get_all_files()
+            self.file_handler.batch_update_cache_status(all_files, self.video_hasher)
 
             # Update UI
             self.force_ui_update()
@@ -600,7 +623,9 @@ class DuplicateFinderWindow(QMainWindow):
         # Ignore button checked state (boolean from clicked signal)
         # Only use folder_path if it's actually a string path
         if not isinstance(folder_path, str):
-            folder_path = QFileDialog.getExistingDirectory(self, "Select folder")
+            # Get last used folder
+            last_folder = self.settings_manager.get_last_folder()
+            folder_path = QFileDialog.getExistingDirectory(self, "Select folder", last_folder)
 
         if not folder_path:
             return
@@ -694,6 +719,17 @@ class DuplicateFinderWindow(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Cannot clear cache: {e}")
+
+    def reset_folder(self) -> None:
+        """
+        Reset the last used folder path.
+        """
+        self.settings_manager.reset_last_folder()
+        self.status_indicator.update_status(
+            "🔄", "Folder path reset",
+            "#17A2B8", "#D1ECF1", "#17A2B8"
+        )
+        logger.info("Last folder path has been reset")
 
     # Configuration
     def apply_preset(self, preset_type: str) -> None:
