@@ -47,46 +47,34 @@ Implémenter 4 dispositions (layouts) différentes pour l'interface du Duplicate
 ### 3. **Dashboard View**
 ```
 [Header: Titre | Sélecteur de layout | Sélecteur de thème]
-[Quick Actions (carte) | Statistiques en temps réel (carte)]
-[Liste de fichiers (pleine largeur)]
-[Progression]
+[Panneau gauche (30%, max 400px) | Panneau droit (70%)]
 ```
-- **Description:** Vue en cartes avec statistiques visuelles
-- **Cartes supérieures:** Max 200px hauteur
-  - **Quick Actions:** Boutons d'actions principales
-  - **Stats Card:** Statistiques en temps réel (fichiers, analysés, doublons)
-- **Panneau inférieur:** Liste complète (stretch: 1)
-- **Style:** Cartes avec bordures arrondies (8px), ombres subtiles
+- **Description:** Splitter horizontal avec proportions différentes
+- **Panneau gauche:** Limité à 400px width, ne s'étire pas (stretch factor: 0)
+- **Panneau droit:** Prend 70% de l'espace, s'étire (stretch factor: 1)
+- **Ratio initial:** 300px / 700px
+- **Idéal pour:** Emphasis sur la liste de fichiers
 
-**Caractéristiques:**
-- Cartes avec `border-radius: 8px`
-- Stats colorées (bleu, vert, orange)
-- Polices en gras pour les chiffres
-- Espacement de 15px entre éléments
-
-**Fichier:** `layouts.py:140-182`
+**Fichier:** `layouts.py:140-180`
 
 ---
 
 ### 4. **Simplified**
 ```
 [Header: Titre | Sélecteur de layout | Sélecteur de thème]
-[Boutons d'action géants (80px hauteur)]
-[⚙️ Advanced Settings (repliable par défaut)]
-[Liste de fichiers (prend le plus d'espace)]
-[Progression minimale]
+[⚙️ Settings (repliable, collapsed par défaut)]
+[Liste de fichiers (expanded, prend le plus d'espace)]
+[Progression]
 ```
-- **Description:** Interface minimaliste avec gros boutons
-- **Boutons géants:**
-  - 📁 Add Files (bleu)
-  - 🔍 Analyze (vert)
-  - 📊 View Results (orange)
-  - Hauteur: 80px, padding: 20px, font-size: 16px
-- **Settings avancés:** QGroupBox repliable (collapsed par défaut)
-- **Panneau gauche dans groupe:** Max 300px quand déployé
-- **Idéal pour:** Utilisateurs débutants, workflow simple
+- **Description:** Settings dans un QGroupBox collapsible
+- **QGroupBox Settings:**
+  - Checkable (peut être coché/décoché pour expand/collapse)
+  - Collapsed par défaut (checked = False)
+  - Panneau gauche à l'intérieur, max 400px hauteur
+- **Panneau droit:** Prend tout l'espace (stretch: 1)
+- **Idéal pour:** Simplifier l'interface, focus sur fichiers
 
-**Fichier:** `layouts.py:184-228`
+**Fichier:** `layouts.py:182-224`
 
 ---
 
@@ -190,34 +178,6 @@ def get_layout_preference(self) -> str:
 
 ---
 
-## 🎨 Widgets Helper
-
-### **_create_card()** (Dashboard)
-Crée une carte stylisée avec:
-- Bordure arrondie (8px)
-- Bordure 1px #E0E0E0
-- Fond blanc
-- Padding 15px
-- Titre en gras (Arial 12pt)
-
-### **_create_stats_card()** (Dashboard)
-Carte de statistiques avec:
-- Bordure bleue 2px (#2196F3)
-- Fond gris clair (#F5F5F5)
-- Grid layout 3×2:
-  - **Files:** Bleu (#2196F3), 16pt bold
-  - **Analyzed:** Vert (#4CAF50), 16pt bold
-  - **Duplicates:** Orange (#FF9800), 16pt bold
-
-### **_create_simplified_actions()** (Simplified)
-3 boutons géants avec:
-- Hauteur minimale: 80px
-- Padding: 20px
-- Font: 16px bold
-- Border-radius: 8px
-- Couleurs: Bleu, Vert, Orange
-- Effets hover et pressed
-
 ---
 
 ## 🚀 Utilisation
@@ -244,10 +204,10 @@ Carte de statistiques avec:
 
 | Layout | Hauteur header | Panneau gauche | Panneau droit | Idéal pour |
 |--------|---------------|----------------|---------------|------------|
-| **Classic** | Compact | 350px fixe | 650px fixe | Utilisateurs expérimentés, multi-tâches |
-| **Vertical** | Compact | 250px max | Expandable | Écrans larges, focus fichiers |
-| **Dashboard** | Compact | Carte 200px | Pleine largeur | Monitoring temps réel |
-| **Simplified** | Compact | Repliable 300px | Expandable | Débutants, workflow simple |
+| **Classic** | Compact | 350px (stretch 1) | 650px (stretch 2) | Utilisateurs expérimentés, équilibré |
+| **Vertical** | Compact | 250px max en haut | Expandable en bas | Écrans larges, focus fichiers |
+| **Dashboard** | Compact | 300px, max 400px | 700px (stretch 1) | Emphasis sur liste de fichiers |
+| **Simplified** | Compact | Collapsible 400px | Expandable (stretch 1) | Interface épurée, débutants |
 
 ---
 
@@ -320,4 +280,24 @@ Le choix est **persisté automatiquement** et **restauré au prochain lancement*
 
 ---
 
-**Statut:** ✅ **IMPLÉMENTÉ ET TESTÉ (syntax checks passed)**
+## 🐛 Corrections (2025-11-16)
+
+### **Problème 1: RuntimeError: QVBoxLayout has been deleted**
+**Symptôme:** Crash lors de l'ajout de fichiers après changement de thème/layout
+**Cause:** `file_handler` pointait vers l'ancien `file_list_widget` supprimé
+**Fix:** Toujours recréer `file_handler` après `setup_ui()`, même sans fichiers
+
+### **Problème 2: Boutons invisibles/non fonctionnels**
+**Symptôme:** Layouts Dashboard et Simplified créaient des boutons non connectés
+**Cause:** Création de nouveaux widgets au lieu de réutiliser les panneaux existants
+**Fix:** Simplifié les layouts pour réutiliser uniquement `left_panel` et `right_panel`
+
+### **Changements aux layouts:**
+- **Dashboard:** Simplifié en split horizontal 30/70 au lieu de cartes
+- **Simplified:** Simplifié en settings collapsibles au lieu de gros boutons
+- **Supprimé:** Méthodes `_create_card()`, `_create_stats_card()`, `_create_simplified_actions()`
+- **Nettoyé:** Imports inutilisés (QPushButton, QLabel, QGridLayout, QFrame, etc.)
+
+---
+
+**Statut:** ✅ **IMPLÉMENTÉ, CORRIGÉ ET TESTÉ (syntax checks passed)**

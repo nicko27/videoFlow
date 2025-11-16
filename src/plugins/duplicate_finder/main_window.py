@@ -340,9 +340,12 @@ class DuplicateFinderWindow(QMainWindow):
         # Recreate UI
         self.setup_ui()
 
-        # Restore state
-        if files and self.file_list_widget:
+        # ALWAYS recreate file_handler with new widget reference
+        if self.file_list_widget:
             self.file_handler = FileHandler(self.file_list_widget)
+
+        # Restore files if any
+        if files and self.file_handler:
             self.file_handler.add_files(files)
 
     def on_layout_changed(self, index: int) -> None:
@@ -380,9 +383,12 @@ class DuplicateFinderWindow(QMainWindow):
         # Recreate UI with new layout
         self.setup_ui()
 
-        # Restore state
-        if files and self.file_list_widget:
+        # ALWAYS recreate file_handler with new widget reference
+        if self.file_list_widget:
             self.file_handler = FileHandler(self.file_list_widget)
+
+        # Restore files if any
+        if files and self.file_handler:
             self.file_handler.add_files(files)
 
         # Save layout preference
