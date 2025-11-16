@@ -398,33 +398,47 @@ class UIPanels:
         )
         scene_layout.addWidget(scene_precision_combo, 1, 1)
 
+        # Algorithm selector
+        scene_layout.addWidget(QLabel("Algorithm:"), 2, 0)
+        scene_algorithm_combo = QComboBox()
+        scene_algorithm_combo.addItem("🚀 Hash Index (10-100x faster, recommended)", "hash_index")
+        scene_algorithm_combo.addItem("🎵 Shazam (Ultra-fast, experimental)", "shazam")
+        scene_algorithm_combo.addItem("🔍 Sliding Window (Classic, slower)", "sliding_window")
+        scene_algorithm_combo.setCurrentIndex(0)  # Default to Hash Index
+        scene_algorithm_combo.setToolTip(
+            "Hash Index: 10-100x faster than sliding window, uses Chromaprint hash lookups\n"
+            "Shazam: Ultra-fast spectrogram-based detection (requires scipy, experimental)\n"
+            "Sliding Window: Classic method, improved step size (slower but reliable)"
+        )
+        scene_layout.addWidget(scene_algorithm_combo, 2, 1)
+
         # Min match ratio
-        scene_layout.addWidget(QLabel("Min match ratio:"), 2, 0)
+        scene_layout.addWidget(QLabel("Min match ratio:"), 3, 0)
         scene_min_match_spin = QDoubleSpinBox()
         scene_min_match_spin.setRange(75.0, 99.0)
         scene_min_match_spin.setValue(85.0)
         scene_min_match_spin.setSuffix("%")
         scene_min_match_spin.setDecimals(1)
         scene_min_match_spin.setToolTip("Minimum audio match ratio to consider a scene (default: 85%)")
-        scene_layout.addWidget(scene_min_match_spin, 2, 1)
+        scene_layout.addWidget(scene_min_match_spin, 3, 1)
 
         # Min scene duration
-        scene_layout.addWidget(QLabel("Min scene duration:"), 3, 0)
+        scene_layout.addWidget(QLabel("Min scene duration:"), 4, 0)
         scene_min_duration_spin = QSpinBox()
         scene_min_duration_spin.setRange(5, 300)
         scene_min_duration_spin.setValue(10)
         scene_min_duration_spin.setSuffix(" sec")
         scene_min_duration_spin.setToolTip("Minimum scene duration to avoid false positives (default: 10 seconds)")
-        scene_layout.addWidget(scene_min_duration_spin, 3, 1)
+        scene_layout.addWidget(scene_min_duration_spin, 4, 1)
 
         # Cache size
-        scene_layout.addWidget(QLabel("Fingerprint cache:"), 4, 0)
+        scene_layout.addWidget(QLabel("Fingerprint cache:"), 5, 0)
         scene_cache_size_spin = QSpinBox()
         scene_cache_size_spin.setRange(100, 2000)
         scene_cache_size_spin.setValue(500)
         scene_cache_size_spin.setSuffix(" items")
         scene_cache_size_spin.setToolTip("Maximum number of audio fingerprints to cache (default: 500)")
-        scene_layout.addWidget(scene_cache_size_spin, 4, 1)
+        scene_layout.addWidget(scene_cache_size_spin, 5, 1)
 
         # Info label with explanation
         info_label = QLabel(
@@ -437,7 +451,7 @@ class UIPanels:
         )
         info_label.setStyleSheet("QLabel { color: #6C757D; font-size: 9px; padding: 5px; }")
         info_label.setWordWrap(True)
-        scene_layout.addWidget(info_label, 5, 0, 1, 2)
+        scene_layout.addWidget(info_label, 6, 0, 1, 2)
 
         layout.addWidget(scene_group)
 
@@ -454,6 +468,7 @@ class UIPanels:
         tab.comparison_timeout_spin = comparison_timeout_spin
         tab.enable_scene_check = enable_scene_check
         tab.scene_precision_combo = scene_precision_combo
+        tab.scene_algorithm_combo = scene_algorithm_combo
         tab.scene_min_match_spin = scene_min_match_spin
         tab.scene_min_duration_spin = scene_min_duration_spin
         tab.scene_cache_size_spin = scene_cache_size_spin

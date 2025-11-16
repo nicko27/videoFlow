@@ -117,6 +117,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.comparison_timeout_spin = None
         self.enable_scene_check = None
         self.scene_precision_combo = None
+        self.scene_algorithm_combo = None
         self.scene_min_match_spin = None
         self.scene_min_duration_spin = None
         self.scene_cache_size_spin = None
@@ -457,6 +458,7 @@ class DuplicateFinderWindow(QMainWindow):
             self.comparison_timeout_spin = params_tab.comparison_timeout_spin
             self.enable_scene_check = params_tab.enable_scene_check
             self.scene_precision_combo = params_tab.scene_precision_combo
+            self.scene_algorithm_combo = params_tab.scene_algorithm_combo
             self.scene_min_match_spin = params_tab.scene_min_match_spin
             self.scene_min_duration_spin = params_tab.scene_min_duration_spin
             self.scene_cache_size_spin = params_tab.scene_cache_size_spin
@@ -522,6 +524,9 @@ class DuplicateFinderWindow(QMainWindow):
         if self.scene_precision_combo:
             self.scene_precision_combo.currentIndexChanged.connect(self._on_settings_changed)
 
+        if self.scene_algorithm_combo:
+            self.scene_algorithm_combo.currentIndexChanged.connect(self._on_settings_changed)
+
     def _load_settings(self) -> None:
         """
         Load saved settings.
@@ -547,6 +552,7 @@ class DuplicateFinderWindow(QMainWindow):
             'comparison_timeout_spin': self.comparison_timeout_spin,
             'enable_scene_check': self.enable_scene_check,
             'scene_precision_combo': self.scene_precision_combo,
+            'scene_algorithm_combo': self.scene_algorithm_combo,
             'scene_min_match_spin': self.scene_min_match_spin,
             'scene_min_duration_spin': self.scene_min_duration_spin,
             'scene_cache_size_spin': self.scene_cache_size_spin
