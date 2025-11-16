@@ -487,16 +487,22 @@ class UIPanels:
         content_widget = QWidget()
         layout = QVBoxLayout(content_widget)
         layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setSpacing(20)
 
-        # Create hash debugger V2
+        # Create hash debugger V2 (visual hashing)
         hash_debugger_v2 = HashDebuggerV2()
-
         layout.addWidget(hash_debugger_v2)
+
+        # Create audio fingerprint debugger (scene detection)
+        from ..progress_widgets import AudioFingerprintDebugger
+        audio_debugger = AudioFingerprintDebugger()
+        layout.addWidget(audio_debugger)
+
         layout.addStretch()
 
-        # Store reference for later access
+        # Store references for later access
         tab.hash_debugger_v2 = hash_debugger_v2
+        tab.audio_debugger = audio_debugger
 
         # Set scroll area content and add to tab
         scroll_area.setWidget(content_widget)
