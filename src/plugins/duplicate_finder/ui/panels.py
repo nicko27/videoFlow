@@ -73,7 +73,7 @@ class UIPanels:
         panel = QFrame()
         panel.setStyleSheet(f"""
             QFrame {{
-                background-color: {colors['surface']};
+                background-color: {colors['bg_card']};
                 border: 1px solid {colors['border']};
                 border-radius: {spacing['radius']}px;
             }}
@@ -472,7 +472,7 @@ class UIPanels:
         panel = QFrame()
         panel.setStyleSheet(f"""
             QFrame {{
-                background-color: {colors['surface']};
+                background-color: {colors['bg_card']};
                 border: 1px solid {colors['border']};
                 border-radius: {spacing['radius']}px;
             }}
