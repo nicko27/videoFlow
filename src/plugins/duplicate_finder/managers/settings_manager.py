@@ -141,7 +141,7 @@ class SettingsManager(QObject):
 
             # Load algorithm choice (combobox)
             if 'scene_algorithm_combo' in widgets and widgets['scene_algorithm_combo'] is not None:
-                algorithm = self.settings.value('algorithm', 'hash_index', type=str)
+                algorithm = self.settings.value('algorithm', 'long_video', type=str)
                 combo = widgets['scene_algorithm_combo']
                 # Find and set the correct index
                 for i in range(combo.count()):
@@ -446,7 +446,7 @@ class SettingsManager(QObject):
             min_duration = 10  # Default 10 seconds from UI
             cache_size = 500  # Default from UI
             precision_mode = 'balanced'  # Default from UI
-            algorithm = 'hash_index'  # Default: Hash Index (fastest)
+            algorithm = 'long_video'  # Default: Long Video Sampling (best for 1h+ videos)
 
             # Override with actual widget values if available
             if 'scene_min_match_spin' in widgets and widgets['scene_min_match_spin'] is not None:

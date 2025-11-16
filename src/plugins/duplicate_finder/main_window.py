@@ -950,6 +950,21 @@ class DuplicateFinderWindow(QMainWindow):
                 precision_mode = PrecisionMode.BALANCED
 
             # Create detector based on algorithm choice
+            if algorithm == 'long_video':
+                # Use Long Video Sampling (optimized for 1h+ videos)
+                try:
+                    from .long_video_detector import LongVideoSceneDetector
+                    self.scene_detector = LongVideoSceneDetector(
+                        sample_interval=30,  # Sample every 30 seconds
+                        sample_duration=5,   # 5 seconds per sample
+                        min_match_ratio=scene_config.get('min_match_ratio', 0.75)
+                    )
+                    algorithm_name = "Long Video Sampling (optimized for 1h+)"
+                    logger.info("Using Long Video Sampling algorithm for scene detection")
+                except ImportError as e:
+                    logger.warning(f"Long video detector not available: {e}, falling back to hash index")
+                    algorithm = 'hash_index'
+
             if algorithm == 'shazam':
                 # Use Shazam algorithm (ultra-fast, experimental)
                 try:

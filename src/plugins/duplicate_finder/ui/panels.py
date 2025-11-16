@@ -401,14 +401,16 @@ class UIPanels:
         # Algorithm selector
         scene_layout.addWidget(QLabel("Algorithm:"), 2, 0)
         scene_algorithm_combo = QComboBox()
-        scene_algorithm_combo.addItem("🚀 Hash Index (10-100x faster, recommended)", "hash_index")
-        scene_algorithm_combo.addItem("🎵 Shazam (Ultra-fast, experimental)", "shazam")
-        scene_algorithm_combo.addItem("🔍 Sliding Window (Classic, slower)", "sliding_window")
-        scene_algorithm_combo.setCurrentIndex(0)  # Default to Hash Index
+        scene_algorithm_combo.addItem("📊 Long Video Sampling (BEST for 1h+ videos)", "long_video")
+        scene_algorithm_combo.addItem("🚀 Hash Index (fast, good for <1h)", "hash_index")
+        scene_algorithm_combo.addItem("🎵 Shazam (experimental)", "shazam")
+        scene_algorithm_combo.addItem("🔍 Sliding Window (slowest)", "sliding_window")
+        scene_algorithm_combo.setCurrentIndex(0)  # Default to Long Video
         scene_algorithm_combo.setToolTip(
-            "Hash Index: 10-100x faster than sliding window, uses Chromaprint hash lookups\n"
-            "Shazam: Ultra-fast spectrogram-based detection (requires scipy, experimental)\n"
-            "Sliding Window: Classic method, improved step size (slower but reliable)"
+            "Long Video Sampling: Optimized for 1h+ videos, samples key sections (~30s)\n"
+            "Hash Index: Fast for videos <1h, requires pyacoustid\n"
+            "Shazam: Experimental spectrogram-based (requires scipy)\n"
+            "Sliding Window: Classic method (slow for long videos)"
         )
         scene_layout.addWidget(scene_algorithm_combo, 2, 1)
 

@@ -176,7 +176,12 @@ class SceneDetectionWorker(QThread):
             # Call the appropriate detection method based on algorithm
             result = None
 
-            if self.algorithm == 'hash_index':
+            if self.algorithm == 'long_video':
+                # Use long video sampling method (optimized for 1h+ videos)
+                if hasattr(self.scene_detector, 'find_scene'):
+                    result = self.scene_detector.find_scene(short_video, long_video)
+
+            elif self.algorithm == 'hash_index':
                 # Use hash index method
                 if hasattr(self.scene_detector, 'find_scene_with_index'):
                     result = self.scene_detector.find_scene_with_index(short_video, long_video)
