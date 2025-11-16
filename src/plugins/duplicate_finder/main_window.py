@@ -110,6 +110,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.hash_workers_spin = None
         self.comparison_workers_spin = None
         self.batch_size_spin = None
+        self.comparison_algorithm_combo = None
         self.hash_timeout_spin = None
         self.comparison_timeout_spin = None
         self.enable_subsequence_check = None
@@ -438,6 +439,7 @@ class DuplicateFinderWindow(QMainWindow):
             self.hash_workers_spin = params_tab.hash_workers_spin
             self.comparison_workers_spin = params_tab.comparison_workers_spin
             self.batch_size_spin = params_tab.batch_size_spin
+            self.comparison_algorithm_combo = params_tab.comparison_algorithm_combo
             self.hash_timeout_spin = params_tab.hash_timeout_spin
             self.comparison_timeout_spin = params_tab.comparison_timeout_spin
             self.enable_subsequence_check = params_tab.enable_subsequence_check
@@ -497,6 +499,9 @@ class DuplicateFinderWindow(QMainWindow):
         if self.hash_method_combo:
             self.hash_method_combo.currentIndexChanged.connect(self._on_settings_changed)
 
+        if self.comparison_algorithm_combo:
+            self.comparison_algorithm_combo.currentIndexChanged.connect(self._on_settings_changed)
+
     def _load_settings(self) -> None:
         """
         Load saved settings.
@@ -517,6 +522,7 @@ class DuplicateFinderWindow(QMainWindow):
             'hash_workers_spin': self.hash_workers_spin,
             'comparison_workers_spin': self.comparison_workers_spin,
             'batch_size_spin': self.batch_size_spin,
+            'comparison_algorithm_combo': self.comparison_algorithm_combo,
             'hash_timeout_spin': self.hash_timeout_spin,
             'comparison_timeout_spin': self.comparison_timeout_spin,
             'enable_subsequence_check': self.enable_subsequence_check,
