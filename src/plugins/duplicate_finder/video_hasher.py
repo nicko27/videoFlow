@@ -299,7 +299,7 @@ class VideoHasher:
             numpy.ndarray: Binary hash array, or None if computation fails.
         """
         try:
-            # Conversion en gris directement
+            # Convert to grayscale
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             
             if self.method == "pHash":
@@ -310,19 +310,19 @@ class VideoHasher:
                 return dct_low > avg
                 
             elif self.method == "dHash":
-                # Difference Hash - plus rapide
+                # Difference Hash - faster than pHash
                 resized = cv2.resize(gray, (9, 8))
                 diff = resized[:, 1:] > resized[:, :-1]
                 return diff
-                
+
             elif self.method == "aHash":
-                # Average Hash - le plus rapide
+                # Average Hash - fastest method
                 resized = cv2.resize(gray, (8, 8))
                 avg = resized.mean()
                 return resized > avg
-                
+
         except Exception as e:
-            logger.error(f"Error calcul hash frame: {e}")
+            logger.error(f"Error computing frame hash: {e}")
             return None
 
     def compute_video_hash_fast(self, video_path):
@@ -343,15 +343,15 @@ class VideoHasher:
             Exception: If the video cannot be opened or processed.
         """
         try:
-            # 1. Check cache mémoire (ultra rapide)
+            # 1. Check memory cache (ultra fast)
             if video_path in self.hash_cache:
                 cache_entry = self.hash_cache[video_path]
                 current_mtime = os.path.getmtime(video_path)
-                # Checks si le file a changé
+                # Check if file has changed
                 if abs(current_mtime - cache_entry['mtime']) < 1:
                     return cache_entry['hash'], cache_entry['duration']
-            
-            # 2. Calcul du hash nécessaire
+
+            # 2. Hash computation required
             cv2.setLogLevel(0)
             cap = cv2.VideoCapture(video_path)
             
