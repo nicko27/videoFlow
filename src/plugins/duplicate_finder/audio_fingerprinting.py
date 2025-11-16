@@ -260,7 +260,7 @@ class AudioFingerprintDetector:
 
             # Add algorithm option
             if 'algorithm' in self.precision_mode:
-                cmd.extend(['-algo', str(self.precision_mode['algorithm'])])
+                cmd.extend(['-algorithm', str(self.precision_mode['algorithm'])])
 
             # Add raw output option for detailed comparison
             cmd.append('-raw')
