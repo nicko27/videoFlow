@@ -190,6 +190,21 @@ class AudioFingerprintDetector:
         # Check if fpcalc (chromaprint) is available
         self.fpcalc_available = self._check_fpcalc()
 
+        # Check if pyacoustid is available for better comparison
+        self.has_acoustid = False
+        try:
+            import acoustid
+            self.has_acoustid = True
+            logger.info("pyacoustid found - using accurate fingerprint comparison")
+        except ImportError:
+            logger.warning(
+                "⚠️ pyacoustid not installed - using simplified comparison\n"
+                "   Scene detection may only work for scenes at the START of videos.\n"
+                "   For accurate detection of scenes anywhere in videos:\n"
+                "   Install with: pip3 install pyacoustid\n"
+                "   See: SCENE_DETECTION_LIMITATIONS.md"
+            )
+
         if not self.fpcalc_available:
             logger.warning("fpcalc not found! Audio fingerprinting will not work. Install chromaprint-tools.")
         else:
@@ -262,8 +277,7 @@ class AudioFingerprintDetector:
             if 'algorithm' in self.precision_mode:
                 cmd.extend(['-algorithm', str(self.precision_mode['algorithm'])])
 
-            # Add raw output option for detailed comparison
-            cmd.append('-raw')
+            # Add JSON output for structured data (no -raw to avoid decoding issues)
             cmd.append('-json')
 
             # Add video path
@@ -287,19 +301,15 @@ class AudioFingerprintDetector:
                 fingerprint = data.get('fingerprint', '')
                 duration = float(data.get('duration', 0.0))
 
-                # Parse raw fingerprint if available
+                # No raw fingerprint parsing needed (we don't use -raw anymore)
                 raw_fp = None
-                if 'fingerprint' in data:
-                    # Convert fingerprint string to array of integers
-                    # Chromaprint uses base64 encoding, we'll work with the string
-                    raw_fp = self._decode_fingerprint(fingerprint)
 
                 if not fingerprint:
                     logger.warning(f"Empty fingerprint for {os.path.basename(video_path)}")
                     return None, 0.0, None
 
                 # Cache the result
-                self.cache.put(video_path, fingerprint, duration, raw_fp)
+                self.cache.put(video_path, fingerprint, duration, None)
 
                 if progress_callback:
                     progress_callback(1, 1, "Fingerprint extracted")
@@ -320,25 +330,6 @@ class AudioFingerprintDetector:
             logger.error(f"Error extracting fingerprint from {os.path.basename(video_path)}: {e}")
             return None, 0.0, None
 
-    def _decode_fingerprint(self, fp_string: str) -> List[int]:
-        """Decode chromaprint fingerprint string to array of integers.
-
-        Args:
-            fp_string: Chromaprint fingerprint string
-
-        Returns:
-            List of integers representing the fingerprint
-        """
-        try:
-            # Chromaprint uses compressed base64 encoding
-            # For now, we'll use the string directly and compute similarity
-            # using string comparison (Levenshtein distance or similar)
-            # This is a simplified version - full implementation would decode the base64
-            return [ord(c) for c in fp_string]
-        except Exception as e:
-            logger.error(f"Error decoding fingerprint: {e}")
-            return []
-
     def _compute_similarity(
         self,
         fp1: str,
@@ -351,34 +342,26 @@ class AudioFingerprintDetector:
         Args:
             fp1: First fingerprint string
             fp2: Second fingerprint string
-            raw_fp1: Optional raw fingerprint array for fp1
-            raw_fp2: Optional raw fingerprint array for fp2
+            raw_fp1: Optional raw fingerprint array for fp1 (unused)
+            raw_fp2: Optional raw fingerprint array for fp2 (unused)
 
         Returns:
             Similarity ratio (0.0-1.0)
-        """
-        # Simple string similarity using common subsequence
-        # This is a simplified version - real Chromaprint comparison is more complex
 
+        Note:
+            This is a SIMPLIFIED comparison using difflib.SequenceMatcher.
+            For accurate scene detection, install pyacoustid:
+                pip3 install pyacoustid
+        """
         if not fp1 or not fp2:
             return 0.0
 
-        # Use longest common substring ratio
-        len1 = len(fp1)
-        len2 = len(fp2)
+        # Use difflib for better sequence matching
+        # This is better than character-by-character but still not optimal
+        import difflib
 
-        if len1 == 0 or len2 == 0:
-            return 0.0
-
-        # Find longest common substring length
-        max_len = 0
-        curr_len = 0
-
-        # Simplified - just count matching characters at same positions
-        matching_chars = sum(1 for c1, c2 in zip(fp1, fp2) if c1 == c2)
-
-        # Similarity is based on overlap
-        similarity = matching_chars / max(len1, len2)
+        matcher = difflib.SequenceMatcher(None, fp1, fp2)
+        similarity = matcher.ratio()
 
         return similarity
 

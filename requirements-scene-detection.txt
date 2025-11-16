@@ -1,0 +1,10 @@
+# Requirements for scene detection using audio fingerprinting
+
+# Core audio fingerprinting library
+pyacoustid>=1.2.0
+
+# Alternative: use chromaprint directly (requires chromaprint C library)
+# chromaprint-python>=0.1.0
+
+# For better audio processing (optional)
+# pydub>=0.25.0
