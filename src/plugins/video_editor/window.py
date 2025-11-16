@@ -91,6 +91,9 @@ class VideoEditorWindow(QMainWindow):
         # Timeline zoom level
         self.zoom_level = 1.0
 
+        # Worker references (to prevent garbage collection)
+        self.scene_detection_worker = None
+
         # Selected segment index (for Inspector Panel actions)
         self.selected_segment_index = -1
 
@@ -772,6 +775,7 @@ class VideoEditorWindow(QMainWindow):
         self.detection_panel = DetectionPanel()
         self.detection_panel.detect_black_frames_clicked.connect(self.detect_black_frames_from_panel)
         self.detection_panel.detect_scenes_clicked.connect(self.detect_scenes_from_panel)
+        self.detection_panel.stop_scene_detection_clicked.connect(self.stop_scene_detection)
         self.detection_panel.split_n_parts_clicked.connect(self.split_into_n_parts)
         self.detection_panel.split_by_duration_clicked.connect(self.split_by_duration)
         self.detection_panel.merge_all_clicked.connect(self.merge_all_segments)
@@ -1930,43 +1934,80 @@ class VideoEditorWindow(QMainWindow):
             QMessageBox.warning(self, "Pas de vidéo", "Ouvrez d'abord une vidéo")
             return
 
+        # Stop any existing scene detection
+        if self.scene_detection_worker and self.scene_detection_worker.isRunning():
+            self.scene_detection_worker.stop()
+            self.scene_detection_worker.wait()
+
         from .detectors.scene_detector import SceneDetectionWorker
 
         # Save current state for undo
         old_segments = copy.deepcopy(self.timeline.segments)
 
-        # Create worker
-        self.detection_panel.setEnabled(False)
-        self.statusBar().showMessage("🔍 Détection de scènes en cours...")
-
-        worker = SceneDetectionWorker(
+        # Create worker and store reference to prevent garbage collection
+        self.scene_detection_worker = SceneDetectionWorker(
             self.video_path,
             threshold=threshold,
             min_scene_length=min_scene_length
         )
 
+        # Show progress bar and stop button
+        self.detection_panel.show_scene_progress()
+        self.statusBar().showMessage("🔍 Détection de scènes en cours...")
+
+        def on_progress(percentage):
+            """Update progress bar."""
+            self.detection_panel.update_scene_progress(percentage)
+
         def on_finished(scenes):
+            """Handle scene detection completion."""
             # Create segments from detected scenes
             for start_frame, end_frame, timestamp in scenes:
                 segment = VideoSegment(start_frame=start_frame, end_frame=end_frame)
                 self.timeline.segments.append(segment)
 
             self.refresh_segments_table()
-            self.detection_panel.setEnabled(True)
+
+            # Hide progress bar and show detect button
+            self.detection_panel.hide_scene_progress()
+
             self.statusBar().showMessage(
                 f"✅ {len(scenes)} scènes détectées et segments créés",
                 3000
             )
             logger.info(f"Created {len(scenes)} segments from scene detection")
 
+            # Clean up worker reference
+            self.scene_detection_worker = None
+
         def on_error(error_msg):
-            self.detection_panel.setEnabled(True)
+            """Handle scene detection error."""
+            self.detection_panel.hide_scene_progress()
             self.statusBar().showMessage(f"❌ Erreur: {error_msg}", 5000)
             QMessageBox.critical(self, "Erreur", f"Erreur lors de la détection:\n{error_msg}")
 
-        worker.finished.connect(on_finished)
-        worker.error.connect(on_error)
-        worker.start()
+            # Clean up worker reference
+            self.scene_detection_worker = None
+
+        # Connect signals
+        self.scene_detection_worker.progress.connect(on_progress)
+        self.scene_detection_worker.finished.connect(on_finished)
+        self.scene_detection_worker.error.connect(on_error)
+        self.scene_detection_worker.start()
+
+    def stop_scene_detection(self):
+        """Stop the scene detection worker."""
+        if self.scene_detection_worker and self.scene_detection_worker.isRunning():
+            logger.info("Stopping scene detection...")
+            self.scene_detection_worker.stop()
+            self.scene_detection_worker.wait()
+
+            # Hide progress bar and show detect button
+            self.detection_panel.hide_scene_progress()
+            self.statusBar().showMessage("⏹️ Détection de scènes arrêtée", 3000)
+
+            # Clean up worker reference
+            self.scene_detection_worker = None
 
     def detect_black_frames(self):
         """Open black frame detection dialog."""
