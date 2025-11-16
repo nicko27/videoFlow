@@ -95,8 +95,10 @@ class DuplicateFinderWindow(QMainWindow):
         # Initialize UI components (will be set in setup_ui)
         self.file_list_widget: Optional[FileListWidget] = None
         self.status_indicator = None
+        self.stats_counter = None
         self.file_progress = None
         self.comparison_progress = None
+        self.subsequence_progress = None
         self.config_tabs = None
         self.analyze_btn = None
         self.stop_btn = None
@@ -194,8 +196,10 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Store right panel widgets
         self.status_indicator = right_widgets['status_indicator']
+        self.stats_counter = right_widgets['stats_counter']
         self.file_progress = right_widgets['file_progress']
         self.comparison_progress = right_widgets['comparison_progress']
+        self.subsequence_progress = right_widgets['subsequence_progress']
 
         # Header with title, layout selector and theme selector
         header = self._create_header()
@@ -721,6 +725,9 @@ class DuplicateFinderWindow(QMainWindow):
         self.set_analysis_mode(True)
         self.duplicate_handler.processing_stopped = False
 
+        # Reset stats counters
+        self.stats_counter.reset()
+
         # Start UI updates
         self.start_ui_updates()
 
@@ -819,10 +826,18 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Check if subsequence detection is enabled
         config = self.get_analysis_config()
-        if config.get('subsequence_detection', {}).get('enabled', False):
+        subseq_config = config.get('subsequence_detection', {})
+        is_enabled = subseq_config.get('enabled', False)
+
+        logger.info(f"Subsequence detection enabled: {is_enabled}")
+        if is_enabled:
+            logger.info(f"Subsequence parameters: sample_interval={subseq_config.get('sample_interval')}s, "
+                       f"min_match_ratio={subseq_config.get('min_match_ratio', 0)*100:.1f}%, "
+                       f"cache_memory={subseq_config.get('cache_memory_mb')}MB")
             # Start subsequence detection
             self._start_subsequence_detection()
         else:
+            logger.info("Subsequence detection skipped (not enabled)")
             # No subsequence detection, finish analysis
             self._finish_analysis()
 
@@ -841,8 +856,8 @@ class DuplicateFinderWindow(QMainWindow):
                 self.subsequence_detector = SubsequenceDetector(
                     hasher=self.video_hasher,
                     max_cache_memory_mb=subseq_config.get('cache_memory_mb', 500),
-                    sample_interval_seconds=subseq_config.get('sample_interval', 1.5),
-                    min_match_ratio=subseq_config.get('min_match_ratio', 0.70)
+                    sample_interval_seconds=subseq_config.get('sample_interval', 3.0),
+                    min_match_ratio=subseq_config.get('min_match_ratio', 0.80)
                 )
 
             # Update UI
@@ -859,7 +874,7 @@ class DuplicateFinderWindow(QMainWindow):
 
             def progress_callback(current, total, message):
                 """Update progress display."""
-                self.comparison_progress.update_progress(current, total, message)
+                self.subsequence_progress.update_progress(current, total, message)
                 self.force_ui_update()
 
             subsequences = self.subsequence_detector.detect_all_subsequences(
@@ -905,6 +920,10 @@ class DuplicateFinderWindow(QMainWindow):
         duplicates_count = self.duplicate_handler.get_duplicate_count()
         subsequence_count = self.duplicate_handler.get_subsequence_count()
         elapsed = self.analysis_handler.get_elapsed_time()
+
+        # Update stats counter
+        self.stats_counter.update_duplicates(duplicates_count)
+        self.stats_counter.update_subsequences(subsequence_count)
 
         if duplicates_count > 0:
             self.status_indicator.update_status(

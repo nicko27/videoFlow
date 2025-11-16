@@ -520,3 +520,95 @@ class StatusIndicator(QFrame):
         
         self.update()
         self.repaint()
+
+
+class StatsCounter(QFrame):
+    """Widget to display real-time statistics counters."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.duplicates_count = 0
+        self.subsequences_count = 0
+        self.setup_ui()
+
+    def setup_ui(self):
+        """Configure the stats counter UI."""
+        self.setMinimumHeight(60)
+        self.setStyleSheet("""
+            QFrame {
+                background-color: #F5F5F5;
+                border: 1px solid #E0E0E0;
+                border-radius: 6px;
+                padding: 8px;
+            }
+        """)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(12, 8, 12, 8)
+        layout.setSpacing(20)
+
+        # Title
+        title_label = QLabel("📊 Results:")
+        title_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: #424242;")
+        layout.addWidget(title_label)
+
+        # Duplicates counter
+        dup_container = QWidget()
+        dup_layout = QVBoxLayout(dup_container)
+        dup_layout.setContentsMargins(0, 0, 0, 0)
+        dup_layout.setSpacing(2)
+
+        dup_label = QLabel("Duplicates")
+        dup_label.setFont(QFont("Arial", 8))
+        dup_label.setStyleSheet("color: #757575;")
+
+        self.dup_value = QLabel("0")
+        self.dup_value.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        self.dup_value.setStyleSheet("color: #FF6B6B;")
+
+        dup_layout.addWidget(dup_label)
+        dup_layout.addWidget(self.dup_value)
+        layout.addWidget(dup_container)
+
+        # Separator
+        separator1 = QFrame()
+        separator1.setFrameShape(QFrame.Shape.VLine)
+        separator1.setFrameShadow(QFrame.Shadow.Sunken)
+        separator1.setStyleSheet("color: #E0E0E0;")
+        layout.addWidget(separator1)
+
+        # Subsequences counter
+        subseq_container = QWidget()
+        subseq_layout = QVBoxLayout(subseq_container)
+        subseq_layout.setContentsMargins(0, 0, 0, 0)
+        subseq_layout.setSpacing(2)
+
+        subseq_label = QLabel("Subsequences")
+        subseq_label.setFont(QFont("Arial", 8))
+        subseq_label.setStyleSheet("color: #757575;")
+
+        self.subseq_value = QLabel("0")
+        self.subseq_value.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        self.subseq_value.setStyleSheet("color: #4ECDC4;")
+
+        subseq_layout.addWidget(subseq_label)
+        subseq_layout.addWidget(self.subseq_value)
+        layout.addWidget(subseq_container)
+
+        layout.addStretch()
+
+    def update_duplicates(self, count: int):
+        """Update duplicates counter."""
+        self.duplicates_count = count
+        self.dup_value.setText(str(count))
+
+    def update_subsequences(self, count: int):
+        """Update subsequences counter."""
+        self.subsequences_count = count
+        self.subseq_value.setText(str(count))
+
+    def reset(self):
+        """Reset all counters to zero."""
+        self.update_duplicates(0)
+        self.update_subsequences(0)

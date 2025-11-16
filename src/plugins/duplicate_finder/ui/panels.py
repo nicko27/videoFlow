@@ -486,6 +486,11 @@ class UIPanels:
         status_indicator = StatusIndicator()
         layout.addWidget(status_indicator)
 
+        # Stats counter (duplicates, subsequences, etc.)
+        from ..progress_widgets import StatsCounter
+        stats_counter = StatsCounter()
+        layout.addWidget(stats_counter)
+
         # Progress widgets
         file_progress = ModernProgressWidget("📊 File analysis")
         layout.addWidget(file_progress)
@@ -493,13 +498,18 @@ class UIPanels:
         comparison_progress = ModernProgressWidget("🔍 Comparisons")
         layout.addWidget(comparison_progress)
 
+        subsequence_progress = ModernProgressWidget("🎬 Subsequence detection")
+        layout.addWidget(subsequence_progress)
+
         # Add stretch
         layout.addStretch(2)
 
         widgets = {
             'status_indicator': status_indicator,
+            'stats_counter': stats_counter,
             'file_progress': file_progress,
-            'comparison_progress': comparison_progress
+            'comparison_progress': comparison_progress,
+            'subsequence_progress': subsequence_progress
         }
 
         return panel, widgets
