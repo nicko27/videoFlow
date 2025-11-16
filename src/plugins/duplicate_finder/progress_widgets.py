@@ -4,7 +4,7 @@ Widgets de progression modernes - Version with TEXTE NOIR VISIBLE
 
 import os
 import numpy as np
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame, QScrollArea, QPushButton, QTextEdit
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame, QScrollArea, QPushButton, QTextEdit, QSpinBox
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QPalette, QColor
 
@@ -917,9 +917,10 @@ class HashDebugger(QFrame):
 class HashDebuggerV2(QFrame):
     """Advanced widget for interactive hash debugging with frame selection."""
 
-    def __init__(self, video_hasher=None, parent=None):
+    def __init__(self, video_hasher=None, settings_manager=None, parent=None):
         super().__init__(parent)
         self.video_hasher = video_hasher
+        self.settings_manager = settings_manager
         self.video_data = []  # List of {path, cap, total_frames, fps, start_frame}
         self.setup_ui()
 
@@ -1065,23 +1066,38 @@ class HashDebuggerV2(QFrame):
         self.video_hasher = video_hasher
 
     def _add_video(self):
-        """Add a video to the list."""
+        """Add one or more videos to the list."""
         from PyQt6.QtWidgets import QFileDialog
         import cv2
 
-        file_path, _ = QFileDialog.getOpenFileName(
+        # Get last used folder if settings_manager available
+        last_folder = ""
+        if self.settings_manager:
+            last_folder = self.settings_manager.get_last_folder()
+
+        # Allow multiple selection
+        file_paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Select Video File",
-            "",
+            "Select Video File(s) - Multiple selection allowed",
+            last_folder,
             "Video Files (*.mp4 *.avi *.mkv *.mov *.wmv *.flv *.webm);;All Files (*.*)"
         )
 
-        if file_path:
+        if not file_paths:
+            return
+
+        # Save the folder of the first selected file
+        if file_paths and self.settings_manager:
+            folder = os.path.dirname(file_paths[0])
+            self.settings_manager.save_last_folder(folder)
+
+        # Process each selected video
+        for file_path in file_paths:
             # Open video to get metadata
             cap = cv2.VideoCapture(file_path)
             if not cap.isOpened():
                 self.results_table.setPlainText(f"ERROR: Cannot open video {file_path}")
-                return
+                continue
 
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             fps = cap.get(cv2.CAP_PROP_FPS)
@@ -1105,12 +1121,10 @@ class HashDebuggerV2(QFrame):
                 'widget': video_entry
             })
 
-            self.calculate_btn.setEnabled(True)
+        self.calculate_btn.setEnabled(True)
 
     def _create_video_entry(self, file_path, total_frames, fps):
         """Create a widget for a single video entry."""
-        from PyQt6.QtWidgets import QSlider
-
         entry_frame = QFrame()
         entry_frame.setStyleSheet("""
             QFrame {

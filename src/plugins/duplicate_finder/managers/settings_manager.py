@@ -507,3 +507,58 @@ class SettingsManager(QObject):
         except Exception as e:
             logger.error(f"Error getting layout preference: {e}")
             return "classic"
+
+    def save_last_folder(self, folder_path: str) -> None:
+        """
+        Save the last used folder path.
+
+        Args:
+            folder_path: Path to the folder to remember.
+        """
+        try:
+            self.settings.beginGroup("ui")
+            self.settings.setValue("last_folder", folder_path)
+            self.settings.endGroup()
+            self.settings.sync()
+            logger.debug(f"Last folder saved: {folder_path}")
+        except Exception as e:
+            logger.error(f"Error saving last folder: {e}")
+
+    def get_last_folder(self) -> str:
+        """
+        Get the last used folder path.
+
+        Returns:
+            Last folder path string, or empty string if not set or doesn't exist.
+        """
+        try:
+            import os
+            self.settings.beginGroup("ui")
+            folder = self.settings.value("last_folder", "", type=str)
+            self.settings.endGroup()
+
+            # Check if folder still exists
+            if folder and os.path.exists(folder):
+                return folder
+            else:
+                # Folder doesn't exist anymore, clear it
+                if folder:
+                    logger.debug(f"Last folder no longer exists: {folder}")
+                    self.reset_last_folder()
+                return ""
+        except Exception as e:
+            logger.error(f"Error getting last folder: {e}")
+            return ""
+
+    def reset_last_folder(self) -> None:
+        """
+        Reset (clear) the last used folder path.
+        """
+        try:
+            self.settings.beginGroup("ui")
+            self.settings.remove("last_folder")
+            self.settings.endGroup()
+            self.settings.sync()
+            logger.debug("Last folder reset")
+        except Exception as e:
+            logger.error(f"Error resetting last folder: {e}")
