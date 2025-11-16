@@ -210,7 +210,7 @@ class SubsequenceDetector:
                 if len(positions) > max_frames:
                     step = len(positions) // max_frames
                     positions = positions[::step]
-                    logger.warning(f"Video too long, sampling reduced to {len(positions)} frames")
+                    logger.debug(f"Long video detected, sampling optimized to {len(positions)} frames for efficient processing")
 
                 # Ensure we have at least a few frames
                 if len(positions) < 5:
@@ -306,8 +306,7 @@ class SubsequenceDetector:
 
             # If short video has more frames, swap and retry
             if len(hash_short) > len(hash_long):
-                logger.debug(f"Videos mislabeled, swapping: {os.path.basename(short_video)} has more frames than {os.path.basename(long_video)}")
-                # Recursively call with swapped parameters
+                # Recursively call with swapped parameters to ensure correct order
                 return self.find_subsequence(long_video, short_video, min_ratio, min_duration_seconds)
 
             # Sliding window comparison

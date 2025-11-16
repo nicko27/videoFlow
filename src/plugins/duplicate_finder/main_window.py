@@ -32,6 +32,8 @@ try:
     from .handlers.file_handler import FileHandler
     from .handlers.analysis_handler import AnalysisHandler
     from .handlers.duplicate_handler import DuplicateHandler
+    from .theme_selector import ThemeSelector
+    from .themes import get_theme_manager, get_current_theme
 except ImportError:
     # Fallback for direct imports
     from video_hasher import VideoHasher
@@ -43,6 +45,8 @@ except ImportError:
     from handlers.file_handler import FileHandler
     from handlers.analysis_handler import AnalysisHandler
     from handlers.duplicate_handler import DuplicateHandler
+    from theme_selector import ThemeSelector
+    from themes import get_theme_manager, get_current_theme
 
 from src.core.logger import Logger
 
@@ -163,9 +167,9 @@ class DuplicateFinderWindow(QMainWindow):
         main_layout.setContentsMargins(15, 15, 15, 15)
         main_layout.setSpacing(10)
 
-        # Title
-        title = UIPanels.create_title_label()
-        main_layout.addWidget(title)
+        # Header with title and theme selector
+        header = self._create_header()
+        main_layout.addWidget(header)
 
         # Splitter for panels
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -192,6 +196,90 @@ class DuplicateFinderWindow(QMainWindow):
         # Initial button states
         self.analyze_btn.setEnabled(False)
         self.stop_btn.setEnabled(False)
+
+        # Apply initial theme
+        self.apply_theme()
+
+    def _create_header(self) -> QWidget:
+        """
+        Create header with title and theme selector.
+
+        Returns:
+            QWidget containing the header.
+        """
+        from PyQt6.QtWidgets import QHBoxLayout
+
+        header = QWidget()
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(15)
+
+        # Title
+        theme = get_current_theme()
+        colors = theme.get_colors()
+        spacing = theme.get_spacing()
+
+        title = QLabel("🔍 Video Duplicate Detector")
+        title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet(theme.get_title_style())
+        header_layout.addWidget(title, stretch=1)
+
+        # Theme selector
+        self.theme_selector = ThemeSelector()
+        self.theme_selector.setMaximumWidth(300)
+        self.theme_selector.theme_changed.connect(self.on_theme_changed)
+        header_layout.addWidget(self.theme_selector)
+
+        return header
+
+    def apply_theme(self) -> None:
+        """
+        Apply current theme to all UI components.
+        """
+        theme = get_current_theme()
+
+        # Update main window background
+        self.setStyleSheet(f"""
+            QMainWindow {{
+                background-color: {theme.get_colors()['background']};
+            }}
+        """)
+
+        # Update progress widgets if they exist
+        if hasattr(self, 'file_progress') and self.file_progress:
+            self.file_progress.progress_bar.setStyleSheet(theme.get_progress_style())
+
+        if hasattr(self, 'comparison_progress') and self.comparison_progress:
+            self.comparison_progress.progress_bar.setStyleSheet(theme.get_progress_style())
+
+        # Force UI refresh
+        if hasattr(self, 'centralWidget') and self.centralWidget():
+            self.centralWidget().update()
+
+    def on_theme_changed(self, theme_key: str) -> None:
+        """
+        Handle theme change event.
+
+        Args:
+            theme_key: Key of the new theme.
+        """
+        logger.info(f"Theme changed to: {theme_key}")
+        self.apply_theme()
+
+        # Recreate UI with new theme
+        # Store current state
+        files = []
+        if self.file_list_widget:
+            files = self.file_list_widget.get_files()
+
+        # Recreate UI
+        self.setup_ui()
+
+        # Restore state
+        if files and self.file_list_widget:
+            self.file_handler = FileHandler(self.file_list_widget)
+            self.file_handler.add_files(files)
 
     def _create_left_panel(self):
         """
