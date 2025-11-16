@@ -263,6 +263,15 @@ class OptimizedComparisonWorker(QThread):
             # Generate pairs to compare
             pairs = self.generate_pairs(self.files)
 
+            # Process cached pairs first (emit progress and duplicates)
+            if self.cached_pairs:
+                logger.info(f"Processing {len(self.cached_pairs)} cached comparisons")
+                for file1, file2, similarity in self.cached_pairs:
+                    if self.is_stopped():
+                        break
+                    # Emit progress for cached pairs
+                    self.update_progress((file1, file2, similarity), (file1, file2))
+
             # Handle case where all pairs are cached
             if not pairs:
                 self.status_update.emit("✅ All comparisons cached!")
