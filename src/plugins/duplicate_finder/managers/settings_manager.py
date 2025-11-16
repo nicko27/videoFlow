@@ -308,10 +308,8 @@ class SettingsManager(QObject):
         widget_names = [
             'threshold_spin', 'hash_workers_spin', 'comparison_workers_spin',
             'batch_size_spin', 'hash_timeout_spin', 'comparison_timeout_spin',
-            'subsequence_sample_interval_spin', 'subsequence_min_match_spin',
-            'subsequence_cache_memory_spin', 'subsequence_sliding_tolerance_spin',
-            'subsequence_temporal_window_spin', 'enable_subsequence_check',
-            'subsequence_adaptive_refinement_check'
+            'scene_min_match_spin', 'scene_min_duration_spin',
+            'scene_cache_size_spin', 'scene_precision_combo', 'enable_scene_check'
         ]
 
         for widget_name in widget_names:
