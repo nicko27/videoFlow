@@ -35,6 +35,7 @@ try:
     from .theme_selector import ThemeSelector
     from .themes import get_current_theme
     from .layouts import LayoutManager, LayoutType
+    from .workers.subsequence_worker import SubsequenceDetectionWorker
 except ImportError:
     # Fallback for direct imports
     from video_hasher import VideoHasher
@@ -49,6 +50,7 @@ except ImportError:
     from theme_selector import ThemeSelector
     from themes import get_current_theme
     from layouts import LayoutManager, LayoutType
+    from workers.subsequence_worker import SubsequenceDetectionWorker
 
 from src.core.logger import Logger
 
@@ -128,6 +130,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.analysis_handler: Optional[AnalysisHandler] = None
         self.duplicate_handler: Optional[DuplicateHandler] = None
         self.subsequence_detector = None  # Will be created on demand
+        self.subsequence_worker = None  # Worker for background subsequence detection
 
         # Layout manager
         self.layout_manager = LayoutManager()
@@ -801,15 +804,37 @@ class DuplicateFinderWindow(QMainWindow):
             "#007BFF", "#CCE5FF", "#007BFF"
         )
 
-        # Start hash analysis
+        # Get analysis configuration
         config = self.get_analysis_config()
+
+        # Pre-create subsequence detector if enabled (for dense hash pre-computation)
+        subsequence_detector_for_precompute = None
+        subseq_config = config.get('subsequence_detection', {})
+        if subseq_config.get('enabled', False):
+            logger.info("Subsequence detection enabled - creating detector for hash pre-computation")
+            from .subsequence_detector import SubsequenceDetector
+
+            subsequence_detector_for_precompute = SubsequenceDetector(
+                self.video_hasher,
+                max_cache_memory_mb=subseq_config.get('cache_memory_mb', 500),
+                sample_interval_seconds=subseq_config.get('sample_interval', 0.75),
+                min_match_ratio=subseq_config.get('min_match_ratio', 0.80),
+                temporal_window_frames=subseq_config.get('temporal_window_frames', 5),
+                sliding_window_tolerance=subseq_config.get('sliding_window_tolerance', 3),
+                enable_adaptive_refinement=subseq_config.get('enable_adaptive_refinement', False)
+            )
+            # Store it for later use in subsequence detection
+            self.subsequence_detector = subsequence_detector_for_precompute
+
+        # Start hash analysis (with optional dense hash pre-computation)
         self.analysis_handler.start_hash_analysis(
             valid_files,
             config,
             progress_callback=self.update_file_progress,
             file_processed_callback=self.update_file_processed,
             current_file_callback=self.update_current_file_display,
-            progress_details_callback=self.update_hash_progress_details
+            progress_details_callback=self.update_hash_progress_details,
+            subsequence_detector=subsequence_detector_for_precompute
         )
 
         # Initialize progress display
@@ -827,8 +852,19 @@ class DuplicateFinderWindow(QMainWindow):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
+            # Stop hash and comparison workers
             self.analysis_handler.stop_analysis()
+
+            # Stop subsequence detection worker
+            if self.subsequence_worker and self.subsequence_worker.isRunning():
+                logger.info("Stopping subsequence detection worker...")
+                self.subsequence_worker.stop()
+                self.subsequence_worker.wait()
+                self.subsequence_worker = None
+
+            # Stop duplicate processing
             self.duplicate_handler.stop_processing()
+
             self.stop_ui_updates()
             self.set_analysis_mode(False)
 
@@ -937,21 +973,27 @@ class DuplicateFinderWindow(QMainWindow):
             # Get all files
             files = self.file_handler.get_all_files()
 
-            # Detect subsequences
-            logger.info(f"Starting subsequence detection on {len(files)} files")
+            # Stop any existing subsequence worker
+            if self.subsequence_worker and self.subsequence_worker.isRunning():
+                logger.info("Stopping existing subsequence worker...")
+                self.subsequence_worker.stop()
+                self.subsequence_worker.wait()
 
-            def progress_callback(current, total, message):
+            # Create and configure worker
+            logger.info(f"Starting subsequence detection on {len(files)} files")
+            self.subsequence_worker = SubsequenceDetectionWorker(
+                self.subsequence_detector,
+                files
+            )
+
+            # Connect signals
+            def on_progress(current: int, total: int, message: str):
                 """Update progress display."""
                 self.subsequence_progress.update_progress(current, total, message)
                 self.force_ui_update()
 
-            subsequences = self.subsequence_detector.detect_all_subsequences(
-                files,
-                progress_callback=progress_callback
-            )
-
-            # Store results in database and add to handler
-            for short_video, long_video, result in subsequences:
+            def on_subsequence_found(short_video: str, long_video: str, result: dict):
+                """Handle each found subsequence."""
                 # Store in database
                 self.video_hasher.db.store_subsequence_detection(
                     short_video,
@@ -964,17 +1006,46 @@ class DuplicateFinderWindow(QMainWindow):
                 # Add to duplicate handler for processing
                 self.duplicate_handler.add_subsequence(short_video, long_video, result)
 
-            logger.info(f"Subsequence detection complete: {len(subsequences)} found")
+            def on_finished(subsequences: list):
+                """Handle completion of subsequence detection."""
+                logger.info(f"Subsequence detection complete: {len(subsequences)} found")
 
-            # Finish analysis (will process subsequences after duplicates)
-            self._finish_analysis()
+                # Clean up worker reference
+                self.subsequence_worker = None
+
+                # Finish analysis (will process subsequences after duplicates)
+                self._finish_analysis()
+
+            def on_error(error_msg: str):
+                """Handle error in subsequence detection."""
+                logger.error(f"Error during subsequence detection: {error_msg}")
+                QMessageBox.warning(
+                    self,
+                    "Subsequence Detection Error",
+                    f"An error occurred during subsequence detection:\n{error_msg}\n\n"
+                    f"Continuing with duplicate results..."
+                )
+
+                # Clean up worker reference
+                self.subsequence_worker = None
+
+                # Finish analysis anyway
+                self._finish_analysis()
+
+            self.subsequence_worker.progress.connect(on_progress)
+            self.subsequence_worker.subsequence_found.connect(on_subsequence_found)
+            self.subsequence_worker.finished.connect(on_finished)
+            self.subsequence_worker.error.connect(on_error)
+
+            # Start worker
+            self.subsequence_worker.start()
 
         except Exception as e:
-            logger.error(f"Error during subsequence detection: {e}")
+            logger.error(f"Error setting up subsequence detection: {e}")
             QMessageBox.warning(
                 self,
                 "Subsequence Detection Error",
-                f"An error occurred during subsequence detection:\n{str(e)}\n\n"
+                f"An error occurred setting up subsequence detection:\n{str(e)}\n\n"
                 f"Continuing with duplicate results..."
             )
             self._finish_analysis()

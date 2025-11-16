@@ -58,7 +58,8 @@ class ParallelHashWorker(QThread):
         files: List[str],
         video_hasher,
         max_workers: int,
-        timeout: int = 120
+        timeout: int = 120,
+        subsequence_detector = None
     ) -> None:
         """
         Initialize the hash worker.
@@ -68,16 +69,22 @@ class ParallelHashWorker(QThread):
             video_hasher: VideoHasher instance for computing hashes.
             max_workers: Maximum number of concurrent worker threads.
             timeout: Timeout in seconds for processing each file (default: 120).
+            subsequence_detector: Optional SubsequenceDetector for pre-computing dense hashes.
         """
         super().__init__()
         self.files = files
         self.video_hasher = video_hasher
+        self.subsequence_detector = subsequence_detector
 
         # Validate max_workers
         validated_workers = ConfigValidator.validate_workers(max_workers, 'max_workers')
         # Don't exceed number of files to process
         self.max_workers = min(validated_workers, max(1, len(files)))
         logger.info(f"Hash worker using {self.max_workers} workers for {len(files)} files")
+
+        # Log if dense hash pre-computation is enabled
+        if self.subsequence_detector:
+            logger.info("Dense hash pre-computation ENABLED - will compute during hashing phase")
 
         # Validate timeout
         self.timeout = ConfigValidator.validate_timeout(timeout, 'hash_timeout')
@@ -106,7 +113,8 @@ class ParallelHashWorker(QThread):
         Process a single video file to compute its hash.
 
         This method checks if the file is already cached, validates its existence
-        and size, then computes the video hash.
+        and size, then computes the video hash. If subsequence detection is enabled,
+        also pre-computes dense hash to avoid reprocessing during subsequence phase.
 
         Args:
             file_path: Path to the video file.
@@ -124,14 +132,30 @@ class ParallelHashWorker(QThread):
 
             # Check if already cached
             if self.video_hasher.has_hash(file_path):
+                # Even if normal hash is cached, compute dense hash if needed
+                if self.subsequence_detector:
+                    try:
+                        self.subsequence_detector.compute_dense_hash(file_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to pre-compute dense hash for {filename}: {e}")
                 return file_path, True
 
             # Validate file using centralized validator
             if not FileValidator.validate_video_file(file_path):
                 return file_path, False
 
-            # Compute the hash
+            # Compute the normal hash
             self.video_hasher.compute_video_hash(file_path)
+
+            # Also compute dense hash if subsequence detection is enabled
+            # This saves time by avoiding reopening the video later
+            if self.subsequence_detector:
+                try:
+                    self.subsequence_detector.compute_dense_hash(file_path)
+                    logger.debug(f"Pre-computed dense hash for {filename}")
+                except Exception as e:
+                    logger.warning(f"Failed to pre-compute dense hash for {filename}: {e}")
+
             return file_path, True
 
         except Exception as e:
