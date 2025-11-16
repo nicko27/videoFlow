@@ -118,6 +118,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.subsequence_min_match_spin = None
         self.subsequence_cache_memory_spin = None
         self.hash_debugger = None
+        self.hash_debugger_v2 = None
 
         # Initialize managers and handlers
         self.settings_manager = SettingsManager()
@@ -152,9 +153,11 @@ class DuplicateFinderWindow(QMainWindow):
         hash_method = self.hash_method_combo.currentData() if self.hash_method_combo else 'pHash'
         self.video_hasher = VideoHasher(method=hash_method)
 
-        # Set video hasher on hash debugger widget
+        # Set video hasher on hash debugger widgets
         if self.hash_debugger:
             self.hash_debugger.set_video_hasher(self.video_hasher)
+        if self.hash_debugger_v2:
+            self.hash_debugger_v2.set_video_hasher(self.video_hasher)
 
         # Initialize handlers after video_hasher is created
         self.file_handler = FileHandler(self.file_list_widget)
@@ -433,10 +436,12 @@ class DuplicateFinderWindow(QMainWindow):
         # The parameters tab is the second tab (index 1)
         self.config_tabs = panel.findChild(QWidget.__class__)
         params_tab = None
+        debug_tab = None
         for child in panel.findChildren(QWidget):
             if hasattr(child, 'threshold_spin'):
                 params_tab = child
-                break
+            if hasattr(child, 'hash_debugger_v2'):
+                debug_tab = child
 
         if params_tab:
             self.threshold_spin = params_tab.threshold_spin
@@ -452,6 +457,9 @@ class DuplicateFinderWindow(QMainWindow):
             self.subsequence_min_match_spin = params_tab.subsequence_min_match_spin
             self.subsequence_cache_memory_spin = params_tab.subsequence_cache_memory_spin
             self.hash_debugger = params_tab.hash_debugger
+
+        if debug_tab:
+            self.hash_debugger_v2 = debug_tab.hash_debugger_v2
 
         # Extract button references
         for child in panel.findChildren(QWidget):

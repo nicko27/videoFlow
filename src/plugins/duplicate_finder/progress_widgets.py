@@ -912,3 +912,438 @@ class HashDebugger(QFrame):
         results.append(f"{'=' * 70}")
 
         self.results_text.setPlainText("\n".join(results))
+
+
+class HashDebuggerV2(QFrame):
+    """Advanced widget for interactive hash debugging with frame selection."""
+
+    def __init__(self, video_hasher=None, parent=None):
+        super().__init__(parent)
+        self.video_hasher = video_hasher
+        self.video_data = []  # List of {path, cap, total_frames, fps, start_frame}
+        self.setup_ui()
+
+    def setup_ui(self):
+        """Configure the advanced hash debugger UI."""
+        self.setStyleSheet("""
+            QFrame {
+                background-color: #F0F8FF;
+                border: 2px solid #4682B4;
+                border-radius: 8px;
+            }
+        """)
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(16, 16, 16, 16)
+        main_layout.setSpacing(16)
+
+        # Title
+        title_label = QLabel("🎬 Interactive Hash Debugger")
+        title_label.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+        title_label.setStyleSheet("color: #1E3A8A; border: none;")
+        main_layout.addWidget(title_label)
+
+        # Description
+        desc_label = QLabel("Select videos, choose starting frame positions, and calculate 10 consecutive hashes for detailed comparison")
+        desc_label.setFont(QFont("Arial", 9))
+        desc_label.setStyleSheet("color: #475569; border: none;")
+        desc_label.setWordWrap(True)
+        main_layout.addWidget(desc_label)
+
+        # Video selection
+        select_layout = QHBoxLayout()
+
+        self.add_video_btn = QPushButton("➕ Add Video")
+        self.add_video_btn.setMinimumHeight(36)
+        self.add_video_btn.clicked.connect(self._add_video)
+        self.add_video_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #10B981;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #059669;
+            }
+        """)
+        select_layout.addWidget(self.add_video_btn)
+
+        self.clear_all_btn = QPushButton("🗑️ Clear All")
+        self.clear_all_btn.setMinimumHeight(36)
+        self.clear_all_btn.clicked.connect(self._clear_all)
+        self.clear_all_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #EF4444;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #DC2626;
+            }
+        """)
+        select_layout.addWidget(self.clear_all_btn)
+
+        select_layout.addStretch()
+        main_layout.addLayout(select_layout)
+
+        # Video list container (scrollable)
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setMinimumHeight(200)
+        scroll_area.setMaximumHeight(400)
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                border: 1px solid #CBD5E1;
+                border-radius: 6px;
+                background-color: white;
+            }
+        """)
+
+        self.video_list_widget = QWidget()
+        self.video_list_layout = QVBoxLayout(self.video_list_widget)
+        self.video_list_layout.setSpacing(12)
+        self.video_list_layout.addStretch()
+
+        scroll_area.setWidget(self.video_list_widget)
+        main_layout.addWidget(scroll_area)
+
+        # Calculate button
+        self.calculate_btn = QPushButton("⚡ Calculate Hash Table")
+        self.calculate_btn.setMinimumHeight(44)
+        self.calculate_btn.clicked.connect(self._calculate_hash_table)
+        self.calculate_btn.setEnabled(False)
+        self.calculate_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3B82F6;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 12px 24px;
+                font-weight: bold;
+                font-size: 12pt;
+            }
+            QPushButton:hover:enabled {
+                background-color: #2563EB;
+            }
+            QPushButton:disabled {
+                background-color: #CBD5E1;
+            }
+        """)
+        main_layout.addWidget(self.calculate_btn)
+
+        # Results display
+        results_header = QLabel("📊 Results Table (copy/paste ready):")
+        results_header.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        results_header.setStyleSheet("color: #1E3A8A; border: none;")
+        main_layout.addWidget(results_header)
+
+        self.results_table = QTextEdit()
+        self.results_table.setReadOnly(True)
+        self.results_table.setMinimumHeight(300)
+        self.results_table.setPlaceholderText("Hash table will appear here (ready to copy/paste)")
+        self.results_table.setStyleSheet("""
+            QTextEdit {
+                background-color: #FFFFFF;
+                border: 2px solid #94A3B8;
+                border-radius: 6px;
+                padding: 12px;
+                font-family: 'Courier New', monospace;
+                font-size: 9pt;
+                line-height: 1.4;
+            }
+        """)
+        main_layout.addWidget(self.results_table)
+
+    def set_video_hasher(self, video_hasher):
+        """Set the video hasher instance."""
+        self.video_hasher = video_hasher
+
+    def _add_video(self):
+        """Add a video to the list."""
+        from PyQt6.QtWidgets import QFileDialog
+        import cv2
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Video File",
+            "",
+            "Video Files (*.mp4 *.avi *.mkv *.mov *.wmv *.flv *.webm);;All Files (*.*)"
+        )
+
+        if file_path:
+            # Open video to get metadata
+            cap = cv2.VideoCapture(file_path)
+            if not cap.isOpened():
+                self.results_table.setPlainText(f"ERROR: Cannot open video {file_path}")
+                return
+
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            cap.release()
+
+            # Create video entry widget
+            video_entry = self._create_video_entry(file_path, total_frames, fps)
+
+            # Insert before stretch
+            self.video_list_layout.insertWidget(
+                self.video_list_layout.count() - 1,
+                video_entry
+            )
+
+            # Store video data
+            self.video_data.append({
+                'path': file_path,
+                'total_frames': total_frames,
+                'fps': fps,
+                'start_frame': 0,
+                'widget': video_entry
+            })
+
+            self.calculate_btn.setEnabled(True)
+
+    def _create_video_entry(self, file_path, total_frames, fps):
+        """Create a widget for a single video entry."""
+        from PyQt6.QtWidgets import QSlider
+
+        entry_frame = QFrame()
+        entry_frame.setStyleSheet("""
+            QFrame {
+                background-color: #F8FAFC;
+                border: 1px solid #E2E8F0;
+                border-radius: 6px;
+                padding: 12px;
+            }
+        """)
+
+        layout = QVBoxLayout(entry_frame)
+        layout.setSpacing(8)
+
+        # Video name
+        name_label = QLabel(f"📹 {os.path.basename(file_path)}")
+        name_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        name_label.setStyleSheet("color: #1E293B; border: none;")
+        layout.addWidget(name_label)
+
+        # Video info
+        duration_sec = total_frames / fps if fps > 0 else 0
+        info_label = QLabel(f"Total frames: {total_frames} | FPS: {fps:.2f} | Duration: {duration_sec:.2f}s")
+        info_label.setFont(QFont("Arial", 8))
+        info_label.setStyleSheet("color: #64748B; border: none;")
+        layout.addWidget(info_label)
+
+        # Frame selection
+        frame_layout = QHBoxLayout()
+
+        frame_label = QLabel("Start frame:")
+        frame_label.setStyleSheet("color: #475569; border: none;")
+        frame_layout.addWidget(frame_label)
+
+        frame_spin = QSpinBox()
+        frame_spin.setMinimum(0)
+        frame_spin.setMaximum(max(0, total_frames - 10))
+        frame_spin.setValue(0)
+        frame_spin.setSuffix(f" / {total_frames}")
+        frame_spin.setMinimumWidth(150)
+        frame_spin.valueChanged.connect(lambda v: self._update_start_frame(file_path, v))
+        frame_layout.addWidget(frame_spin)
+
+        # Time display
+        time_label = QLabel("(0.00s)")
+        time_label.setStyleSheet("color: #64748B; border: none;")
+        time_label.setMinimumWidth(80)
+        frame_spin.valueChanged.connect(lambda v: time_label.setText(f"({v/fps:.2f}s)"))
+        frame_layout.addWidget(time_label)
+
+        frame_layout.addStretch()
+
+        # Remove button
+        remove_btn = QPushButton("✖")
+        remove_btn.setFixedSize(24, 24)
+        remove_btn.clicked.connect(lambda: self._remove_video(file_path, entry_frame))
+        remove_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #EF4444;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #DC2626;
+            }
+        """)
+        frame_layout.addWidget(remove_btn)
+
+        layout.addLayout(frame_layout)
+
+        # Store widgets for later access
+        entry_frame.frame_spin = frame_spin
+        entry_frame.file_path = file_path
+
+        return entry_frame
+
+    def _update_start_frame(self, file_path, frame_num):
+        """Update start frame for a video."""
+        for video in self.video_data:
+            if video['path'] == file_path:
+                video['start_frame'] = frame_num
+                break
+
+    def _remove_video(self, file_path, widget):
+        """Remove a video from the list."""
+        # Remove from data
+        self.video_data = [v for v in self.video_data if v['path'] != file_path]
+
+        # Remove widget
+        self.video_list_layout.removeWidget(widget)
+        widget.deleteLater()
+
+        # Disable calculate if no videos
+        if not self.video_data:
+            self.calculate_btn.setEnabled(False)
+
+    def _clear_all(self):
+        """Clear all videos."""
+        # Clear all widgets
+        while self.video_list_layout.count() > 1:  # Keep stretch
+            item = self.video_list_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        self.video_data = []
+        self.results_table.clear()
+        self.calculate_btn.setEnabled(False)
+
+    def _calculate_hash_table(self):
+        """Calculate hash table for all videos."""
+        if not self.video_hasher:
+            self.results_table.setPlainText("ERROR: No video hasher available")
+            return
+
+        if not self.video_data:
+            return
+
+        import cv2
+        from src.core.logger import Logger
+        logger = Logger.get_logger('DuplicateFinder.HashDebuggerV2')
+
+        results = []
+        results.append("=" * 100)
+        results.append("HASH DEBUGGING TABLE - COPY/PASTE READY")
+        results.append("=" * 100)
+        results.append(f"Hash Method: {self.video_hasher.method}")
+        results.append(f"Number of videos: {len(self.video_data)}")
+        results.append(f"Consecutive hashes per video: 10")
+        results.append("")
+
+        all_hashes = {}
+
+        # Calculate hashes for each video
+        for idx, video in enumerate(self.video_data, 1):
+            file_path = video['path']
+            start_frame = video['start_frame']
+
+            results.append(f"\n{'─' * 100}")
+            results.append(f"VIDEO {idx}: {os.path.basename(file_path)}")
+            results.append(f"Path: {file_path}")
+            results.append(f"Start frame: {start_frame}")
+            results.append(f"{'─' * 100}")
+
+            try:
+                cv2.setLogLevel(0)
+                cap = cv2.VideoCapture(file_path)
+
+                if not cap.isOpened():
+                    results.append("✗ ERROR: Cannot open video")
+                    continue
+
+                # Jump to start frame
+                cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+
+                # Calculate 10 consecutive hashes
+                hashes = []
+                for i in range(10):
+                    ret, frame = cap.read()
+                    if not ret:
+                        results.append(f"✗ ERROR: Could not read frame {start_frame + i}")
+                        break
+
+                    frame_hash = self.video_hasher.compute_frame_hash(frame)
+                    if frame_hash is not None:
+                        hashes.append(frame_hash)
+                    else:
+                        results.append(f"✗ ERROR: Hash calculation failed for frame {start_frame + i}")
+                        break
+
+                cap.release()
+
+                if len(hashes) == 10:
+                    all_hashes[f"Video{idx}"] = hashes
+                    results.append(f"✓ Successfully calculated 10 hashes")
+                    results.append("")
+
+                    # Display hashes in table format
+                    results.append("Frame | Hash (first 64 bits)")
+                    results.append("------|" + "-" * 66)
+
+                    for i, h in enumerate(hashes):
+                        frame_num = start_frame + i
+                        flat_hash = h.flatten()
+                        bits = ''.join(['1' if b else '0' for b in flat_hash[:64]])
+                        # Format in groups of 8 for readability
+                        formatted_bits = ' '.join([bits[j:j+8] for j in range(0, 64, 8)])
+                        results.append(f"{frame_num:5d} | {formatted_bits}")
+
+            except Exception as e:
+                results.append(f"✗ ERROR: {str(e)}")
+                logger.error(f"Error processing {file_path}: {e}")
+
+        # Comparison section if we have multiple videos
+        if len(all_hashes) >= 2:
+            results.append(f"\n{'=' * 100}")
+            results.append("FRAME-BY-FRAME COMPARISON MATRIX")
+            results.append(f"{'=' * 100}")
+
+            video_names = list(all_hashes.keys())
+
+            # Compare each pair
+            for i in range(len(video_names)):
+                for j in range(i + 1, len(video_names)):
+                    vid1 = video_names[i]
+                    vid2 = video_names[j]
+
+                    results.append(f"\n{vid1} vs {vid2}:")
+                    results.append("Frame | Similarity | Status")
+                    results.append("------|------------|--------")
+
+                    hashes1 = all_hashes[vid1]
+                    hashes2 = all_hashes[vid2]
+
+                    for k in range(min(len(hashes1), len(hashes2))):
+                        # Calculate similarity for this frame
+                        diff = np.sum(hashes1[k] != hashes2[k])
+                        total = hashes1[k].size
+                        similarity = (1 - diff / total) * 100
+
+                        status = "MATCH" if similarity > 80 else "DIFF "
+                        results.append(f"  {k:2d}  | {similarity:6.2f}%   | {status}")
+
+                    # Overall average
+                    avg_similarity = np.mean([
+                        (1 - np.sum(hashes1[k] != hashes2[k]) / hashes1[k].size) * 100
+                        for k in range(min(len(hashes1), len(hashes2)))
+                    ])
+                    results.append(f"\nAverage similarity: {avg_similarity:.2f}%")
+
+        results.append(f"\n{'=' * 100}")
+        results.append("END OF TABLE")
+        results.append(f"{'=' * 100}")
+        results.append("\nYou can copy/paste this entire table to share for debugging.")
+
+        self.results_table.setPlainText("\n".join(results))
