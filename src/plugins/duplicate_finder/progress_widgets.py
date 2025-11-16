@@ -4,9 +4,11 @@ Widgets de progression modernes - Version with TEXTE NOIR VISIBLE
 
 import os
 import numpy as np
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame, QScrollArea, QPushButton, QTextEdit, QSpinBox
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QPalette, QColor
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar, QFrame,
+                              QScrollArea, QPushButton, QTextEdit, QSpinBox, QDialog, QSlider,
+                              QApplication)
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage
 
 try:
     from .design_system import Colors, Spacing, Typography, Styles, get_status_colors
@@ -914,6 +916,384 @@ class HashDebugger(QFrame):
         self.results_text.setPlainText("\n".join(results))
 
 
+class FrameSelectorDialog(QDialog):
+    """Dialog for visually selecting a starting frame in a video."""
+
+    def __init__(self, video_path, parent=None):
+        super().__init__(parent)
+        self.video_path = video_path
+        self.current_frame = 0
+        self.selected_frame = 0
+        self.is_playing = False
+        self.cap = None
+        self.total_frames = 0
+        self.fps = 0
+
+        self.setWindowTitle(f"Select Starting Frame - {os.path.basename(video_path)}")
+        self.setModal(True)
+        self.resize(900, 700)
+
+        # Open video
+        import cv2
+        self.cap = cv2.VideoCapture(video_path)
+        if not self.cap.isOpened():
+            raise Exception(f"Cannot open video: {video_path}")
+
+        self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
+
+        self.setup_ui()
+
+        # Timer for playback
+        self.play_timer = QTimer(self)
+        self.play_timer.timeout.connect(self._next_frame)
+
+        # Load first frame
+        self._go_to_frame(0)
+
+    def setup_ui(self):
+        """Setup the UI components."""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        # Video display
+        self.video_label = QLabel()
+        self.video_label.setMinimumSize(640, 480)
+        self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.video_label.setStyleSheet("""
+            QLabel {
+                background-color: #000000;
+                border: 2px solid #4682B4;
+                border-radius: 4px;
+            }
+        """)
+        layout.addWidget(self.video_label)
+
+        # Frame info
+        info_layout = QHBoxLayout()
+        self.frame_label = QLabel("Frame: 0")
+        self.frame_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        self.time_label = QLabel("Time: 0.00s")
+        self.time_label.setFont(QFont("Arial", 11))
+        info_layout.addWidget(self.frame_label)
+        info_layout.addWidget(self.time_label)
+        info_layout.addStretch()
+        layout.addLayout(info_layout)
+
+        # Slider
+        self.frame_slider = QSlider(Qt.Orientation.Horizontal)
+        self.frame_slider.setMinimum(0)
+        self.frame_slider.setMaximum(max(0, self.total_frames - 1))
+        self.frame_slider.setValue(0)
+        self.frame_slider.valueChanged.connect(self._on_slider_changed)
+        layout.addWidget(self.frame_slider)
+
+        # Control buttons
+        controls_layout = QHBoxLayout()
+
+        self.play_btn = QPushButton("▶ Play")
+        self.play_btn.setMinimumHeight(36)
+        self.play_btn.clicked.connect(self._toggle_play)
+        self.play_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28A745;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
+
+        prev_btn = QPushButton("◀ Previous")
+        prev_btn.setMinimumHeight(36)
+        prev_btn.clicked.connect(self._prev_frame)
+        prev_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6C757D;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+            }
+            QPushButton:hover {
+                background-color: #5A6268;
+            }
+        """)
+
+        next_btn = QPushButton("Next ▶")
+        next_btn.setMinimumHeight(36)
+        next_btn.clicked.connect(self._next_frame)
+        next_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6C757D;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+            }
+            QPushButton:hover {
+                background-color: #5A6268;
+            }
+        """)
+
+        controls_layout.addWidget(prev_btn)
+        controls_layout.addWidget(self.play_btn)
+        controls_layout.addWidget(next_btn)
+        controls_layout.addStretch()
+        layout.addLayout(controls_layout)
+
+        # Action buttons
+        action_layout = QHBoxLayout()
+
+        confirm_btn = QPushButton("✓ Confirm This Frame")
+        confirm_btn.setMinimumHeight(44)
+        confirm_btn.clicked.connect(self.accept)
+        confirm_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #007BFF;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 12px 24px;
+                font-weight: bold;
+                font-size: 12pt;
+            }
+            QPushButton:hover {
+                background-color: #0056B3;
+            }
+        """)
+
+        cancel_btn = QPushButton("✗ Cancel")
+        cancel_btn.setMinimumHeight(44)
+        cancel_btn.clicked.connect(self.reject)
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #DC3545;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 12px 24px;
+                font-weight: bold;
+                font-size: 12pt;
+            }
+            QPushButton:hover {
+                background-color: #C82333;
+            }
+        """)
+
+        action_layout.addWidget(confirm_btn)
+        action_layout.addWidget(cancel_btn)
+        layout.addLayout(action_layout)
+
+    def _go_to_frame(self, frame_num):
+        """Go to specific frame and display it."""
+        import cv2
+
+        if frame_num < 0:
+            frame_num = 0
+        if frame_num >= self.total_frames:
+            frame_num = self.total_frames - 1
+
+        self.current_frame = frame_num
+        self.selected_frame = frame_num
+
+        # Set frame position
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+        ret, frame = self.cap.read()
+
+        if ret:
+            # Convert BGR to RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+            # Resize to fit display (keep aspect ratio)
+            h, w = frame_rgb.shape[:2]
+            max_w, max_h = 640, 480
+            scale = min(max_w / w, max_h / h)
+            new_w, new_h = int(w * scale), int(h * scale)
+            frame_resized = cv2.resize(frame_rgb, (new_w, new_h))
+
+            # Convert to QImage and QPixmap
+            h, w, ch = frame_resized.shape
+            bytes_per_line = ch * w
+            q_img = QImage(frame_resized.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+            pixmap = QPixmap.fromImage(q_img)
+
+            self.video_label.setPixmap(pixmap)
+
+        # Update labels
+        self.frame_label.setText(f"Frame: {frame_num} / {self.total_frames}")
+        time_sec = frame_num / self.fps if self.fps > 0 else 0
+        self.time_label.setText(f"Time: {time_sec:.2f}s")
+
+        # Update slider without triggering signal
+        self.frame_slider.blockSignals(True)
+        self.frame_slider.setValue(frame_num)
+        self.frame_slider.blockSignals(False)
+
+    def _on_slider_changed(self, value):
+        """Handle slider value change."""
+        if not self.is_playing:
+            self._go_to_frame(value)
+
+    def _toggle_play(self):
+        """Toggle play/pause."""
+        self.is_playing = not self.is_playing
+        if self.is_playing:
+            self.play_btn.setText("⏸ Pause")
+            interval = int(1000 / self.fps) if self.fps > 0 else 33
+            self.play_timer.start(interval)
+        else:
+            self.play_btn.setText("▶ Play")
+            self.play_timer.stop()
+
+    def _next_frame(self):
+        """Go to next frame."""
+        if self.current_frame < self.total_frames - 1:
+            self._go_to_frame(self.current_frame + 1)
+        else:
+            # Stop at end
+            if self.is_playing:
+                self._toggle_play()
+
+    def _prev_frame(self):
+        """Go to previous frame."""
+        if self.current_frame > 0:
+            self._go_to_frame(self.current_frame - 1)
+
+    def get_selected_frame(self):
+        """Get the selected frame number."""
+        return self.selected_frame
+
+    def closeEvent(self, event):
+        """Clean up when closing."""
+        if self.cap:
+            self.cap.release()
+        event.accept()
+
+
+class ResultsDialog(QDialog):
+    """Dialog for displaying hash comparison results."""
+
+    def __init__(self, results_text, parent=None):
+        super().__init__(parent)
+        self.results_text = results_text
+
+        self.setWindowTitle("Hash Debugging Results")
+        self.setModal(False)  # Allow interaction with main window
+        self.resize(1000, 700)
+
+        self.setup_ui()
+
+    def setup_ui(self):
+        """Setup the UI components."""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        # Title
+        title = QLabel("📊 Hash Debugging Results - Ready to Copy/Paste")
+        title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
+        title.setStyleSheet("color: #1E3A8A; padding: 8px;")
+        layout.addWidget(title)
+
+        # Instructions
+        instructions = QLabel("Select all (Ctrl+A) and copy (Ctrl+C) to share these results")
+        instructions.setFont(QFont("Arial", 9))
+        instructions.setStyleSheet("color: #64748B; padding: 4px;")
+        layout.addWidget(instructions)
+
+        # Results display
+        self.text_display = QTextEdit()
+        self.text_display.setReadOnly(False)  # Allow selection
+        self.text_display.setPlainText(self.results_text)
+        self.text_display.setStyleSheet("""
+            QTextEdit {
+                background-color: #FFFFFF;
+                border: 2px solid #3B82F6;
+                border-radius: 6px;
+                padding: 12px;
+                font-family: 'Courier New', 'Monaco', monospace;
+                font-size: 10pt;
+                line-height: 1.5;
+            }
+        """)
+        layout.addWidget(self.text_display)
+
+        # Buttons
+        button_layout = QHBoxLayout()
+
+        copy_btn = QPushButton("📋 Copy to Clipboard")
+        copy_btn.setMinimumHeight(40)
+        copy_btn.clicked.connect(self._copy_to_clipboard)
+        copy_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #10B981;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 10px 20px;
+                font-weight: bold;
+                font-size: 11pt;
+            }
+            QPushButton:hover {
+                background-color: #059669;
+            }
+        """)
+
+        select_all_btn = QPushButton("✓ Select All")
+        select_all_btn.setMinimumHeight(40)
+        select_all_btn.clicked.connect(self.text_display.selectAll)
+        select_all_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3B82F6;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 10px 20px;
+                font-weight: bold;
+                font-size: 11pt;
+            }
+            QPushButton:hover {
+                background-color: #2563EB;
+            }
+        """)
+
+        close_btn = QPushButton("✗ Close")
+        close_btn.setMinimumHeight(40)
+        close_btn.clicked.connect(self.accept)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6B7280;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 10px 20px;
+                font-weight: bold;
+                font-size: 11pt;
+            }
+            QPushButton:hover {
+                background-color: #4B5563;
+            }
+        """)
+
+        button_layout.addWidget(select_all_btn)
+        button_layout.addWidget(copy_btn)
+        button_layout.addStretch()
+        button_layout.addWidget(close_btn)
+        layout.addLayout(button_layout)
+
+    def _copy_to_clipboard(self):
+        """Copy results to clipboard."""
+        clipboard = QApplication.clipboard()
+        clipboard.setText(self.results_text)
+
+        # Visual feedback
+        self.text_display.selectAll()
+
+
 class HashDebuggerV2(QFrame):
     """Advanced widget for interactive hash debugging with frame selection."""
 
@@ -945,7 +1325,7 @@ class HashDebuggerV2(QFrame):
         main_layout.addWidget(title_label)
 
         # Description
-        desc_label = QLabel("Select videos, choose starting frame positions, and calculate 10 consecutive hashes for detailed comparison")
+        desc_label = QLabel("Add videos, then start the debug session. You'll visually select the starting frame for each video, and see a comparison table.")
         desc_label.setFont(QFont("Arial", 9))
         desc_label.setStyleSheet("color: #475569; border: none;")
         desc_label.setWordWrap(True)
@@ -1014,20 +1394,20 @@ class HashDebuggerV2(QFrame):
         scroll_area.setWidget(self.video_list_widget)
         main_layout.addWidget(scroll_area)
 
-        # Calculate button
-        self.calculate_btn = QPushButton("⚡ Calculate Hash Table")
-        self.calculate_btn.setMinimumHeight(44)
-        self.calculate_btn.clicked.connect(self._calculate_hash_table)
-        self.calculate_btn.setEnabled(False)
-        self.calculate_btn.setStyleSheet("""
+        # Start Debug Session button
+        self.start_btn = QPushButton("🎬 Start Debug Session")
+        self.start_btn.setMinimumHeight(50)
+        self.start_btn.clicked.connect(self._start_debug_session)
+        self.start_btn.setEnabled(False)
+        self.start_btn.setStyleSheet("""
             QPushButton {
                 background-color: #3B82F6;
                 color: white;
                 border: none;
-                border-radius: 6px;
-                padding: 12px 24px;
+                border-radius: 8px;
+                padding: 14px 28px;
                 font-weight: bold;
-                font-size: 12pt;
+                font-size: 13pt;
             }
             QPushButton:hover:enabled {
                 background-color: #2563EB;
@@ -1036,30 +1416,15 @@ class HashDebuggerV2(QFrame):
                 background-color: #CBD5E1;
             }
         """)
-        main_layout.addWidget(self.calculate_btn)
+        main_layout.addWidget(self.start_btn)
 
-        # Results display
-        results_header = QLabel("📊 Results Table (copy/paste ready):")
-        results_header.setFont(QFont("Arial", 11, QFont.Weight.Bold))
-        results_header.setStyleSheet("color: #1E3A8A; border: none;")
-        main_layout.addWidget(results_header)
-
-        self.results_table = QTextEdit()
-        self.results_table.setReadOnly(True)
-        self.results_table.setMinimumHeight(300)
-        self.results_table.setPlaceholderText("Hash table will appear here (ready to copy/paste)")
-        self.results_table.setStyleSheet("""
-            QTextEdit {
-                background-color: #FFFFFF;
-                border: 2px solid #94A3B8;
-                border-radius: 6px;
-                padding: 12px;
-                font-family: 'Courier New', monospace;
-                font-size: 9pt;
-                line-height: 1.4;
-            }
-        """)
-        main_layout.addWidget(self.results_table)
+        # Info label
+        info_label = QLabel("💡 Click the button above to start the debug session.\nYou'll select frames visually, then see results in a new window.")
+        info_label.setFont(QFont("Arial", 9))
+        info_label.setStyleSheet("color: #64748B; border: none; padding: 8px;")
+        info_label.setWordWrap(True)
+        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(info_label)
 
     def set_video_hasher(self, video_hasher):
         """Set the video hasher instance."""
@@ -1121,7 +1486,7 @@ class HashDebuggerV2(QFrame):
                 'widget': video_entry
             })
 
-        self.calculate_btn.setEnabled(True)
+        self.start_btn.setEnabled(True)
 
     def _create_video_entry(self, file_path, total_frames, fps):
         """Create a widget for a single video entry."""
@@ -1151,30 +1516,15 @@ class HashDebuggerV2(QFrame):
         info_label.setStyleSheet("color: #64748B; border: none;")
         layout.addWidget(info_label)
 
-        # Frame selection
-        frame_layout = QHBoxLayout()
+        # Action row
+        action_layout = QHBoxLayout()
 
-        frame_label = QLabel("Start frame:")
-        frame_label.setStyleSheet("color: #475569; border: none;")
-        frame_layout.addWidget(frame_label)
+        # Status label (will be updated after frame selection)
+        status_label = QLabel("⏳ Waiting for debug session...")
+        status_label.setStyleSheet("color: #F59E0B; border: none; font-weight: bold;")
+        action_layout.addWidget(status_label)
 
-        frame_spin = QSpinBox()
-        frame_spin.setMinimum(0)
-        frame_spin.setMaximum(max(0, total_frames - 10))
-        frame_spin.setValue(0)
-        frame_spin.setSuffix(f" / {total_frames}")
-        frame_spin.setMinimumWidth(150)
-        frame_spin.valueChanged.connect(lambda v: self._update_start_frame(file_path, v))
-        frame_layout.addWidget(frame_spin)
-
-        # Time display
-        time_label = QLabel("(0.00s)")
-        time_label.setStyleSheet("color: #64748B; border: none;")
-        time_label.setMinimumWidth(80)
-        frame_spin.valueChanged.connect(lambda v: time_label.setText(f"({v/fps:.2f}s)"))
-        frame_layout.addWidget(time_label)
-
-        frame_layout.addStretch()
+        action_layout.addStretch()
 
         # Remove button
         remove_btn = QPushButton("✖")
@@ -1192,22 +1542,15 @@ class HashDebuggerV2(QFrame):
                 background-color: #DC2626;
             }
         """)
-        frame_layout.addWidget(remove_btn)
+        action_layout.addWidget(remove_btn)
 
-        layout.addLayout(frame_layout)
+        layout.addLayout(action_layout)
 
         # Store widgets for later access
-        entry_frame.frame_spin = frame_spin
+        entry_frame.status_label = status_label
         entry_frame.file_path = file_path
 
         return entry_frame
-
-    def _update_start_frame(self, file_path, frame_num):
-        """Update start frame for a video."""
-        for video in self.video_data:
-            if video['path'] == file_path:
-                video['start_frame'] = frame_num
-                break
 
     def _remove_video(self, file_path, widget):
         """Remove a video from the list."""
@@ -1218,9 +1561,9 @@ class HashDebuggerV2(QFrame):
         self.video_list_layout.removeWidget(widget)
         widget.deleteLater()
 
-        # Disable calculate if no videos
+        # Disable start button if no videos
         if not self.video_data:
-            self.calculate_btn.setEnabled(False)
+            self.start_btn.setEnabled(False)
 
     def _clear_all(self):
         """Clear all videos."""
@@ -1231,21 +1574,66 @@ class HashDebuggerV2(QFrame):
                 item.widget().deleteLater()
 
         self.video_data = []
-        self.results_table.clear()
-        self.calculate_btn.setEnabled(False)
+        self.start_btn.setEnabled(False)
 
-    def _calculate_hash_table(self):
-        """Calculate hash table for all videos."""
+    def _start_debug_session(self):
+        """Start the interactive debug session."""
         if not self.video_hasher:
-            self.results_table.setPlainText("ERROR: No video hasher available")
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Error", "No video hasher available")
             return
 
         if not self.video_data:
             return
 
-        import cv2
         from src.core.logger import Logger
         logger = Logger.get_logger('DuplicateFinder.HashDebuggerV2')
+
+        # Step 1: For each video, open frame selector dialog
+        for idx, video in enumerate(self.video_data, 1):
+            file_path = video['path']
+
+            # Update status
+            widget = video['widget']
+            widget.status_label.setText(f"🎬 Selecting starting frame...")
+            widget.status_label.setStyleSheet("color: #3B82F6; border: none; font-weight: bold;")
+            QApplication.processEvents()  # Force UI update
+
+            try:
+                # Open frame selector dialog
+                dialog = FrameSelectorDialog(file_path, self)
+                result = dialog.exec()
+
+                if result == QDialog.DialogCode.Accepted:
+                    # User confirmed - save the selected frame
+                    start_frame = dialog.get_selected_frame()
+                    video['start_frame'] = start_frame
+
+                    # Update status
+                    widget.status_label.setText(f"✓ Frame {start_frame} selected")
+                    widget.status_label.setStyleSheet("color: #10B981; border: none; font-weight: bold;")
+                else:
+                    # User cancelled - abort the session
+                    widget.status_label.setText("✗ Session cancelled")
+                    widget.status_label.setStyleSheet("color: #EF4444; border: none; font-weight: bold;")
+
+                    # Reset all previous statuses
+                    for i in range(idx - 1):
+                        prev_widget = self.video_data[i]['widget']
+                        prev_widget.status_label.setText("⏳ Waiting for debug session...")
+                        prev_widget.status_label.setStyleSheet("color: #F59E0B; border: none; font-weight: bold;")
+
+                    logger.info("Debug session cancelled by user")
+                    return
+
+            except Exception as e:
+                logger.error(f"Error opening frame selector for {file_path}: {e}")
+                widget.status_label.setText(f"✗ Error: {str(e)}")
+                widget.status_label.setStyleSheet("color: #EF4444; border: none; font-weight: bold;")
+                return
+
+        # Step 2: All frames selected, now calculate hashes
+        import cv2
 
         results = []
         results.append("=" * 100)
@@ -1263,6 +1651,12 @@ class HashDebuggerV2(QFrame):
             file_path = video['path']
             start_frame = video['start_frame']
 
+            # Update status
+            widget = video['widget']
+            widget.status_label.setText(f"⚡ Calculating hashes...")
+            widget.status_label.setStyleSheet("color: #8B5CF6; border: none; font-weight: bold;")
+            QApplication.processEvents()
+
             results.append(f"\n{'─' * 100}")
             results.append(f"VIDEO {idx}: {os.path.basename(file_path)}")
             results.append(f"Path: {file_path}")
@@ -1275,6 +1669,8 @@ class HashDebuggerV2(QFrame):
 
                 if not cap.isOpened():
                     results.append("✗ ERROR: Cannot open video")
+                    widget.status_label.setText("✗ Error opening video")
+                    widget.status_label.setStyleSheet("color: #EF4444; border: none; font-weight: bold;")
                     continue
 
                 # Jump to start frame
@@ -1314,9 +1710,17 @@ class HashDebuggerV2(QFrame):
                         formatted_bits = ' '.join([bits[j:j+8] for j in range(0, 64, 8)])
                         results.append(f"{frame_num:5d} | {formatted_bits}")
 
+                    widget.status_label.setText("✓ Hashes calculated")
+                    widget.status_label.setStyleSheet("color: #10B981; border: none; font-weight: bold;")
+                else:
+                    widget.status_label.setText("✗ Hash calculation incomplete")
+                    widget.status_label.setStyleSheet("color: #EF4444; border: none; font-weight: bold;")
+
             except Exception as e:
                 results.append(f"✗ ERROR: {str(e)}")
                 logger.error(f"Error processing {file_path}: {e}")
+                widget.status_label.setText(f"✗ Error: {str(e)[:30]}")
+                widget.status_label.setStyleSheet("color: #EF4444; border: none; font-weight: bold;")
 
         # Comparison section if we have multiple videos
         if len(all_hashes) >= 2:
@@ -1360,4 +1764,9 @@ class HashDebuggerV2(QFrame):
         results.append(f"{'=' * 100}")
         results.append("\nYou can copy/paste this entire table to share for debugging.")
 
-        self.results_table.setPlainText("\n".join(results))
+        # Step 3: Open results dialog
+        results_text = "\n".join(results)
+        dialog = ResultsDialog(results_text, self)
+        dialog.show()
+
+        logger.info("Debug session completed successfully")
