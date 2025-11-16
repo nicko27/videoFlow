@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
-from ..progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator, HashDebugger
+from ..progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator, HashDebugger, HashDebuggerV2
 from ..themes import get_current_theme
 
 
@@ -135,6 +135,10 @@ class UIPanels:
         # Parameters tab
         params_tab = UIPanels._create_parameters_tab(callbacks)
         tabs.addTab(params_tab, "⚙️ Settings")
+
+        # Debug tab
+        debug_tab = UIPanels._create_debug_tab()
+        tabs.addTab(debug_tab, "🔬 Debug")
 
         return tabs
 
@@ -420,6 +424,30 @@ class UIPanels:
         tab.subsequence_min_match_spin = subsequence_min_match_spin
         tab.subsequence_cache_memory_spin = subsequence_cache_memory_spin
         tab.hash_debugger = hash_debugger
+
+        return tab
+
+    @staticmethod
+    def _create_debug_tab() -> QWidget:
+        """
+        Create the debug tab with interactive hash debugger.
+
+        Returns:
+            Configured QWidget for debug tab.
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(10)
+
+        # Create hash debugger V2
+        hash_debugger_v2 = HashDebuggerV2()
+
+        layout.addWidget(hash_debugger_v2)
+        layout.addStretch()
+
+        # Store reference for later access
+        tab.hash_debugger_v2 = hash_debugger_v2
 
         return tab
 
