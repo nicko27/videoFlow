@@ -34,6 +34,7 @@ try:
     from .handlers.duplicate_handler import DuplicateHandler
     from .theme_selector import ThemeSelector
     from .themes import get_current_theme
+    from .layouts import LayoutManager, LayoutType
 except ImportError:
     # Fallback for direct imports
     from video_hasher import VideoHasher
@@ -47,6 +48,7 @@ except ImportError:
     from handlers.duplicate_handler import DuplicateHandler
     from theme_selector import ThemeSelector
     from themes import get_current_theme
+    from layouts import LayoutManager, LayoutType
 
 from src.core.logger import Logger
 
@@ -120,6 +122,17 @@ class DuplicateFinderWindow(QMainWindow):
         self.duplicate_handler: Optional[DuplicateHandler] = None
         self.subsequence_detector = None  # Will be created on demand
 
+        # Layout manager
+        self.layout_manager = LayoutManager()
+        # Load saved layout preference (defaults to classic)
+        saved_layout = self.settings_manager.get_layout_preference()
+        try:
+            self.current_layout = LayoutType(saved_layout)
+        except ValueError:
+            logger.warning(f"Invalid saved layout '{saved_layout}', using classic")
+            self.current_layout = LayoutType.CLASSIC
+        self.layout_selector = None
+
         # UI update timer
         self.status_update_timer = QTimer()
         self.status_update_timer.timeout.connect(self.force_ui_update)
@@ -169,16 +182,8 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Main layout
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(15, 15, 15, 15)
-        main_layout.setSpacing(10)
-
-        # Header with title and theme selector
-        header = self._create_header()
-        main_layout.addWidget(header)
-
-        # Splitter for panels
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setChildrenCollapsible(False)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
         # Create file list widget (needed for both panels)
         self.file_list_widget = FileListWidget()
@@ -187,32 +192,42 @@ class DuplicateFinderWindow(QMainWindow):
         left_panel = self._create_left_panel()
         right_panel, right_widgets = UIPanels.create_right_panel()
 
-        splitter.addWidget(left_panel)
-        splitter.addWidget(right_panel)
-        splitter.setSizes([400, 600])
-
-        main_layout.addWidget(splitter)
-
         # Store right panel widgets
         self.status_indicator = right_widgets['status_indicator']
         self.file_progress = right_widgets['file_progress']
         self.comparison_progress = right_widgets['comparison_progress']
 
+        # Header with title, layout selector and theme selector
+        header = self._create_header()
+
+        # Use LayoutManager to create the layout
+        layout_container = self.layout_manager.create_layout(
+            self.current_layout,
+            left_panel,
+            right_panel,
+            header
+        )
+
+        main_layout.addWidget(layout_container)
+
         # Initial button states
-        self.analyze_btn.setEnabled(False)
-        self.stop_btn.setEnabled(False)
+        if self.analyze_btn:
+            self.analyze_btn.setEnabled(False)
+        if self.stop_btn:
+            self.stop_btn.setEnabled(False)
 
         # Apply initial theme
         self.apply_theme()
 
     def _create_header(self) -> QWidget:
         """
-        Create header with title and theme selector.
+        Create header with title, layout selector and theme selector.
 
         Returns:
             QWidget containing the header.
         """
-        from PyQt6.QtWidgets import QHBoxLayout
+        from PyQt6.QtWidgets import QHBoxLayout, QComboBox
+        from .design_system import Colors, Spacing, Typography
 
         header = QWidget()
         header_layout = QHBoxLayout(header)
@@ -227,6 +242,52 @@ class DuplicateFinderWindow(QMainWindow):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet(theme.get_title_style())
         header_layout.addWidget(title, stretch=1)
+
+        # Layout selector
+        layout_label = QLabel("📐 Disposition:")
+        layout_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
+        layout_label.setStyleSheet(f"color: {Colors.GRAY_700};")
+        header_layout.addWidget(layout_label)
+
+        self.layout_selector = QComboBox()
+        self.layout_selector.setMinimumWidth(180)
+        self.layout_selector.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
+        self.layout_selector.setStyleSheet(f"""
+            QComboBox {{
+                border: 1px solid {Colors.BORDER_DEFAULT};
+                border-radius: {Spacing.RADIUS_SM}px;
+                padding: {Spacing.XS}px {Spacing.SM}px;
+                background-color: {Colors.WHITE};
+                color: {Colors.BLACK};
+            }}
+            QComboBox:hover {{
+                border-color: {Colors.PRIMARY};
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                padding-right: {Spacing.XS}px;
+            }}
+            QComboBox QAbstractItemView {{
+                border: 1px solid {Colors.BORDER_DEFAULT};
+                background-color: {Colors.WHITE};
+                selection-background-color: {Colors.PRIMARY_LIGHT};
+                selection-color: {Colors.BLACK};
+            }}
+        """)
+
+        # Populate layouts
+        layout_names = self.layout_manager.get_layout_names()
+        for key, name in layout_names.items():
+            self.layout_selector.addItem(name, key)
+
+        # Set current layout in selector
+        for i in range(self.layout_selector.count()):
+            if self.layout_selector.itemData(i) == self.current_layout.value:
+                self.layout_selector.setCurrentIndex(i)
+                break
+
+        self.layout_selector.currentIndexChanged.connect(self.on_layout_changed)
+        header_layout.addWidget(self.layout_selector)
 
         # Theme selector
         self.theme_selector = ThemeSelector()
@@ -283,6 +344,49 @@ class DuplicateFinderWindow(QMainWindow):
         if files and self.file_list_widget:
             self.file_handler = FileHandler(self.file_list_widget)
             self.file_handler.add_files(files)
+
+    def on_layout_changed(self, index: int) -> None:
+        """
+        Handle layout change event.
+
+        Args:
+            index: Index of the selected layout in the combo box.
+        """
+        if not self.layout_selector:
+            return
+
+        layout_key = self.layout_selector.currentData()
+        if not layout_key:
+            return
+
+        # Convert string key to LayoutType enum
+        try:
+            new_layout = LayoutType(layout_key)
+        except ValueError:
+            logger.error(f"Invalid layout key: {layout_key}")
+            return
+
+        if new_layout == self.current_layout:
+            return  # No change
+
+        logger.info(f"Layout changed to: {layout_key}")
+        self.current_layout = new_layout
+
+        # Store current state
+        files = []
+        if self.file_list_widget:
+            files = self.file_list_widget.get_files()
+
+        # Recreate UI with new layout
+        self.setup_ui()
+
+        # Restore state
+        if files and self.file_list_widget:
+            self.file_handler = FileHandler(self.file_list_widget)
+            self.file_handler.add_files(files)
+
+        # Save layout preference
+        self.settings_manager.save_layout_preference(layout_key)
 
     def _create_left_panel(self):
         """
