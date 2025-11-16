@@ -402,12 +402,37 @@ class UIPanels:
         subsequence_cache_memory_spin.setToolTip("Maximum memory for dense hash cache (default: 500MB)")
         subsequence_layout.addWidget(subsequence_cache_memory_spin, 3, 1)
 
+        # Sliding window tolerance (SOLUTION 1)
+        subsequence_layout.addWidget(QLabel("Sliding window tolerance:"), 4, 0)
+        subsequence_sliding_tolerance_spin = QSpinBox()
+        subsequence_sliding_tolerance_spin.setRange(1, 10)
+        subsequence_sliding_tolerance_spin.setValue(3)
+        subsequence_sliding_tolerance_spin.setSuffix(" frames")
+        subsequence_sliding_tolerance_spin.setToolTip("±N frame tolerance for temporal desynchronization (default: 3 frames = ±2.25s at 0.75s intervals)")
+        subsequence_layout.addWidget(subsequence_sliding_tolerance_spin, 4, 1)
+
+        # Temporal window frames (SOLUTION 4)
+        subsequence_layout.addWidget(QLabel("Temporal averaging window:"), 5, 0)
+        subsequence_temporal_window_spin = QSpinBox()
+        subsequence_temporal_window_spin.setRange(3, 11)
+        subsequence_temporal_window_spin.setValue(5)
+        subsequence_temporal_window_spin.setSingleStep(2)  # Odd numbers only
+        subsequence_temporal_window_spin.setSuffix(" frames")
+        subsequence_temporal_window_spin.setToolTip("Number of consecutive frames for temporal averaging (default: 5 frames, use odd numbers)")
+        subsequence_layout.addWidget(subsequence_temporal_window_spin, 5, 1)
+
+        # Adaptive refinement (SOLUTION 5)
+        subsequence_adaptive_refinement_check = QCheckBox("Enable adaptive refinement")
+        subsequence_adaptive_refinement_check.setChecked(True)
+        subsequence_adaptive_refinement_check.setToolTip("Automatically re-sample at 0.2s intervals for 70-95% matches (default: enabled)")
+        subsequence_layout.addWidget(subsequence_adaptive_refinement_check, 6, 0, 1, 2)
+
         # Info label
         info_label = QLabel("ℹ️ Detects when a short video is extracted from a longer video.\n"
-                           "Uses more memory but protected by LRU cache with limit above.")
+                           "Temporal tolerance settings help match videos with slight time offsets.")
         info_label.setStyleSheet("QLabel { color: #6C757D; font-size: 9px; padding: 5px; }")
         info_label.setWordWrap(True)
-        subsequence_layout.addWidget(info_label, 4, 0, 1, 2)
+        subsequence_layout.addWidget(info_label, 7, 0, 1, 2)
 
         layout.addWidget(subsequence_group)
 
@@ -430,6 +455,9 @@ class UIPanels:
         tab.subsequence_sample_interval_spin = subsequence_sample_interval_spin
         tab.subsequence_min_match_spin = subsequence_min_match_spin
         tab.subsequence_cache_memory_spin = subsequence_cache_memory_spin
+        tab.subsequence_sliding_tolerance_spin = subsequence_sliding_tolerance_spin
+        tab.subsequence_temporal_window_spin = subsequence_temporal_window_spin
+        tab.subsequence_adaptive_refinement_check = subsequence_adaptive_refinement_check
         tab.hash_debugger = hash_debugger
 
         return tab
