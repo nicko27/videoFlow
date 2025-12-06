@@ -658,7 +658,8 @@ class SubsequenceDetector:
                 else:
                     _, duration = self.hasher.compute_video_hash_fast(video_path)
                     video_durations[video_path] = duration
-            except:
+            except (OSError, IOError, ValueError) as e:
+                logger.warning(f"Could not get duration for {video_path}: {e}")
                 continue
 
         # Generate pairs where short video is at least 30% shorter

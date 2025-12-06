@@ -62,7 +62,8 @@ class OptimizedComparisonWorker(QThread):
         files: List[str],
         video_hasher,
         threshold: float,
-        config: Dict[str, Any]
+        config: Dict[str, Any],
+        specific_pairs: Optional[List[tuple]] = None
     ) -> None:
         """
         Initialize the comparison worker.
@@ -75,10 +76,13 @@ class OptimizedComparisonWorker(QThread):
                 - comparison_workers: Number of parallel workers
                 - batch_size: Number of comparisons per batch
                 - comparison_timeout: Timeout in seconds per comparison
+            specific_pairs: Optional list of specific (file1, file2) tuples to compare.
+                          If provided, only these pairs are compared (audio-first mode).
         """
         super().__init__()
         self.files = files
         self.video_hasher = video_hasher
+        self.specific_pairs = specific_pairs
 
         # Validate and sanitize configuration
         self.config = ConfigValidator.validate_config(config)
@@ -137,7 +141,7 @@ class OptimizedComparisonWorker(QThread):
         )
         return optimal_size
 
-    def generate_pairs(self, files: List[str]) -> List[Tuple[str, str]]:
+    def generate_pairs(self, files: List[str], specific_pairs: Optional[List[tuple]] = None) -> List[Tuple[str, str]]:
         """
         Generate pairs of files to compare, optimized with caching.
 
@@ -147,9 +151,12 @@ class OptimizedComparisonWorker(QThread):
         3. Similarity threshold
 
         **OPTIMIZED**: Batch database queries for 10x faster pair generation.
+        **AUDIO-FIRST MODE**: If specific_pairs provided, only filter those pairs.
 
         Args:
             files: List of file paths to compare.
+            specific_pairs: Optional list of specific (file1, file2, similarity) tuples
+                          from audio comparison. If provided, only these pairs are filtered.
 
         Returns:
             List of tuples (file1, file2) that need comparison.
@@ -173,12 +180,20 @@ class OptimizedComparisonWorker(QThread):
         except Exception:
             pass  # Fall back to individual queries
 
-        # Generate all possible pairs - OPTIMIZATION: Use list comprehension
-        all_possible_pairs = [
-            (files[i], files[j])
-            for i in range(len(files))
-            for j in range(i + 1, len(files))
-        ]
+        # Generate pairs - use specific pairs if provided (audio-first mode)
+        if specific_pairs:
+            # Audio-first mode: use only the candidate pairs from audio comparison
+            all_possible_pairs = [
+                (v1, v2) for v1, v2, _ in specific_pairs
+            ]
+            logger.info(f"Audio-first mode: {len(all_possible_pairs)} candidate pairs from audio")
+        else:
+            # Normal mode: generate all N² possible pairs
+            all_possible_pairs = [
+                (files[i], files[j])
+                for i in range(len(files))
+                for j in range(i + 1, len(files))
+            ]
 
         total_pairs = len(all_possible_pairs)
         self.status_update.emit(f"🔍 Filtering {total_pairs:,} pairs...")
@@ -262,7 +277,13 @@ class OptimizedComparisonWorker(QThread):
         """
         try:
             # Generate pairs to compare
-            pairs = self.generate_pairs(self.files)
+            if self.specific_pairs:
+                # Audio-first mode: use specific pairs
+                logger.info(f"Audio-first mode: using {len(self.specific_pairs)} specific pairs")
+                pairs = self.generate_pairs(self.files, specific_pairs=self.specific_pairs)
+            else:
+                # Normal mode: generate all N² pairs
+                pairs = self.generate_pairs(self.files)
 
             # Process cached pairs first (emit progress and duplicates)
             if self.cached_pairs:

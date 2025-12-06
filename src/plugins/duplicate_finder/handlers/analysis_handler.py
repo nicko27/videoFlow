@@ -132,7 +132,8 @@ class AnalysisHandler(QObject):
         progress_callback: Optional[Callable] = None,
         status_callback: Optional[Callable] = None,
         total_comparisons_callback: Optional[Callable] = None,
-        comparison_details_callback: Optional[Callable] = None
+        comparison_details_callback: Optional[Callable] = None,
+        specific_pairs: Optional[List[tuple]] = None
     ) -> None:
         """
         Start video comparison analysis.
@@ -145,13 +146,16 @@ class AnalysisHandler(QObject):
             status_callback: Optional callback for status updates.
             total_comparisons_callback: Optional callback for total count.
             comparison_details_callback: Optional callback for detailed progress.
+            specific_pairs: Optional list of specific (file1, file2) pairs to compare.
+                          If provided, only these pairs are compared (audio-first workflow).
         """
         # Create and configure worker
         self.comparison_worker = OptimizedComparisonWorker(
             files,
             self.video_hasher,
             config['threshold'],
-            config
+            config,
+            specific_pairs=specific_pairs
         )
 
         # Connect signals

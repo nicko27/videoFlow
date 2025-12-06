@@ -1629,7 +1629,7 @@ class DuplicateFinderWindow(QMainWindow):
             unique_videos.add(v1)
             unique_videos.add(v2)
 
-        # Use existing comparison logic
+        # Use existing comparison logic with SPECIFIC PAIRS (audio-first optimization)
         config = self.get_analysis_config()
         self.analysis_handler.start_comparison_analysis(
             list(unique_videos),
@@ -1638,7 +1638,8 @@ class DuplicateFinderWindow(QMainWindow):
             progress_callback=self.update_duplicate_progress,
             status_callback=self.update_comparison_status,
             total_comparisons_callback=self.set_comparison_total,
-            comparison_details_callback=self.update_comparison_details
+            comparison_details_callback=self.update_comparison_details,
+            specific_pairs=candidates  # FIXED: Pass audio candidates to avoid N² comparison
         )
 
     def _get_params_tab(self):

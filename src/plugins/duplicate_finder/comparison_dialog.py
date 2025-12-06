@@ -221,7 +221,8 @@ class ComparisonDialog(QDialog):
                 size_str = f"{size_bytes / 1_000_000_000:.2f} GB"
             else:
                 size_str = f"{size_bytes / 1_000_000:.2f} MB"
-        except:
+        except (OSError, FileNotFoundError) as e:
+            logger.warning(f"Cannot get file size for {video_path}: {e}")
             size_str = "Taille inconnue"
 
         size_label = QLabel(f"Taille : {size_str}")

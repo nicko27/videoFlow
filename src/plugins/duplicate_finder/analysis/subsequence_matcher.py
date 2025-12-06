@@ -132,8 +132,8 @@ class SubsequenceMatcher:
                 if audio_path and os.path.exists(audio_path):
                     try:
                         os.unlink(audio_path)
-                    except:
-                        pass
+                    except OSError as e:
+                        logger.debug(f"Could not delete temporary audio file {audio_path}: {e}")
 
         except Exception as e:
             logger.error(f"Error extracting signature at {time_seconds}s: {e}")
