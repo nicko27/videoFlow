@@ -347,9 +347,19 @@ class VideoHasher:
             if video_path in self.hash_cache:
                 cache_entry = self.hash_cache[video_path]
                 current_mtime = os.path.getmtime(video_path)
-                # Check if file has changed
-                if abs(current_mtime - cache_entry['mtime']) < 1:
+                current_size = os.path.getsize(video_path)
+
+                # Check if file has changed (mtime AND size)
+                # This prevents cache hits when file is replaced with same mtime
+                mtime_match = abs(current_mtime - cache_entry['mtime']) < 1
+                size_match = current_size == cache_entry.get('file_size', current_size)
+
+                if mtime_match and size_match:
+                    logger.debug(f"Cache hit (memory): {os.path.basename(video_path)}")
                     return cache_entry['hash'], cache_entry['duration']
+                else:
+                    logger.debug(f"Cache invalidated: {os.path.basename(video_path)} "
+                               f"(mtime_match={mtime_match}, size_match={size_match})")
 
             # 2. Hash computation required
             cv2.setLogLevel(0)
