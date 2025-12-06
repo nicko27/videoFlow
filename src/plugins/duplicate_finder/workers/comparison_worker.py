@@ -374,13 +374,27 @@ class OptimizedComparisonWorker(QThread):
         if self.is_stopped():
             return None
 
+        # Check if files still exist before comparison
+        if not os.path.exists(file1):
+            logger.warning(f"File deleted during analysis: {os.path.basename(file1)}")
+            return (file1, file2, 0.0)
+        if not os.path.exists(file2):
+            logger.warning(f"File deleted during analysis: {os.path.basename(file2)}")
+            return (file1, file2, 0.0)
+
         try:
             similarity = self.video_hasher.compare_videos(file1, file2)
             return (file1, file2, similarity)
+        except (FileNotFoundError, OSError) as e:
+            logger.warning(
+                f"File access error comparing {os.path.basename(file1)} vs "
+                f"{os.path.basename(file2)}: {e}"
+            )
+            return (file1, file2, 0.0)
         except Exception as e:
             logger.error(
-                f"Error comparing {os.path.basename(file1)} vs "
-                f"{os.path.basename(file2)}: {e}"
+                f"Unexpected error comparing {os.path.basename(file1)} vs "
+                f"{os.path.basename(file2)}: {e}", exc_info=True
             )
             return (file1, file2, 0.0)
 
