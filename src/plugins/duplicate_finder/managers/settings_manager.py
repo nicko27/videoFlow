@@ -133,25 +133,23 @@ class SettingsManager(QObject):
             if 'scene_precision_combo' in widgets and widgets['scene_precision_combo'] is not None:
                 precision = self.settings.value('precision_mode', 'balanced', type=str)
                 combo = widgets['scene_precision_combo']
-                # Find and set the correct index
-                for i in range(combo.count()):
-                    if combo.itemData(i) == precision:
-                        combo.setCurrentIndex(i)
-                        break
+                # Find and set by text since items were added with addItems()
+                index = combo.findText(precision)
+                if index >= 0:
+                    combo.setCurrentIndex(index)
 
             # Load algorithm choice (combobox)
             if 'scene_algorithm_combo' in widgets and widgets['scene_algorithm_combo'] is not None:
                 algorithm = self.settings.value('algorithm', 'hash_index', type=str)
                 combo = widgets['scene_algorithm_combo']
-                # Find and set the correct index
-                for i in range(combo.count()):
-                    if combo.itemData(i) == algorithm:
-                        combo.setCurrentIndex(i)
-                        break
+                # Find and set by text since items were added with addItems()
+                index = combo.findText(algorithm)
+                if index >= 0:
+                    combo.setCurrentIndex(index)
 
             # Load checkbox state
             if 'enable_scene_check' in widgets and widgets['enable_scene_check'] is not None:
-                enabled = self.settings.value('enabled', False, type=str)
+                enabled = self.settings.value('enabled', False, type=bool)
                 widgets['enable_scene_check'].setChecked(enabled)
 
             self.settings.endGroup()
@@ -274,12 +272,12 @@ class SettingsManager(QObject):
 
             # Save precision mode (combobox)
             if 'scene_precision_combo' in widgets and widgets['scene_precision_combo'] is not None:
-                precision = widgets['scene_precision_combo'].currentData()
+                precision = widgets['scene_precision_combo'].currentText()
                 self.settings.setValue('precision_mode', precision)
 
             # Save algorithm choice (combobox)
             if 'scene_algorithm_combo' in widgets and widgets['scene_algorithm_combo'] is not None:
-                algorithm = widgets['scene_algorithm_combo'].currentData()
+                algorithm = widgets['scene_algorithm_combo'].currentText()
                 self.settings.setValue('algorithm', algorithm)
 
             # Save checkbox state

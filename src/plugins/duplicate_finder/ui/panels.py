@@ -731,6 +731,96 @@ class UIPanels:
         layout.addWidget(advanced_mode_group)
 
         # ═══════════════════════════════════════════════════════════
+        # DÉTECTION DE SCÈNES (Audio Fingerprinting)
+        # ═══════════════════════════════════════════════════════════
+        scene_detection_group = QGroupBox("🎬 Détection de Scènes (Audio)")
+        scene_detection_layout = QGridLayout(scene_detection_group)
+        scene_detection_layout.setSpacing(10)
+
+        # Description
+        scene_detection_desc = QLabel(
+            "Phase 1: Détection de candidats par empreintes audio\n"
+            "• Trouve les paires potentielles avec audio fingerprinting\n"
+            "• Rapide et efficace pour filtrage initial\n\n"
+            "Phase 2: Vérification visuelle (voir section ci-dessous)"
+        )
+        scene_detection_desc.setWordWrap(True)
+        scene_detection_desc.setStyleSheet("QLabel { color: #6C757D; font-size: 10px; }")
+        scene_detection_layout.addWidget(scene_detection_desc, 0, 0, 1, 2)
+
+        # Activer la détection de scènes
+        enable_scene_check = QCheckBox("Activer la détection de scènes")
+        enable_scene_check.setChecked(False)
+        enable_scene_check.setStyleSheet("QCheckBox { font-weight: bold; color: #1565C0; }")
+        enable_scene_check.setToolTip(
+            "Active la détection de scènes par audio fingerprinting.\n"
+            "Recherche les vidéos courtes extraites de vidéos longues."
+        )
+        scene_detection_layout.addWidget(enable_scene_check, 1, 0, 1, 2)
+
+        # Algorithme de détection
+        scene_detection_layout.addWidget(QLabel("🔧 Algorithme :"), 2, 0)
+        scene_algorithm_combo = QComboBox()
+        scene_algorithm_combo.addItems([
+            "hash_index",      # Rapide (10-100x)
+            "shazam",          # Ultra-rapide (expérimental)
+            "sliding_window"   # Classique
+        ])
+        scene_algorithm_combo.setCurrentText("hash_index")
+        scene_algorithm_combo.setToolTip(
+            "Algorithme d'audio fingerprinting:\n"
+            "• hash_index: Rapide, recommandé (10-100x)\n"
+            "• shazam: Ultra-rapide, expérimental\n"
+            "• sliding_window: Classique, plus lent"
+        )
+        scene_detection_layout.addWidget(scene_algorithm_combo, 2, 1)
+
+        # Seuil de correspondance audio (Phase 1)
+        scene_detection_layout.addWidget(QLabel("🎵 Seuil audio candidats :"), 3, 0)
+        scene_min_match_spin = QDoubleSpinBox()
+        scene_min_match_spin.setRange(0.50, 0.95)
+        scene_min_match_spin.setValue(0.70)  # 70% comme Strategy 3
+        scene_min_match_spin.setSuffix(" %")
+        scene_min_match_spin.setSingleStep(0.05)
+        scene_min_match_spin.setDecimals(2)
+        scene_min_match_spin.setToolTip(
+            "Seuil de similarité audio pour Phase 1 (détection candidats).\n"
+            "70% = Recommandé (trouve beaucoup de candidats)\n"
+            "Phase 2 (vérification) éliminera les faux positifs.\n\n"
+            "Plus bas = Plus de candidats trouvés\n"
+            "Plus haut = Moins de candidats, risque de manquer des matches"
+        )
+        scene_detection_layout.addWidget(scene_min_match_spin, 3, 1)
+
+        # Durée minimale
+        scene_detection_layout.addWidget(QLabel("⏱️ Durée minimale :"), 4, 0)
+        scene_min_duration_spin = QSpinBox()
+        scene_min_duration_spin.setRange(5, 60)
+        scene_min_duration_spin.setValue(10)
+        scene_min_duration_spin.setSuffix(" sec")
+        scene_min_duration_spin.setToolTip(
+            "Durée minimale de la vidéo courte.\n"
+            "10s = Recommandé\n"
+            "Ignorer les extraits très courts."
+        )
+        scene_detection_layout.addWidget(scene_min_duration_spin, 4, 1)
+
+        # Mode de précision
+        scene_detection_layout.addWidget(QLabel("🎯 Mode précision :"), 5, 0)
+        scene_precision_combo = QComboBox()
+        scene_precision_combo.addItems(["balanced", "fast", "maximum"])
+        scene_precision_combo.setCurrentText("balanced")
+        scene_precision_combo.setToolTip(
+            "Mode de précision pour Chromaprint:\n"
+            "• balanced: Équilibre vitesse/précision\n"
+            "• fast: Plus rapide, moins précis\n"
+            "• maximum: Plus précis, plus lent"
+        )
+        scene_detection_layout.addWidget(scene_precision_combo, 5, 1)
+
+        layout.addWidget(scene_detection_group)
+
+        # ═══════════════════════════════════════════════════════════
         # VÉRIFICATION DE SOUS-SÉQUENCES (Strategy 3: Scene Cuts Veto)
         # ═══════════════════════════════════════════════════════════
         subseq_verification_group = QGroupBox("🎯 Vérification de Sous-séquences")
@@ -864,6 +954,13 @@ class UIPanels:
         tab.level2_threshold_spin = level2_threshold_spin
         tab.level3_phash_threshold_spin = level3_phash_threshold_spin
         tab.level3_frame_rate_spin = level3_frame_rate_spin
+
+        # Scene detection (Audio fingerprinting)
+        tab.enable_scene_check = enable_scene_check
+        tab.scene_algorithm_combo = scene_algorithm_combo
+        tab.scene_min_match_spin = scene_min_match_spin
+        tab.scene_min_duration_spin = scene_min_duration_spin
+        tab.scene_precision_combo = scene_precision_combo
 
         # Subsequence verification (Strategy 3)
         tab.enable_subseq_verification = enable_subseq_verification
