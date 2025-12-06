@@ -475,7 +475,26 @@ def get_status_colors(status_type: str) -> Dict[str, str]:
 
 
 class SimpleTheme:
-    """Simple theme object for backward compatibility."""
+    """Simple theme object for backward compatibility.
+
+    Provides a complete theme implementation compatible with the legacy
+    themes system, using the design_system constants.
+    """
+
+    def get_colors(self) -> Dict[str, str]:
+        """Get theme-specific colors.
+
+        Returns:
+            Dictionary with color values for the theme
+        """
+        return {
+            'primary': Colors.PRIMARY,
+            'primary_dark': Colors.PRIMARY_DARK,
+            'bg_main': Colors.BG_SECONDARY,
+            'bg_card': Colors.BG_PRIMARY,
+            'text': Colors.BLACK,
+            'border': Colors.BORDER_DEFAULT
+        }
 
     def get_spacing(self) -> Dict[str, int]:
         """Get theme-specific spacing values.
@@ -486,8 +505,61 @@ class SimpleTheme:
         return {
             'padding': Spacing.MD,
             'gap': Spacing.SM,
-            'margin': Spacing.MD
+            'margin': Spacing.MD,
+            'radius': Spacing.RADIUS_MD,
+            'title_height': 45,
+            'progress_height': Spacing.PROGRESS_BAR_HEIGHT,
+            'file_item_height': Spacing.FILE_ITEM_HEIGHT
         }
+
+    def get_title_style(self) -> str:
+        """Get title bar stylesheet.
+
+        Returns:
+            CSS stylesheet string for title bars
+        """
+        colors = self.get_colors()
+        spacing = self.get_spacing()
+        return f"""
+            QLabel {{
+                color: {colors['primary_dark']};
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {Colors.PRIMARY_LIGHTER}, stop:1 {Colors.INFO_LIGHTER});
+                border-radius: {spacing['radius']}px;
+                padding: {spacing['padding']}px;
+                font-size: {Typography.FONT_LG}px;
+                font-weight: bold;
+                max-height: {spacing['title_height']}px;
+            }}
+        """
+
+    def get_progress_style(self) -> str:
+        """Get progress bar stylesheet.
+
+        Returns:
+            CSS stylesheet string for progress bars
+        """
+        colors = self.get_colors()
+        spacing = self.get_spacing()
+        return f"""
+            QProgressBar {{
+                border: 1px solid {colors['border']};
+                border-radius: {spacing['radius']}px;
+                text-align: center;
+                font-weight: bold;
+                font-size: {Typography.FONT_XS}px;
+                color: {Colors.BLACK};
+                background-color: {Colors.GRAY_100};
+                min-height: {spacing['progress_height']}px;
+                max-height: {spacing['progress_height']}px;
+            }}
+            QProgressBar::chunk {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 {colors['primary']}, stop:1 {colors['primary_dark']});
+                border-radius: {spacing['radius'] - 1}px;
+                margin: 1px;
+            }}
+        """
 
 
 # Global simple theme instance
