@@ -136,6 +136,8 @@ class DuplicateFinderWindow(QMainWindow):
         self.duplicate_handler: Optional[DuplicateHandler] = None
         self.scene_detector = None  # Audio fingerprint detector for scene detection
         self.scene_worker = None  # Worker for background scene detection
+        self.verification_worker = None  # Worker for subsequence verification
+        self._pending_scenes = []  # Scenes waiting for verification
 
         # Layout manager
         self.layout_manager = LayoutManager()
@@ -929,6 +931,16 @@ class DuplicateFinderWindow(QMainWindow):
                     self.scene_worker.terminate()
                 self.scene_worker = None
 
+            # Stop verification worker
+            if self.verification_worker and self.verification_worker.isRunning():
+                logger.info("Stopping verification worker...")
+                self.verification_worker.stop()
+                # Wait with timeout to prevent indefinite blocking
+                if not self.verification_worker.wait(5000):  # 5 second timeout
+                    logger.warning("Verification worker did not stop gracefully, forcing termination")
+                    self.verification_worker.terminate()
+                self.verification_worker = None
+
             # Stop duplicate processing
             self.duplicate_handler.stop_processing()
 
@@ -1218,6 +1230,9 @@ class DuplicateFinderWindow(QMainWindow):
                 algorithm=algorithm  # Pass algorithm choice to worker
             )
 
+            # Storage for scenes to verify
+            self._pending_scenes = []
+
             # Connect signals
             def on_progress(current: int, total: int, message: str):
                 """Update progress display."""
@@ -1226,31 +1241,41 @@ class DuplicateFinderWindow(QMainWindow):
                 self.force_ui_update()
 
             def on_scene_found(short_video: str, long_video: str, result: dict):
-                """Handle each found scene."""
-                # Store in database (scenes use same table as subsequences)
-                # Convert start_time_seconds to frame index (approximate)
-                start_frame_idx = int(result.get('start_time_seconds', 0) * 25)  # Assume 25fps
-
-                self.video_hasher.db.store_subsequence_detection(
-                    short_video,
-                    long_video,
-                    result['match_ratio'],
-                    start_frame_idx,
-                    result['confidence']
-                )
-
-                # Add to duplicate handler for processing (scenes are shown like subsequences)
-                self.duplicate_handler.add_subsequence(short_video, long_video, result)
+                """Handle each found scene - collect for batch verification."""
+                # Store scene for batch verification
+                self._pending_scenes.append({
+                    'short_video': short_video,
+                    'long_video': long_video,
+                    'start_time': result.get('start_time_seconds', 0),
+                    'duration': result.get('duration', 0),
+                    'sequence_score': result['match_ratio'] * 100.0,
+                    'result': result
+                })
 
             def on_finished(scenes: list):
                 """Handle completion of scene detection."""
-                logger.info(f"Scene detection complete: {len(scenes)} found")
+                logger.info(f"Scene detection complete: {len(scenes)} scenes found")
 
-                # Clean up worker reference
-                self.scene_worker = None
+                # Check if verification is enabled
+                config = self.get_analysis_config()
+                verification_enabled = config.get('enable_subseq_verification', True)
 
-                # Finish analysis (will process scenes after duplicates)
-                self._finish_analysis()
+                if verification_enabled and len(self._pending_scenes) > 0:
+                    # Start verification process
+                    logger.info(f"Starting verification of {len(self._pending_scenes)} scenes")
+                    self._start_scene_verification(self._pending_scenes)
+                else:
+                    # No verification - add all scenes directly
+                    logger.info("Verification disabled, adding all scenes directly")
+                    for scene_data in self._pending_scenes:
+                        self._add_verified_scene(scene_data, accepted=True, from_cache=False)
+
+                    # Clean up
+                    self.scene_worker = None
+                    self._pending_scenes = []
+
+                    # Finish analysis
+                    self._finish_analysis()
 
             def on_error(error_msg: str):
                 """Handle error in scene detection."""
@@ -1285,6 +1310,138 @@ class DuplicateFinderWindow(QMainWindow):
                 f"Poursuite avec les résultats de doublons..."
             )
             self._finish_analysis()
+
+    def _start_scene_verification(self, scenes: list) -> None:
+        """
+        Start verification of detected scenes using Strategy 3.
+
+        Args:
+            scenes: List of scene detection results to verify
+        """
+        try:
+            from .workers.verification_worker import VerificationWorker
+            from .analysis.subsequence_verification import SubsequenceVerificationMethods
+
+            # Get verification parameters from config
+            config = self.get_analysis_config()
+            dct_threshold = config.get('subseq_dct_threshold', 75.0)
+            sequence_threshold = config.get('subseq_sequence_threshold', 95.0)
+            workers = config.get('subseq_verification_workers', 2)
+
+            # Create verifier
+            verifier = SubsequenceVerificationMethods(
+                dct_threshold=dct_threshold,
+                sequence_threshold=sequence_threshold,
+                max_workers=workers
+            )
+
+            # Create worker
+            self.verification_worker = VerificationWorker(
+                verifier=verifier,
+                matches=scenes,
+                db=self.video_hasher.db
+            )
+
+            # Connect signals
+            def on_verification_progress(current: int, total: int, message: str):
+                """Update verification progress bar."""
+                if self.verification_progress:
+                    self.verification_progress.update_progress(current, total, message)
+                    self.verification_progress.set_status(f"Verifying {current}/{total}", "#17A2B8")
+                self.force_ui_update()
+
+            def on_verification_complete(match_data: dict, result: dict):
+                """Handle single verification result."""
+                self._add_verified_scene(match_data, result['accepted'], result.get('from_cache', False))
+
+            def on_all_complete(results: list):
+                """Handle completion of all verifications."""
+                accepted = sum(1 for r in results if r['result']['accepted'])
+                rejected = len(results) - accepted
+                cache_hits = sum(1 for r in results if r.get('from_cache', False))
+
+                logger.info(f"Verification complete: {accepted} accepted, {rejected} rejected ({cache_hits} cached)")
+
+                if self.verification_progress:
+                    self.verification_progress.set_status(
+                        f"✓ Complete: {accepted} verified ({cache_hits} cached)",
+                        "#28A745"
+                    )
+
+                # Clean up
+                self.scene_worker = None
+                self.verification_worker = None
+                self._pending_scenes = []
+
+                # Finish analysis
+                self._finish_analysis()
+
+            def on_verification_error(error_msg: str):
+                """Handle verification error."""
+                logger.error(f"Verification error: {error_msg}")
+                if self.verification_progress:
+                    self.verification_progress.set_status(f"Error: {error_msg}", "#DC3545")
+
+                # Fall back to adding all scenes without verification
+                logger.warning("Verification failed, adding scenes without verification")
+                for scene_data in scenes:
+                    self._add_verified_scene(scene_data, accepted=True, from_cache=False)
+
+                # Clean up and finish
+                self.verification_worker = None
+                self._pending_scenes = []
+                self._finish_analysis()
+
+            # Connect signals
+            self.verification_worker.progress.connect(on_verification_progress)
+            self.verification_worker.verification_complete.connect(on_verification_complete)
+            self.verification_worker.all_complete.connect(on_all_complete)
+            self.verification_worker.error.connect(on_verification_error)
+
+            # Start verification
+            logger.info(f"Starting VerificationWorker with {len(scenes)} scenes")
+            self.verification_worker.start()
+
+        except Exception as e:
+            logger.error(f"Error starting verification: {e}", exc_info=True)
+            # Fall back to adding all scenes
+            for scene_data in scenes:
+                self._add_verified_scene(scene_data, accepted=True, from_cache=False)
+            self._finish_analysis()
+
+    def _add_verified_scene(self, scene_data: dict, accepted: bool, from_cache: bool = False):
+        """
+        Add a verified scene to duplicate handler.
+
+        Args:
+            scene_data: Scene detection data
+            accepted: Whether verification accepted the scene
+            from_cache: Whether result came from cache
+        """
+        if not accepted:
+            logger.info(f"Scene rejected by verification: {os.path.basename(scene_data['short_video'])}")
+            return
+
+        # Store in database
+        start_frame_idx = int(scene_data['start_time'] * 25)  # Assume 25fps
+
+        self.video_hasher.db.store_subsequence_detection(
+            scene_data['short_video'],
+            scene_data['long_video'],
+            scene_data['result']['match_ratio'],
+            start_frame_idx,
+            scene_data['result']['confidence']
+        )
+
+        # Add to duplicate handler for UI processing
+        self.duplicate_handler.add_subsequence(
+            scene_data['short_video'],
+            scene_data['long_video'],
+            scene_data['result']
+        )
+
+        cache_msg = " (cached)" if from_cache else ""
+        logger.debug(f"Scene accepted{cache_msg}: {os.path.basename(scene_data['short_video'])}")
 
     def _finish_analysis(self) -> None:
         """
