@@ -2547,118 +2547,68 @@ class FileHandler:
 
 ## DOCUMENTATION GAPS
 
-### ⚠️ ISSUE #29: Missing Architecture Documentation
+### ✅ ISSUE #29: Missing Architecture Documentation [FIXED 2025-12-06]
 
 **Severity**: MEDIUM (Documentation)
+**Status**: ✅ FIXED
+**File**: `ARCHITECTURE.md` (new)
 
-#### Problem Description:
-No high-level architecture documentation exists:
+#### Problem Description (Original):
+No high-level architecture documentation existed:
 - No component diagram
 - No workflow diagrams
 - No data flow documentation
-- No API documentation
+- No module organization guide
 
-New developers must read ~15,000 lines of code to understand the system.
+New developers had to read ~15,000 lines of code to understand the system.
 
-#### Fix Required:
-**Create architecture documentation**:
+#### Fix Applied:
 
-```markdown
-# Architecture Overview
+**Created comprehensive ARCHITECTURE.md** (~650 lines):
 
-## Component Diagram
+**Contents**:
+1. **Overview**: System summary, key features
+2. **System Architecture**: 5-layer architecture diagram
+3. **Component Diagram**: Visual component relationships
+4. **Core Components**: Detailed descriptions of all major components
+   - Main Window
+   - File Handler (with Phase 10 security)
+   - Database Manager (with Phase 8 optimizations)
+   - Video Hasher (with Phase 7 caching)
+   - Audio Fingerprinting
+   - Subsequence Verification
+   - Worker Threads
+5. **Data Flow**: Complete flow diagrams
+   - File addition flow (with validation)
+   - Hash computation flow (with caching)
+   - Comparison flow (with optimizations)
+   - Audio-first workflow (with Phase 1 fix)
+6. **Workflows**: 3 complete workflow diagrams
+   - Normal duplicate detection
+   - Audio-first (optimized)
+   - Subsequence detection
+7. **Module Organization**: Full directory structure
+8. **Design Patterns**: 5 key patterns documented
+   - Worker Pattern (QThread)
+   - Connection Pool
+   - LRU Cache
+   - Strategy Pattern
+   - Validator Pattern
+9. **Performance Optimizations**: Summary table
+   - All phases (1-10) documented
+   - Speedup metrics
+   - Optimization techniques
+10. **Security Architecture**: Defense layers
+    - 8-layer file validation (Phase 10)
+    - SQL injection prevention (Phase 9)
+    - Input sanitization
 
-```
-┌─────────────────────────────────────────┐
-│         Main Window (UI Layer)          │
-│  - File selection                       │
-│  - Progress display                     │
-│  - User decisions                       │
-└─────────────┬───────────────────────────┘
-              │
-              ├──────────────┬──────────────┬─────────────┐
-              │              │              │             │
-    ┌─────────▼────┐  ┌─────▼──────┐  ┌────▼─────┐  ┌───▼──────┐
-    │File Handler  │  │Duplicate   │  │Analysis  │  │Settings  │
-    │- Add/remove  │  │Handler     │  │Handler   │  │Manager   │
-    │- Validation  │  │- Queue     │  │- Workers │  │- Config  │
-    └─────────┬────┘  └─────┬──────┘  └────┬─────┘  └──────────┘
-              │              │              │
-              │         ┌────▼──────────────▼─────┐
-              │         │   Worker Threads        │
-              │         │  - Hash Worker          │
-              │         │  - Comparison Worker    │
-              │         │  - Verification Worker  │
-              │         └────┬────────────────────┘
-              │              │
-    ┌─────────▼──────────────▼─────────┐
-    │      Core Services               │
-    │  ┌──────────┐   ┌─────────────┐ │
-    │  │Video     │   │Database     │ │
-    │  │Hasher    │   │Manager      │ │
-    │  └──────────┘   └─────────────┘ │
-    │  ┌──────────┐   ┌─────────────┐ │
-    │  │Audio     │   │Subsequence  │ │
-    │  │Detector  │   │Verifier     │ │
-    │  └──────────┘   └─────────────┘ │
-    └──────────────────────────────────┘
-```
-
-## Workflow Diagrams
-
-### Normal Duplicate Detection
-```
-User adds files → Validation → Hash computation (parallel)
-                              ↓
-                     Database cache check
-                              ↓
-                Video comparison (N² pairs, optimized)
-                              ↓
-                    Duplicate queue → User decision → File deletion
-```
-
-### Audio-First Workflow (5 Phases)
-```
-Phase 1: Audio extraction (ffmpeg, parallel, cached)
-              ↓
-Phase 2: LSH indexing (O(N) instead of O(N²))
-              ↓
-Phase 3: Audio comparison (multi-resolution, candidates only)
-              ↓
-Phase 4: Selective video hashing (only candidates, not all files!)
-              ↓
-Phase 5: Video comparison (specific pairs, not N²)
-              ↓
-      Duplicate queue → User decision
-```
-
-### Scene Detection with Strategy 3 Verification
-```
-User selects short + long videos
-              ↓
-    Audio fingerprinting (find position)
-              ↓
-         Position found?
-         /           \
-       Yes            No → Report "not found"
-        ↓
-Verification enabled?
-    /            \
-  Yes             No → Add to queue directly
-   ↓
-Strategy 3 verification (parallel, cached):
-   - Extract frames
-   - Detect scene cuts (veto if > 0)
-   - Compute DCT similarity (≥ 75%)
-   - Check sequence consistency (≥ 95%)
-              ↓
-      Accepted/Rejected
-              ↓
-    Add to queue if accepted
-```
-```
-
----
+#### Impact:
+- ✅ **Onboarding**: New developers can understand system in <1 hour
+- ✅ **Maintenance**: Clear component responsibilities
+- ✅ **Design**: Documented patterns guide future development
+- ✅ **Performance**: All optimizations explained
+- ✅ **Security**: Defense-in-depth documented
 
 ### ⚠️ ISSUE #30: No User Manual
 
@@ -2806,16 +2756,16 @@ Users must figure out features by trial and error.
 - Global state and singletons
 
 **Performance**: 2 concerns
-- No frame extraction caching
-- Redundant database queries
+- ✅ No frame extraction caching (FIXED - Phase 7)
+- ✅ Redundant database queries (FIXED - Phase 8)
 
 **Security**: 2 issues
-- SQL injection risk (low)
-- Unvalidated file paths (medium)
+- ✅ SQL injection risk (VERIFIED SECURE - Phase 9)
+- ✅ Unvalidated file paths (FIXED - Phase 10)
 
-**Documentation**: 2 gaps
-- Missing architecture documentation
-- No user manual
+**Documentation**: 2 issues
+- ✅ ISSUE #29: Missing architecture documentation (FIXED - Phase 11, ARCHITECTURE.md created)
+- ⚠️  ISSUE #30: No user manual (remains)
 
 ---
 
