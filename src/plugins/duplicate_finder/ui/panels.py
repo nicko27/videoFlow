@@ -219,11 +219,12 @@ class UIPanels:
         scene_detection_btn.setMinimumHeight(40)
         scene_detection_btn.setStyleSheet(UIPanels._get_button_style("#1565C0", "#0D47A1"))  # Blue
         scene_detection_btn.setToolTip(
-            "Détection avancée de doublons par analyse en 3 niveaux :\n"
-            "• Audio + Visual + Confirmation\n\n"
-            "Idéal pour détecter scènes extraites et variantes"
+            "Détection de scènes utilisant empreintes audio et vérification visuelle.\n"
+            "• Empreintes audio (rapide)\n"
+            "• Vérification DCT + Scene Cuts\n\n"
+            "La progression s'affiche dans les barres principales"
         )
-        scene_detection_btn.clicked.connect(callbacks.get('run_advanced_mode', lambda: None))
+        scene_detection_btn.clicked.connect(callbacks.get('start_scene_detection', lambda: None))
         buttons_layout.addWidget(scene_detection_btn, 3, 0, 1, 2)  # Span both columns
 
         layout.addLayout(buttons_layout)

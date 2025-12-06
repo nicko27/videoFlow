@@ -326,6 +326,7 @@ class DuplicateFinderWindow(QMainWindow):
             'stop': self.stop_analysis,
             'show_stats': self.show_statistics,
             'show_pending': self.show_pending_duplicates,
+            'start_scene_detection': self.start_scene_detection_mode,
             'run_advanced_mode': self.run_advanced_mode,
             'close': self.close
         }
@@ -813,6 +814,63 @@ class DuplicateFinderWindow(QMainWindow):
                 "⏹️", "Analysis stopped by user",
                 "#DC3545", "#F8D7DA", "#DC3545"
             )
+
+    def start_scene_detection_mode(self) -> None:
+        """
+        Start scene detection using standard workflow with progress bars.
+
+        This enables scene detection in the config and runs the standard analysis
+        workflow, which uses the existing progress bars instead of a popup dialog.
+        """
+        # Check file count
+        file_count = self.file_handler.get_file_count()
+
+        if file_count < 2:
+            QMessageBox.warning(
+                self, "Attention",
+                "Au moins 2 fichiers sont requis pour détecter les scènes"
+            )
+            return
+
+        # Show confirmation dialog
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setWindowTitle("Détection de Scènes")
+        msg.setText(
+            f"🎬 Analyse de {file_count} vidéos\n\n"
+            f"Cette détection utilise :\n"
+            f"• Empreintes audio (algorithme rapide)\n"
+            f"• Vérification visuelle (DCT + Scene Cuts)\n"
+            f"• Confirmation multi-critères\n\n"
+            f"La progression s'affichera dans les barres de progression principales."
+        )
+        msg.setInformativeText("Lancer la détection de scènes ?")
+        msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        msg.setDefaultButton(QMessageBox.StandardButton.Yes)
+
+        if msg.exec() != QMessageBox.StandardButton.Yes:
+            return
+
+        # Temporarily enable scene detection for this analysis
+        # Store original setting
+        config = self.get_analysis_config()
+        scene_config = config.get('scene_detection', {})
+        original_enabled = scene_config.get('enabled', False)
+
+        # Enable scene detection for this run
+        if 'scene_detection' not in config:
+            config['scene_detection'] = {}
+        config['scene_detection']['enabled'] = True
+
+        # Save to settings temporarily
+        self.settings_manager.settings.beginGroup('scene_detection')
+        self.settings_manager.settings.setValue('enabled', True)
+        self.settings_manager.settings.endGroup()
+
+        logger.info("Scene detection temporarily enabled for this analysis")
+
+        # Start the standard analysis (which will include scene detection)
+        self.start_analysis()
 
     def run_advanced_mode(self) -> None:
         """
