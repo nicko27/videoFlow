@@ -1,5 +1,7 @@
-"""
-Duplicate comparison dialog - Clean and professional version
+"""Duplicate comparison dialog for side-by-side video comparison.
+
+This module provides a maximized dialog for comparing two potentially duplicate videos
+with synchronized playback, keyboard shortcuts, and intelligent file ordering.
 """
 
 import os
@@ -27,9 +29,41 @@ logger = Logger.get_logger('DuplicateFinder.ComparisonDialog')
 
 
 class ComparisonDialog(QDialog):
-    """Optimized duplicate comparison dialog"""
+    """Side-by-side video comparison dialog with synchronized playback.
+
+    Displays two videos side-by-side for visual comparison with:
+    - Synchronized playback controls
+    - Similarity indicator
+    - Keyboard shortcuts for quick decisions
+    - Intelligent file ordering (best file on left)
+    - Video navigation (seek, play/pause)
+
+    The dialog opens maximized and is modal to focus user attention.
+
+    Attributes:
+        file1: Path to first video file (left side)
+        file2: Path to second video file (right side)
+        similarity: Similarity percentage (0-100)
+        result: User's choice ("keep_left", "keep_right", "keep_both", or None)
+        left_video: VideoPreviewWidget for left video
+        right_video: VideoPreviewWidget for right video
+
+    Example:
+        >>> dialog = ComparisonDialog('/path/video1.mp4', '/path/video2.mp4', 95.5)
+        >>> result = dialog.exec()
+        >>> if result == QDialog.DialogCode.Accepted:
+        ...     choice = dialog.result  # "keep_left", "keep_right", or "keep_both"
+    """
 
     def __init__(self, file1: str, file2: str, similarity: float, parent=None):
+        """Initialize comparison dialog with two videos.
+
+        Args:
+            file1: Path to first video file
+            file2: Path to second video file
+            similarity: Similarity percentage (0-100)
+            parent: Parent widget (optional)
+        """
         super().__init__(parent)
         self.file1 = file1
         self.file2 = file2
@@ -54,7 +88,18 @@ class ComparisonDialog(QDialog):
         QTimer.singleShot(500, self.show_initial_position)
 
     def arrange_files_by_name(self):
-        """Place best file on the left (no numbering, lighter file)"""
+        """Intelligently arrange files to place the best quality file on the left.
+
+        Uses a priority system to determine which file is "better":
+        1. File without numbering/copy patterns (e.g., "(1)", "_copy")
+        2. Smaller file size (likely compressed less, better quality)
+        3. Alphabetical order (as tie-breaker)
+
+        The better file is placed on the left side for easier "keep left" decision.
+
+        Note:
+            Modifies self.file1 and self.file2 in place by swapping if needed.
+        """
         try:
             file1_name = os.path.basename(self.file1)
             file2_name = os.path.basename(self.file2)
@@ -92,7 +137,16 @@ class ComparisonDialog(QDialog):
             logger.error(f"Error arranging files: {e}")
 
     def setup_ui(self):
-        """Configure the interface"""
+        """Configure the comparison dialog user interface.
+
+        Creates the complete UI layout with:
+        - Similarity indicator at the top
+        - Side-by-side video frames (left and right)
+        - Navigation controls (slider, time display)
+        - Action buttons (Keep Left, Keep Right, Keep Both, Cancel)
+
+        Videos are displayed with colored borders (green for left, orange for right).
+        """
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)  # Marges supprimées
         layout.setSpacing(5)  # Espacement minimal
@@ -490,7 +544,11 @@ class ComparisonDialog(QDialog):
         return frame
 
     def show_initial_position(self):
-        """Show videos at 10%"""
+        """Show both videos at 10% position for initial comparison.
+
+        Called after a 500ms delay to allow UI to fully render.
+        Shows videos at 10% rather than 0% to avoid black frames at start.
+        """
         try:
             self.seek_to_position(0.1)
             logger.info("Initial position set to 10%")
@@ -498,17 +556,41 @@ class ComparisonDialog(QDialog):
             logger.error(f"Error setting initial position: {e}")
 
     def on_slider_changed(self, value):
-        """Handle slider change"""
+        """Handle position slider value change event.
+
+        Args:
+            value: Slider value (0-1000, representing 0-100% position)
+
+        Note:
+            Converts slider value to 0.0-1.0 range and syncs both videos.
+        """
         position = value / 1000.0
         self.sync_video_position(position)
 
     def seek_to_position(self, position):
-        """Seek to a specific position"""
+        """Seek both videos to a specific relative position.
+
+        Args:
+            position: Relative position (0.0 = start, 1.0 = end)
+
+        Note:
+            Updates slider and calls sync_video_position() to move both videos.
+        """
         self.position_slider.setValue(int(position * 1000))
         self.sync_video_position(position)
 
     def sync_video_position(self, position):
-        """Synchronize both videos"""
+        """Synchronize both videos to the same relative position.
+
+        Seeks both left and right videos to the specified position and updates
+        the time display. Uses the longest video duration for time calculation.
+
+        Args:
+            position: Relative position (0.0 = start, 1.0 = end)
+
+        Example:
+            >>> dialog.sync_video_position(0.5)  # Seek to 50% position
+        """
         try:
             self.left_video.seek_to_position(position)
             self.right_video.seek_to_position(position)
@@ -525,7 +607,14 @@ class ComparisonDialog(QDialog):
             logger.error(f"Error synchronizing: {e}")
 
     def play_both_videos(self):
-        """Play both videos simultaneously"""
+        """Play both videos simultaneously from current position.
+
+        Synchronizes position before starting playback to ensure both videos
+        start at exactly the same point.
+
+        Note:
+            Actual playback depends on VideoPreviewWidget API support.
+        """
         try:
             # Sync position first to ensure they start at same point
             current_position = self.position_slider.value() / 1000.0
@@ -539,7 +628,11 @@ class ComparisonDialog(QDialog):
             logger.error(f"Error playing both videos: {e}")
 
     def pause_both_videos(self):
-        """Pause both videos simultaneously"""
+        """Pause both videos simultaneously.
+
+        Note:
+            Actual pause depends on VideoPreviewWidget API support.
+        """
         try:
             # Note: This is a placeholder - actual implementation depends on VideoPreviewWidget API
             logger.info("Pause both videos requested")
@@ -548,12 +641,30 @@ class ComparisonDialog(QDialog):
             logger.error(f"Error pausing both videos: {e}")
 
     def update_time_display(self, current_seconds, total_seconds):
-        """Update time display"""
+        """Update the time and duration labels.
+
+        Args:
+            current_seconds: Current playback time in seconds
+            total_seconds: Total video duration in seconds
+        """
         self.time_label.setText(self.format_time(current_seconds))
         self.duration_label.setText(self.format_time(total_seconds))
 
     def format_time(self, seconds):
-        """Format time"""
+        """Format seconds as human-readable time string.
+
+        Args:
+            seconds: Time in seconds
+
+        Returns:
+            Formatted time string (MM:SS or H:MM:SS if >= 1 hour)
+
+        Example:
+            >>> format_time(65)
+            "1:05"
+            >>> format_time(3665)
+            "1:01:05"
+        """
         if seconds >= 3600:
             hours = int(seconds // 3600)
             minutes = int((seconds % 3600) // 60)
@@ -565,7 +676,14 @@ class ComparisonDialog(QDialog):
             return f"{minutes}:{secs:02d}"
 
     def make_choice(self, choice):
-        """Record the choice"""
+        """Record user's decision about which video(s) to keep.
+
+        Args:
+            choice: User's decision ("keep_left", "keep_right", or "keep_both")
+
+        Note:
+            Sets self.result and closes the dialog with Accepted code.
+        """
         self.result = choice
 
         # Quick animation according to choice with colors
