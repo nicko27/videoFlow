@@ -1,0 +1,114 @@
+{
+  "language_name": "Français",
+  "language_code": "fr",
+
+  "ui": {
+    "presets": {
+      "title": "Préréglages rapides",
+      "speed": "Vitesse maximale",
+      "speed_tooltip": "Toutes les optimisations activées, vitesse maximale\n(Peut avoir de légers compromis de précision)",
+      "balanced": "Équilibré (Recommandé)",
+      "balanced_tooltip": "Meilleur équilibre entre vitesse et précision\n(Recommandé pour la plupart des utilisateurs)",
+      "quality": "Qualité maximale",
+      "quality_tooltip": "Toutes les comparaisons, précision maximale\n(Plus lent mais 100% précis)"
+    },
+
+    "audio": {
+      "title": "Empreinte audio (Filtre principal)",
+      "threshold": "Seuil de similarité audio :",
+      "threshold_tooltip": "Les vidéos avec une similarité audio inférieure à ce seuil sont rejetées\nPlus bas = Plus de candidats (plus lent mais attrape plus)\nPlus haut = Moins de candidats (plus rapide mais peut en manquer)\nRecommandé : 70%",
+      "precision": "Mode de précision :",
+      "precision_fast": "Rapide (2-5s/vidéo, 95%)",
+      "precision_balanced": "Équilibré (5-15s/vidéo, 99%)",
+      "precision_maximum": "Maximum (10-30s/vidéo, 99.9%)",
+      "precision_tooltip": "Rapide : Extraction rapide, bon pour la plupart des cas\nÉquilibré : Meilleure précision, vitesse modérée\nMaximum : Meilleure précision, plus lent",
+      "workers": "Workers audio :",
+      "workers_tooltip": "Nombre de workers parallèles pour l'extraction audio",
+      "cache_size": "Taille du cache audio :",
+      "cache_size_tooltip": "Maximum d'empreintes audio à garder en cache mémoire",
+      "cache_size_suffix": " éléments",
+      "fallback": "Activer le fallback pour vidéos sans audio",
+      "fallback_tooltip": "Si activé, les vidéos sans audio seront comparées uniquement par hash vidéo\nSi désactivé, les vidéos sans audio seront ignorées",
+      "info": "L'empreinte audio filtre 85-90% des paires de vidéos avant la comparaison vidéo.\nNécessite fpcalc (chromaprint) : brew install chromaprint (macOS) ou apt install chromaprint-tools (Linux)"
+    },
+
+    "lsh": {
+      "title": "LSH (Hachage sensible à la localité)",
+      "enable": "Activer LSH (Recommandé pour 500+ vidéos)",
+      "enable_tooltip": "LSH réduit les comparaisons O(N²) à O(N·k) en regroupant les éléments similaires\nAccélération de 20-50x sur les grands ensembles de données",
+      "bands": "Bandes LSH :",
+      "bands_tooltip": "Plus de bandes = Plus de buckets = Meilleure précision mais plus lent",
+      "rows": "Lignes par bande :",
+      "rows_tooltip": "Plus de lignes = Correspondance plus stricte = Moins de faux positifs",
+      "no_audio": "Utiliser LSH pour vidéos sans audio",
+      "no_audio_tooltip": "Appliquer l'optimisation LSH aux vidéos sans audio",
+      "info": "LSH regroupe les empreintes similaires en buckets, ne comparant que dans les buckets.\nExemple : 1000 vidéos → 499 500 paires réduites à ~40 000 paires (réduction de 90%)"
+    },
+
+    "multi_resolution": {
+      "title": "Comparaison multi-résolution",
+      "enable": "Activer multi-résolution (Grossier → Moyen → Fin)",
+      "enable_tooltip": "Compare l'audio progressivement : échantillon court → moyen → complet\nAccélération de 2-3x en rejetant tôt",
+      "coarse_duration": "Durée grossière :",
+      "coarse_duration_tooltip": "Durée de l'échantillon de test rapide",
+      "coarse_threshold": "Seuil grossier :",
+      "coarse_threshold_tooltip": "Rejeter si le test rapide est en dessous de ce seuil",
+      "medium_duration": "Durée moyenne :",
+      "medium_duration_tooltip": "Durée de l'échantillon de test moyen",
+      "medium_threshold": "Seuil moyen :",
+      "medium_threshold_tooltip": "Rejeter si le test moyen est en dessous de ce seuil",
+      "info": "Filtrage progressif : La plupart des paires rejetées en phase grossière (le plus rapide),\nmoins atteignent la phase moyenne, seuls les meilleurs candidats obtiennent une comparaison complète."
+    },
+
+    "metadata": {
+      "title": "Filtre rapide par métadonnées (Optionnel)",
+      "enable": "Activer le pré-filtre métadonnées",
+      "enable_tooltip": "⚠️ ATTENTION : Peut créer des faux négatifs si les vidéos sont réencodées !\nFiltre par durée et taille de fichier avant la comparaison audio.\nN'activer que si vous êtes sûr que les vidéos n'ont pas été réencodées.",
+      "duration_tolerance": "Tolérance de durée :",
+      "duration_tolerance_tooltip": "Rejeter si la différence de durée > ce pourcentage",
+      "size_ratio": "Ratio de taille min :",
+      "size_ratio_tooltip": "Rejeter si le ratio de taille < cette valeur",
+      "warning": "⚠️ Le filtre métadonnées peut manquer les doublons réencodés avec des tailles/durées différentes.\nN'activer que si vous avez besoin d'une vitesse maximale et êtes sûr que les vidéos sont des copies identiques."
+    },
+
+    "video_hash": {
+      "title": "Hachage vidéo (Sélectif)",
+      "method": "Méthode de hash :",
+      "method_phash": "pHash (Précis, plus lent)",
+      "method_dhash": "dHash (Équilibré)",
+      "method_ahash": "aHash (Rapide, moins précis)",
+      "method_tooltip": "pHash : Le plus précis (basé DCT), ~1s par vidéo\ndHash : Bon équilibre (basé gradient), ~0.5s par vidéo\naHash : Le plus rapide (basé moyenne), ~0.2s par vidéo",
+      "workers": "Workers hash :",
+      "workers_tooltip": "Workers parallèles pour le hachage vidéo",
+      "timeout": "Timeout hash :",
+      "timeout_tooltip": "Timeout par vidéo pour le calcul de hash",
+      "cache_size": "Taille du cache vidéo :",
+      "cache_size_tooltip": "Maximum de hash vidéo à garder en cache mémoire",
+      "cache_size_suffix": " éléments",
+      "info": "Les vidéos sont hachées UNIQUEMENT si leur similarité audio est au-dessus du seuil.\nLe hachage sélectif économise 70-90% du temps de traitement vidéo !"
+    },
+
+    "video_comparison": {
+      "title": "Comparaison vidéo",
+      "threshold": "Seuil de similarité vidéo :",
+      "threshold_tooltip": "Les vidéos avec une similarité au-dessus de ce seuil sont marquées comme doublons\nRecommandé : 90%",
+      "flip_detection": "Activer la détection de flip (miroir/retournement horizontal)",
+      "flip_detection_tooltip": "Détecter les vidéos qui sont retournées horizontalement (en miroir)\nCourant sur les réseaux sociaux pour éviter la détection de copyright",
+      "workers": "Workers de comparaison :",
+      "workers_tooltip": "Workers parallèles pour la comparaison vidéo",
+      "batch_size": "Taille de batch :",
+      "batch_size_tooltip": "Nombre de comparaisons par batch",
+      "timeout": "Timeout comparaison :",
+      "timeout_tooltip": "Timeout par comparaison",
+      "cache_size": "Cache de comparaison :",
+      "cache_size_tooltip": "Maximum de comparaisons à garder en cache",
+      "cache_size_suffix": " éléments"
+    },
+
+    "common": {
+      "sec": " sec",
+      "percent": "%",
+      "items": " éléments"
+    }
+  }
+}

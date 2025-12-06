@@ -217,22 +217,71 @@ class AudioFingerprintDetector:
         self.has_acoustid = False
         try:
             import acoustid
-            self.has_acoustid = True
-            logger.info("pyacoustid found - using accurate fingerprint comparison")
+
+            # Check if chromaprint is compatible with pyacoustid
+            chromaprint_compatible = False
+            try:
+                import chromaprint
+                # pyacoustid needs Fingerprinter and decode_fingerprint
+                if hasattr(chromaprint, 'Fingerprinter') and hasattr(chromaprint, 'decode_fingerprint'):
+                    chromaprint_compatible = True
+                else:
+                    missing = []
+                    if not hasattr(chromaprint, 'Fingerprinter'):
+                        missing.append('Fingerprinter')
+                    if not hasattr(chromaprint, 'decode_fingerprint'):
+                        missing.append('decode_fingerprint')
+                    logger.info(f"chromaprint installé mais incompatible avec pyacoustid (manque: {', '.join(missing)})")
+                    logger.info("Utilisation de fpcalc uniquement")
+            except ImportError:
+                logger.debug("chromaprint non disponible")
+
+            # Only enable pyacoustid if chromaprint is compatible
+            if chromaprint_compatible:
+                self.has_acoustid = True
+                logger.info("pyacoustid trouvé avec chromaprint compatible - comparaison précise activée")
+            else:
+                self.has_acoustid = False
+                logger.info("pyacoustid trouvé mais chromaprint incompatible - utilisation de fpcalc uniquement")
+
         except ImportError:
-            logger.warning(
-                "⚠️ pyacoustid not installed - using simplified comparison\n"
-                "   Scene detection may only work for scenes at the START of videos.\n"
-                "   For accurate detection of scenes anywhere in videos:\n"
-                "   Install with: pip3 install pyacoustid\n"
-                "   See: SCENE_DETECTION_LIMITATIONS.md"
-            )
+            logger.info("pyacoustid non installé - utilisation de fpcalc (fonctionnel)")
 
         if not self.fpcalc_available:
             logger.warning("fpcalc not found! Audio fingerprinting will not work. Install chromaprint-tools.")
         else:
             logger.info(f"AudioFingerprintDetector initialized: {self.precision_mode['name']}, "
                        f"{min_match_ratio*100:.0f}% min match")
+
+    def extract_fingerprint(self, video_path: str) -> Optional['np.ndarray']:
+        """
+        Extract audio fingerprint from video file (public API for audio-first workflow).
+
+        Args:
+            video_path: Path to video file
+
+        Returns:
+            Numpy array containing the fingerprint string as bytes, or None if extraction failed
+        """
+        try:
+            fp_string, duration, raw_fp = self._extract_audio_fingerprint(video_path)
+
+            # If we have raw fingerprint, use it
+            if raw_fp is not None and len(raw_fp) > 0:
+                import numpy as np
+                return np.array(raw_fp, dtype=np.uint32)
+
+            # Otherwise, convert fingerprint string to numpy array of character codes
+            # This allows comparison even without chromaprint decoding
+            if fp_string and len(fp_string) > 0:
+                import numpy as np
+                # Convert string to array of character codes (bytes)
+                return np.array([ord(c) for c in fp_string], dtype=np.uint32)
+
+            return None
+        except Exception as e:
+            logger.error(f"Error extracting fingerprint from {video_path}: {e}")
+            return None
 
     def _check_fpcalc(self) -> bool:
         """Check if fpcalc (chromaprint command-line tool) is available.
@@ -281,44 +330,51 @@ class AudioFingerprintDetector:
         if self.has_acoustid:
             try:
                 import acoustid
-                import chromaprint
 
                 if progress_callback:
-                    progress_callback(0, 1, f"Extracting audio fingerprint (pyacoustid)...")
+                    progress_callback(0, 1, f"Extraction empreinte audio (pyacoustid)...")
 
                 # Extract fingerprint using pyacoustid
                 duration, fp_encoded = acoustid.fingerprint_file(video_path)
 
-                # Decode to raw fingerprint for comparison
-                raw_fp = chromaprint.decode_fingerprint(fp_encoded)[0]
+                # Try to decode to raw fingerprint for comparison
+                raw_fp = None
+                try:
+                    import chromaprint
+                    if hasattr(chromaprint, 'decode_fingerprint'):
+                        raw_fp = chromaprint.decode_fingerprint(fp_encoded)[0]
+                except Exception as decode_error:
+                    logger.debug(f"Chromaprint decode non disponible, utilisation de l'empreinte encodée: {decode_error}")
+                    # Will use encoded fingerprint instead
 
-                if not fp_encoded or not raw_fp:
-                    logger.warning(f"Empty fingerprint for {os.path.basename(video_path)}")
+                if not fp_encoded:
+                    logger.warning(f"Empreinte vide pour {os.path.basename(video_path)}")
                     return None, 0.0, None
 
                 # Cache the result
                 self.cache.put(video_path, fp_encoded, duration, raw_fp)
 
                 if progress_callback:
-                    progress_callback(1, 1, "Fingerprint extracted")
+                    progress_callback(1, 1, "Empreinte extraite")
 
-                logger.info(f"Audio fingerprint extracted (pyacoustid): {os.path.basename(video_path)} "
-                          f"({duration:.1f}s, {len(raw_fp)} samples)")
+                samples_info = f"{len(raw_fp)} samples" if raw_fp else "encodé"
+                logger.info(f"Empreinte audio extraite (pyacoustid): {os.path.basename(video_path)} "
+                          f"({duration:.1f}s, {samples_info})")
 
                 return fp_encoded, duration, raw_fp
 
             except Exception as e:
-                logger.error(f"pyacoustid extraction failed, falling back to fpcalc: {e}")
+                logger.error(f"Extraction pyacoustid échouée, utilisation de fpcalc: {e}")
                 # Fall through to fpcalc method
 
         # Fallback to fpcalc if pyacoustid not available or failed
         if not self.fpcalc_available:
-            logger.error("fpcalc not available - cannot extract fingerprint")
+            logger.error("fpcalc non disponible - impossible d'extraire l'empreinte")
             return None, 0.0, None
 
         try:
             if progress_callback:
-                progress_callback(0, 1, f"Extracting audio fingerprint...")
+                progress_callback(0, 1, f"Extraction empreinte audio...")
 
             # Build fpcalc command based on precision mode
             cmd = ['fpcalc']
@@ -331,9 +387,9 @@ class AudioFingerprintDetector:
             if 'duration' in self.precision_mode and self.precision_mode['duration']:
                 cmd.extend(['-length', str(self.precision_mode['duration'])])
 
-            # Add algorithm option
-            if 'algorithm' in self.precision_mode:
-                cmd.extend(['-algorithm', str(self.precision_mode['algorithm'])])
+            # Add algorithm option (skip for now as it seems to cause issues with some fpcalc versions)
+            # if 'algorithm' in self.precision_mode:
+            #     cmd.extend(['-algorithm', str(self.precision_mode['algorithm'])])
 
             # Add JSON output for structured data (no -raw to avoid decoding issues)
             cmd.append('-json')
@@ -359,33 +415,54 @@ class AudioFingerprintDetector:
                 fingerprint = data.get('fingerprint', '')
                 duration = float(data.get('duration', 0.0))
 
-                # No raw fingerprint parsing needed (we don't use -raw anymore)
-                raw_fp = None
-
                 if not fingerprint:
                     logger.warning(f"Empty fingerprint for {os.path.basename(video_path)}")
                     return None, 0.0, None
 
+                # Decode fingerprint to raw values for comparison
+                raw_fp = None
+                try:
+                    if self.has_acoustid:
+                        import chromaprint
+                        if hasattr(chromaprint, 'decode_fingerprint'):
+                            raw_fp = chromaprint.decode_fingerprint(fingerprint)[0]
+                        else:
+                            logger.debug("chromaprint.decode_fingerprint non disponible")
+
+                    if raw_fp is None:
+                        # Fallback: parse fingerprint string manually
+                        # The fingerprint is a base64-encoded array of uint32 values
+                        import base64
+                        # Add correct padding for base64 decoding
+                        padding_needed = (4 - len(fingerprint) % 4) % 4
+                        padded_fingerprint = fingerprint + ('=' * padding_needed)
+                        decoded = base64.b64decode(padded_fingerprint)
+                        raw_fp = [int.from_bytes(decoded[i:i+4], 'little')
+                                 for i in range(0, len(decoded), 4)]
+                except Exception as e:
+                    logger.debug(f"Décodage brut de l'empreinte échoué pour {os.path.basename(video_path)}: {e}")
+                    # Continue without raw_fp - not critical, encoded fingerprint works fine
+
                 # Cache the result
-                self.cache.put(video_path, fingerprint, duration, None)
+                self.cache.put(video_path, fingerprint, duration, raw_fp)
 
                 if progress_callback:
-                    progress_callback(1, 1, "Fingerprint extracted")
+                    progress_callback(1, 1, "Empreinte extraite")
 
-                logger.info(f"Audio fingerprint extracted: {os.path.basename(video_path)} "
-                          f"({duration:.1f}s, {len(fingerprint)} chars)")
+                logger.info(f"Empreinte audio extraite: {os.path.basename(video_path)} "
+                          f"({duration:.1f}s, {len(fingerprint)} caractères)")
 
                 return fingerprint, duration, raw_fp
 
             except (json.JSONDecodeError, KeyError, ValueError) as e:
-                logger.error(f"Failed to parse fpcalc output: {e}")
+                logger.error(f"Échec du parsing de la sortie fpcalc: {e}")
                 return None, 0.0, None
 
         except subprocess.TimeoutExpired:
-            logger.error(f"fpcalc timeout for {os.path.basename(video_path)}")
+            logger.error(f"Timeout fpcalc pour {os.path.basename(video_path)}")
             return None, 0.0, None
         except Exception as e:
-            logger.error(f"Error extracting fingerprint from {os.path.basename(video_path)}: {e}")
+            logger.error(f"Erreur extraction empreinte de {os.path.basename(video_path)}: {e}")
             return None, 0.0, None
 
     def _compute_similarity(

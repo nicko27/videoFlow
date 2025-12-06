@@ -1041,6 +1041,9 @@ class UIPanels:
         duplicate_progress = ModernProgressWidget("🔍 Duplicate detection")
         layout.addWidget(duplicate_progress)
 
+        verification_progress = ModernProgressWidget("🎯 Subsequence verification")
+        layout.addWidget(verification_progress)
+
         # Add stretch
         layout.addStretch(2)
 
@@ -1049,7 +1052,8 @@ class UIPanels:
             'stats_counter': stats_counter,
             'audio_progress': audio_progress,
             'file_progress': file_progress,
-            'duplicate_progress': duplicate_progress
+            'duplicate_progress': duplicate_progress,
+            'verification_progress': verification_progress
         }
 
         return panel, widgets

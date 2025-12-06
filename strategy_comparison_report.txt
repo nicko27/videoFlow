@@ -1,0 +1,225 @@
+================================================================================
+TESTING 3 DETECTION STRATEGIES (with simulated Scene Cuts & Texture data)
+================================================================================
+
+Loaded 174 matches from dual vote results
+
+================================================================================
+Strategy 1: Adaptive DCT Thresholds
+================================================================================
+Total matches accepted: 11
+  ✅ True Positives:  8
+  ❌ False Positives: 0
+  ❌ False Negatives: 3
+  ✅ True Negatives:  72
+
+📊 Metrics:
+  Precision: 72.7%
+  Recall:    72.7%
+  F1 Score:  72.7%
+
+🎯 Critical Cases:
+  Reencoded .mkv detected: ✅ YES
+  Das Monster _2 detected: ❌ NO
+  Das Monster _9 detected: ❌ NO
+
+❌ False Negatives (3):
+  Das Monster und die Schone_2.mp4 → Das Monster und die Schone.mp4 @ 13m30s (seq:99.7% dct:32.5% scene:0.0% texture:100.0%)
+  Das Monster und die Schone_6.mp4 → Das Monster und die Schone.mp4 @ 51m30s (seq:99.7% dct:60.4% scene:100.0% texture:100.0%)
+  Das Monster und die Schone_9.mp4 → Das Monster und die Schone.mp4 @ 1h22m00s (seq:97.7% dct:47.6% scene:100.0% texture:100.0%)
+
+================================================================================
+Strategy 2: Weighted Vote (DCT×2 + Scene + Texture)
+================================================================================
+Total matches accepted: 50
+  ✅ True Positives:  10
+  ❌ False Positives: 36
+  ❌ False Negatives: 1
+  ✅ True Negatives:  36
+
+📊 Metrics:
+  Precision: 20.0%
+  Recall:    90.9%
+  F1 Score:  32.8%
+
+🎯 Critical Cases:
+  Reencoded .mkv detected: ✅ YES
+  Das Monster _2 detected: ❌ NO
+  Das Monster _9 detected: ✅ YES
+
+❌ False Positives (36):
+  Aisling Franciosi - The Abandons - S01E05 - 1.mp4 → Aur_Flo - Couple hétéro.mp4 @ 17m20s (seq:87.7% dct:73.6% scene:0.0% texture:95.0%)
+  Aisling Franciosi - The Abandons - S01E05 - 1.mp4 → Das Monster und die Schone_5.mp4 @ 6m20s (seq:90.5% dct:77.5% scene:0.0% texture:95.0%)
+  Aisling Franciosi - The Abandons - S01E05 - 1.mp4 → Das Monster und die Schone_8.mp4 @ 0m40s (seq:86.5% dct:75.9% scene:0.0% texture:95.0%)
+  ... and 33 more
+
+❌ False Negatives (1):
+  Das Monster und die Schone_2.mp4 → Das Monster und die Schone.mp4 @ 13m30s (seq:99.7% dct:32.5% scene:0.0% texture:100.0%)
+
+================================================================================
+Strategy 3: Scene Cuts Veto + DCT
+================================================================================
+Total matches accepted: 8
+  ✅ True Positives:  8
+  ❌ False Positives: 0
+  ❌ False Negatives: 3
+  ✅ True Negatives:  72
+
+📊 Metrics:
+  Precision: 100.0%
+  Recall:    72.7%
+  F1 Score:  84.2%
+
+🎯 Critical Cases:
+  Reencoded .mkv detected: ✅ YES
+  Das Monster _2 detected: ❌ NO
+  Das Monster _9 detected: ❌ NO
+
+❌ False Negatives (3):
+  Das Monster und die Schone_2.mp4 → Das Monster und die Schone.mp4 @ 13m30s (seq:99.7% dct:32.5% scene:0.0% texture:100.0%)
+  Das Monster und die Schone_6.mp4 → Das Monster und die Schone.mp4 @ 51m30s (seq:99.7% dct:60.4% scene:100.0% texture:100.0%)
+  Das Monster und die Schone_9.mp4 → Das Monster und die Schone.mp4 @ 1h22m00s (seq:97.7% dct:47.6% scene:100.0% texture:100.0%)
+
+================================================================================
+Strategy 4: Hybrid (Scene Veto OR High Confidence)
+================================================================================
+Total matches accepted: 9
+  ✅ True Positives:  8
+  ❌ False Positives: 0
+  ❌ False Negatives: 3
+  ✅ True Negatives:  72
+
+📊 Metrics:
+  Precision: 88.9%
+  Recall:    72.7%
+  F1 Score:  80.0%
+
+🎯 Critical Cases:
+  Reencoded .mkv detected: ✅ YES
+  Das Monster _2 detected: ❌ NO
+  Das Monster _9 detected: ❌ NO
+
+❌ False Negatives (3):
+  Das Monster und die Schone_2.mp4 → Das Monster und die Schone.mp4 @ 13m30s (seq:99.7% dct:32.5% scene:0.0% texture:100.0%)
+  Das Monster und die Schone_6.mp4 → Das Monster und die Schone.mp4 @ 51m30s (seq:99.7% dct:60.4% scene:100.0% texture:100.0%)
+  Das Monster und die Schone_9.mp4 → Das Monster und die Schone.mp4 @ 1h22m00s (seq:97.7% dct:47.6% scene:100.0% texture:100.0%)
+
+================================================================================
+Strategy 5: Scene Veto + Color Backup
+================================================================================
+Total matches accepted: 12
+  ✅ True Positives:  8
+  ❌ False Positives: 1
+  ❌ False Negatives: 3
+  ✅ True Negatives:  71
+
+📊 Metrics:
+  Precision: 66.7%
+  Recall:    72.7%
+  F1 Score:  69.6%
+
+🎯 Critical Cases:
+  Reencoded .mkv detected: ✅ YES
+  Das Monster _2 detected: ❌ NO
+  Das Monster _9 detected: ❌ NO
+
+❌ False Positives (1):
+  Aur_Flo - Couple hétéro (1).mp4 → Aur_Flo - Couple hétéro.mp4 @ 4m20s (seq:92.8% dct:81.3% scene:0.0% texture:95.0%)
+
+❌ False Negatives (3):
+  Das Monster und die Schone_2.mp4 → Das Monster und die Schone.mp4 @ 13m30s (seq:99.7% dct:32.5% scene:0.0% texture:100.0%)
+  Das Monster und die Schone_6.mp4 → Das Monster und die Schone.mp4 @ 51m30s (seq:99.7% dct:60.4% scene:100.0% texture:100.0%)
+  Das Monster und die Schone_9.mp4 → Das Monster und die Schone.mp4 @ 1h22m00s (seq:97.7% dct:47.6% scene:100.0% texture:100.0%)
+
+================================================================================
+Strategy 6: Relaxed Adaptive DCT
+================================================================================
+Total matches accepted: 12
+  ✅ True Positives:  8
+  ❌ False Positives: 1
+  ❌ False Negatives: 3
+  ✅ True Negatives:  71
+
+📊 Metrics:
+  Precision: 66.7%
+  Recall:    72.7%
+  F1 Score:  69.6%
+
+🎯 Critical Cases:
+  Reencoded .mkv detected: ✅ YES
+  Das Monster _2 detected: ❌ NO
+  Das Monster _9 detected: ❌ NO
+
+❌ False Positives (1):
+  Aur_Flo - Couple hétéro (1).mp4 → Aur_Flo - Couple hétéro.mp4 @ 4m20s (seq:92.8% dct:81.3% scene:0.0% texture:95.0%)
+
+❌ False Negatives (3):
+  Das Monster und die Schone_2.mp4 → Das Monster und die Schone.mp4 @ 13m30s (seq:99.7% dct:32.5% scene:0.0% texture:100.0%)
+  Das Monster und die Schone_6.mp4 → Das Monster und die Schone.mp4 @ 51m30s (seq:99.7% dct:60.4% scene:100.0% texture:100.0%)
+  Das Monster und die Schone_9.mp4 → Das Monster und die Schone.mp4 @ 1h22m00s (seq:97.7% dct:47.6% scene:100.0% texture:100.0%)
+
+================================================================================
+Strategy 7: Scene Veto + Color Fallback
+================================================================================
+Total matches accepted: 9
+  ✅ True Positives:  8
+  ❌ False Positives: 0
+  ❌ False Negatives: 3
+  ✅ True Negatives:  72
+
+📊 Metrics:
+  Precision: 88.9%
+  Recall:    72.7%
+  F1 Score:  80.0%
+
+🎯 Critical Cases:
+  Reencoded .mkv detected: ✅ YES
+  Das Monster _2 detected: ❌ NO
+  Das Monster _9 detected: ❌ NO
+
+❌ False Negatives (3):
+  Das Monster und die Schone_2.mp4 → Das Monster und die Schone.mp4 @ 13m30s (seq:99.7% dct:32.5% scene:0.0% texture:100.0%)
+  Das Monster und die Schone_6.mp4 → Das Monster und die Schone.mp4 @ 51m30s (seq:99.7% dct:60.4% scene:100.0% texture:100.0%)
+  Das Monster und die Schone_9.mp4 → Das Monster und die Schone.mp4 @ 1h22m00s (seq:97.7% dct:47.6% scene:100.0% texture:100.0%)
+
+================================================================================
+Strategy 8: Very Strict (Scene AND High DCT)
+================================================================================
+Total matches accepted: 6
+  ✅ True Positives:  6
+  ❌ False Positives: 0
+  ❌ False Negatives: 5
+  ✅ True Negatives:  72
+
+📊 Metrics:
+  Precision: 100.0%
+  Recall:    54.5%
+  F1 Score:  70.6%
+
+🎯 Critical Cases:
+  Reencoded .mkv detected: ❌ NO
+  Das Monster _2 detected: ❌ NO
+  Das Monster _9 detected: ❌ NO
+
+❌ False Negatives (5):
+  Das Monster und die Schone_2.mp4 → Das Monster und die Schone.mp4 @ 13m30s (seq:99.7% dct:32.5% scene:0.0% texture:100.0%)
+  Das Monster und die Schone_3.mkv → Das Monster und die Schone.mp4 @ 27m30s (seq:99.4% dct:79.7% scene:100.0% texture:100.0%)
+  Das Monster und die Schone_3.mp4 → Das Monster und die Schone.mp4 @ 27m30s (seq:99.4% dct:79.7% scene:100.0% texture:100.0%)
+
+================================================================================
+FINAL COMPARISON
+================================================================================
+
+Strategy                                       Precision     Recall         F1
+--------------------------------------------------------------------------------
+1. Adaptive DCT                                    72.7%      72.7%      72.7%
+2. Weighted Vote                                   20.0%      90.9%      32.8%
+3. Scene Cuts Veto ⭐                              100.0%      72.7%      84.2%
+4. Hybrid                                          88.9%      72.7%      80.0%
+5. Color Backup                                    66.7%      72.7%      69.6%
+6. Relaxed Adaptive                                66.7%      72.7%      69.6%
+7. Scene + Color Fallback                          88.9%      72.7%      80.0%
+8. Very Strict                                    100.0%      54.5%      70.6%
+
+🏆 Best F1 Score: Strategy 3 (84.2%)
+   TP=8 FP=0 FN=3

@@ -99,7 +99,7 @@ class LayoutManager:
         splitter.setStretchFactor(1, 2)  # Right panel gets more space
         splitter.setSizes([350, 650])
 
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(splitter, stretch=1)  # CRITIQUE: Permet au splitter de s'étendre verticalement
 
         return container
 
@@ -173,7 +173,7 @@ class LayoutManager:
         splitter.setStretchFactor(0, 0)  # Don't stretch left
         splitter.setStretchFactor(1, 1)  # Stretch right panel
 
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(splitter, stretch=1)  # CRITIQUE: Permet au splitter de s'étendre verticalement
 
         return container
 

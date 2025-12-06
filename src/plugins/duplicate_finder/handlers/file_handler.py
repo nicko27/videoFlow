@@ -96,7 +96,8 @@ class FileHandler:
         Returns:
             Number of new files added (excluding duplicates).
         """
-        existing_files = self.file_list_widget.get_files()
+        # Optimisation O(N) : conversion en set pour lookup rapide
+        existing_files = set(self.file_list_widget.get_files())
         new_files = [f for f in file_paths if f not in existing_files]
 
         if new_files:
@@ -120,7 +121,8 @@ class FileHandler:
             logger.warning(f"Invalid folder path: {folder_path}")
             return 0
 
-        existing_files = self.file_list_widget.get_files()
+        # Optimisation O(N) : conversion en set pour lookup rapide
+        existing_files = set(self.file_list_widget.get_files())
         found_files = []
 
         # Recursively scan folder for video files

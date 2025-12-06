@@ -117,8 +117,8 @@ class ConnectionPool:
                     # Connection might be broken, create a new one
                     try:
                         conn.close()
-                    except:
-                        pass
+                    except Exception as close_error:
+                        logger.debug(f"Error closing broken connection: {close_error}")
                     new_conn = self._create_connection()
                     self.pool.put(new_conn, block=False)
 
@@ -195,7 +195,11 @@ class VideoDatabase:
                 'ignored_pairs': True,
                 'corrupted_files': True,
                 'found_duplicates': True,
-                'video_subsequences': True
+                'video_subsequences': True,
+                'lsh_fingerprints': True,
+                'level2_long_audio': True,
+                'level3_phash': True,
+                'advanced_duplicates': True
             }
                 
         except Exception as e:
@@ -308,6 +312,108 @@ class VideoDatabase:
                     )
                 ''')
 
+                # ═══════════════════════════════════════════════════════════
+                # ADVANCED 3-LEVEL MODE TABLES
+                # ═══════════════════════════════════════════════════════════
+
+                # Table for LSH fingerprints (Level 1)
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS lsh_fingerprints (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        video_id INTEGER UNIQUE,
+                        fingerprint BLOB NOT NULL,
+                        signature_bands TEXT,
+                        n_bands INTEGER,
+                        n_rows INTEGER,
+                        computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        fingerprint_version INTEGER DEFAULT 1,
+                        FOREIGN KEY (video_id) REFERENCES video_files (id) ON DELETE CASCADE
+                    )
+                ''')
+
+                # Table for Level 2 long-period audio comparisons
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS level2_long_audio (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        pair_id TEXT UNIQUE NOT NULL,
+                        file1_id INTEGER,
+                        file2_id INTEGER,
+                        similarity_score REAL,
+                        window_duration INTEGER,
+                        window_start REAL,
+                        compared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (file1_id) REFERENCES video_files (id) ON DELETE CASCADE,
+                        FOREIGN KEY (file2_id) REFERENCES video_files (id) ON DELETE CASCADE
+                    )
+                ''')
+
+                # Table for Level 3 pHash visual comparisons
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS level3_phash (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        pair_id TEXT UNIQUE NOT NULL,
+                        file1_id INTEGER,
+                        file2_id INTEGER,
+                        phash_distance INTEGER,
+                        frames_compared INTEGER,
+                        frames_similar INTEGER,
+                        similarity_rate REAL,
+                        frame_indices TEXT,
+                        compared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (file1_id) REFERENCES video_files (id) ON DELETE CASCADE,
+                        FOREIGN KEY (file2_id) REFERENCES video_files (id) ON DELETE CASCADE
+                    )
+                ''')
+
+                # ═══════════════════════════════════════════════════════════
+                # SUBSEQUENCE VERIFICATION CACHE (Strategy 3)
+                # ═══════════════════════════════════════════════════════════
+
+                # Table for caching verification results
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS verification_cache (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        short_video_id INTEGER NOT NULL,
+                        long_video_id INTEGER NOT NULL,
+                        short_mtime REAL NOT NULL,
+                        long_mtime REAL NOT NULL,
+                        short_size INTEGER NOT NULL,
+                        long_size INTEGER NOT NULL,
+                        start_time REAL NOT NULL,
+                        duration REAL NOT NULL,
+                        sequence_score REAL NOT NULL,
+                        -- Verification results
+                        accepted BOOLEAN NOT NULL,
+                        scene_cuts_score REAL NOT NULL,
+                        dct_score REAL NOT NULL,
+                        rejection_reason TEXT,
+                        verification_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (short_video_id) REFERENCES video_files (id) ON DELETE CASCADE,
+                        FOREIGN KEY (long_video_id) REFERENCES video_files (id) ON DELETE CASCADE,
+                        UNIQUE(short_video_id, long_video_id, start_time)
+                    )
+                ''')
+
+                # Table for validated duplicates from 3-level analysis
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS advanced_duplicates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        pair_id TEXT UNIQUE NOT NULL,
+                        file1_id INTEGER,
+                        file2_id INTEGER,
+                        level1_score REAL,
+                        level2_score REAL,
+                        level3_score REAL,
+                        confidence TEXT DEFAULT 'high',
+                        status TEXT DEFAULT 'pending',
+                        action_taken TEXT,
+                        validated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        processed_at TIMESTAMP,
+                        FOREIGN KEY (file1_id) REFERENCES video_files (id) ON DELETE CASCADE,
+                        FOREIGN KEY (file2_id) REFERENCES video_files (id) ON DELETE CASCADE
+                    )
+                ''')
+
                 # STEP 3: Check and add ignore_type column if necessary (migration)
                 cursor.execute("PRAGMA table_info(ignored_pairs)")
                 columns = [column[1] for column in cursor.fetchall()]
@@ -323,6 +429,15 @@ class VideoDatabase:
 
                 # After migration, ignore_type column ALWAYS exists
                 self._ignore_type_exists = True
+
+                # STEP 4: Check and add audio_fingerprint column if necessary (migration)
+                cursor.execute("PRAGMA table_info(video_files)")
+                video_columns = [column[1] for column in cursor.fetchall()]
+
+                if 'audio_fingerprint' not in video_columns:
+                    logger.info("Adding audio_fingerprint column to video_files table")
+                    cursor.execute("ALTER TABLE video_files ADD COLUMN audio_fingerprint BLOB")
+                    logger.info("Audio fingerprint column added")
                 
                 # ÉTAPE 4: Crée les index
                 index_commands = [
@@ -340,7 +455,23 @@ class VideoDatabase:
                     "CREATE INDEX IF NOT EXISTS idx_ignored_type ON ignored_pairs(ignore_type)",
                     "CREATE INDEX IF NOT EXISTS idx_subsequences_status ON video_subsequences(status)",
                     "CREATE INDEX IF NOT EXISTS idx_subsequences_files ON video_subsequences(short_video_id, long_video_id)",
-                    "CREATE INDEX IF NOT EXISTS idx_subsequences_confidence ON video_subsequences(confidence)"
+                    "CREATE INDEX IF NOT EXISTS idx_subsequences_confidence ON video_subsequences(confidence)",
+                    # Verification cache indexes
+                    "CREATE INDEX IF NOT EXISTS idx_verification_videos ON verification_cache(short_video_id, long_video_id, start_time)",
+                    "CREATE INDEX IF NOT EXISTS idx_verification_accepted ON verification_cache(accepted)",
+                    "CREATE INDEX IF NOT EXISTS idx_verification_date ON verification_cache(verification_date)",
+                    # Advanced 3-level mode indexes
+                    "CREATE INDEX IF NOT EXISTS idx_lsh_video ON lsh_fingerprints(video_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_lsh_computed_at ON lsh_fingerprints(computed_at)",
+                    "CREATE INDEX IF NOT EXISTS idx_level2_pair ON level2_long_audio(pair_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_level2_files ON level2_long_audio(file1_id, file2_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_level2_similarity ON level2_long_audio(similarity_score)",
+                    "CREATE INDEX IF NOT EXISTS idx_level3_pair ON level3_phash(pair_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_level3_files ON level3_phash(file1_id, file2_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_level3_similarity ON level3_phash(similarity_rate)",
+                    "CREATE INDEX IF NOT EXISTS idx_advanced_dup_status ON advanced_duplicates(status)",
+                    "CREATE INDEX IF NOT EXISTS idx_advanced_dup_pair ON advanced_duplicates(pair_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_advanced_dup_confidence ON advanced_duplicates(confidence)"
                 ]
                 
                 for cmd in index_commands:
@@ -534,9 +665,106 @@ class VideoDatabase:
 
         except Exception as e:
             logger.error(f"Error retrieving hash {file_path}: {e}")
-            
+
         return None
-    
+
+    def store_audio_fingerprint(self, file_path, audio_fingerprint):
+        """
+        Store audio fingerprint in database.
+
+        Args:
+            file_path (str): Path to the video file.
+            audio_fingerprint (np.ndarray): Audio fingerprint data.
+
+        Returns:
+            bool: True if successful, False otherwise.
+        """
+        try:
+            from src.core.serialization import serialize_numpy_to_json
+
+            file_stats = os.stat(file_path)
+
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Serialize audio fingerprint to JSON
+                audio_json = serialize_numpy_to_json(audio_fingerprint)
+                audio_blob = audio_json.encode('utf-8')
+
+                # First, ensure the video file exists in the database
+                cursor.execute('''
+                    INSERT OR IGNORE INTO video_files
+                    (file_path, file_name, file_size, modification_time)
+                    VALUES (?, ?, ?, ?)
+                ''', (
+                    file_path,
+                    os.path.basename(file_path),
+                    file_stats.st_size,
+                    file_stats.st_mtime
+                ))
+
+                # Then update the audio fingerprint
+                cursor.execute('''
+                    UPDATE video_files
+                    SET audio_fingerprint = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE file_path = ?
+                ''', (audio_blob, file_path))
+
+                conn.commit()
+                return True
+
+        except Exception as e:
+            logger.error(f"Error storing audio fingerprint for {file_path}: {e}")
+            return False
+
+    def get_audio_fingerprint(self, file_path):
+        """
+        Retrieve audio fingerprint from database.
+
+        Args:
+            file_path (str): Path to the video file.
+
+        Returns:
+            np.ndarray: Audio fingerprint, or None if not found.
+        """
+        try:
+            from src.core.serialization import deserialize_numpy_from_json
+
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT audio_fingerprint, modification_time FROM video_files
+                    WHERE file_path = ?
+                ''', (file_path,))
+
+                result = cursor.fetchone()
+                if result and result[0] is not None:
+                    audio_blob, db_mtime = result
+
+                    # Check if file has been modified since fingerprint was stored
+                    try:
+                        current_mtime = os.path.getmtime(file_path)
+                        if abs(current_mtime - db_mtime) >= 1:
+                            # File was modified, fingerprint is stale
+                            return None
+                    except Exception as e:
+                        # File doesn't exist anymore or permission error
+                        logger.debug(f"Cannot access file {file_path}: {e}")
+                        return None
+
+                    # Deserialize audio fingerprint
+                    try:
+                        audio_data = deserialize_numpy_from_json(audio_blob.decode('utf-8'))
+                        return audio_data
+                    except (UnicodeDecodeError, AttributeError):
+                        # Legacy pickle format (if any)
+                        return pickle.loads(audio_blob)
+
+        except Exception as e:
+            logger.error(f"Error retrieving audio fingerprint for {file_path}: {e}")
+
+        return None
+
     def get_cached_comparison(self, file1_path, file2_path):
         """Récupère un résultat de comparison - OPTIMISÉ"""
         try:
@@ -1242,7 +1470,8 @@ class VideoDatabase:
                             cursor.execute(f"PRAGMA {pragma}")
                             result = cursor.fetchone()
                             info['pragma_settings'][pragma] = result[0] if result else None
-                        except:
+                        except Exception as e:
+                            logger.debug(f"Error reading PRAGMA {pragma}: {e}")
                             info['pragma_settings'][pragma] = 'error'
 
             return info
@@ -1446,3 +1675,565 @@ class VideoDatabase:
             'avg_match_ratio': 0.0,
             'avg_confidence': 0.0
         }
+
+    # ═══════════════════════════════════════════════════════════
+    # VERIFICATION CACHE METHODS (Strategy 3)
+    # ═══════════════════════════════════════════════════════════
+
+    def store_verification_result(self, short_video_path, long_video_path, start_time,
+                                  duration, sequence_score, verification_result):
+        """
+        Store verification result in cache with file metadata.
+
+        Args:
+            short_video_path: Path to short video
+            long_video_path: Path to long video
+            start_time: Start time in long video (seconds)
+            duration: Duration of match (seconds)
+            sequence_score: Sequence match score (0-100)
+            verification_result: Dict with verification results
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Get video IDs and metadata
+                short_id = self._get_or_create_video_id(short_video_path, cursor)
+                long_id = self._get_or_create_video_id(long_video_path, cursor)
+
+                # Get file metadata for cache invalidation
+                short_stat = os.stat(short_video_path)
+                long_stat = os.stat(long_video_path)
+
+                # Store verification result
+                cursor.execute('''
+                    INSERT OR REPLACE INTO verification_cache (
+                        short_video_id, long_video_id,
+                        short_mtime, long_mtime,
+                        short_size, long_size,
+                        start_time, duration, sequence_score,
+                        accepted, scene_cuts_score, dct_score, rejection_reason
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    short_id, long_id,
+                    short_stat.st_mtime, long_stat.st_mtime,
+                    short_stat.st_size, long_stat.st_size,
+                    start_time, duration, sequence_score,
+                    verification_result['accepted'],
+                    verification_result['scene_cuts_score'],
+                    verification_result['dct_score'],
+                    verification_result.get('rejection_reason')
+                ))
+
+                conn.commit()
+                logger.debug(f"Verification result cached: {os.path.basename(short_video_path)} @ {start_time:.1f}s")
+
+        except Exception as e:
+            logger.error(f"Error storing verification result: {e}")
+
+    def get_cached_verification(self, short_video_path, long_video_path, start_time, tolerance=0.5):
+        """
+        Get cached verification result if files haven't changed.
+
+        Args:
+            short_video_path: Path to short video
+            long_video_path: Path to long video
+            start_time: Start time in long video (seconds)
+            tolerance: Time tolerance for matching (default: 0.5s)
+
+        Returns:
+            Dict with verification result or None if not cached/invalidated
+        """
+        try:
+            # Check if files still exist
+            if not os.path.exists(short_video_path) or not os.path.exists(long_video_path):
+                return None
+
+            # Get current file metadata
+            short_stat = os.stat(short_video_path)
+            long_stat = os.stat(long_video_path)
+
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Get video IDs
+                cursor.execute('SELECT id FROM video_files WHERE file_path = ?', (short_video_path,))
+                short_row = cursor.fetchone()
+                if not short_row:
+                    return None
+                short_id = short_row[0]
+
+                cursor.execute('SELECT id FROM video_files WHERE file_path = ?', (long_video_path,))
+                long_row = cursor.fetchone()
+                if not long_row:
+                    return None
+                long_id = long_row[0]
+
+                # Get cached result with time tolerance
+                cursor.execute('''
+                    SELECT
+                        short_mtime, long_mtime,
+                        short_size, long_size,
+                        accepted, scene_cuts_score, dct_score,
+                        rejection_reason, sequence_score
+                    FROM verification_cache
+                    WHERE short_video_id = ?
+                      AND long_video_id = ?
+                      AND ABS(start_time - ?) < ?
+                    ORDER BY verification_date DESC
+                    LIMIT 1
+                ''', (short_id, long_id, start_time, tolerance))
+
+                result = cursor.fetchone()
+                if not result:
+                    return None
+
+                # Verify file hasn't changed (mtime + size)
+                cached_short_mtime, cached_long_mtime = result[0], result[1]
+                cached_short_size, cached_long_size = result[2], result[3]
+
+                # Check if files modified (1 second tolerance for mtime)
+                if (abs(short_stat.st_mtime - cached_short_mtime) > 1.0 or
+                    short_stat.st_size != cached_short_size or
+                    abs(long_stat.st_mtime - cached_long_mtime) > 1.0 or
+                    long_stat.st_size != cached_long_size):
+                    logger.debug(f"Cache invalidated: files modified")
+                    return None
+
+                # Return cached result
+                return {
+                    'accepted': bool(result[4]),
+                    'scene_cuts_score': result[5],
+                    'dct_score': result[6],
+                    'rejection_reason': result[7],
+                    'sequence_score': result[8],
+                    'from_cache': True
+                }
+
+        except Exception as e:
+            logger.error(f"Error retrieving cached verification: {e}")
+            return None
+
+    def get_verification_statistics(self):
+        """Get statistics about verification cache.
+
+        Returns:
+            dict: Statistics about cached verifications
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                    SELECT
+                        COUNT(*) as total,
+                        SUM(CASE WHEN accepted = 1 THEN 1 ELSE 0 END) as accepted,
+                        SUM(CASE WHEN accepted = 0 THEN 1 ELSE 0 END) as rejected,
+                        AVG(scene_cuts_score) as avg_scene_cuts,
+                        AVG(dct_score) as avg_dct,
+                        AVG(sequence_score) as avg_sequence
+                    FROM verification_cache
+                ''')
+
+                result = cursor.fetchone()
+                if result:
+                    return {
+                        'total': result[0] or 0,
+                        'accepted': result[1] or 0,
+                        'rejected': result[2] or 0,
+                        'avg_scene_cuts': result[3] or 0.0,
+                        'avg_dct': result[4] or 0.0,
+                        'avg_sequence': result[5] or 0.0
+                    }
+
+        except Exception as e:
+            logger.error(f"Error retrieving verification stats: {e}")
+
+        return {
+            'total': 0,
+            'accepted': 0,
+            'rejected': 0,
+            'avg_scene_cuts': 0.0,
+            'avg_dct': 0.0,
+            'avg_sequence': 0.0
+        }
+
+    def clear_verification_cache(self):
+        """Clear all verification cache entries."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM verification_cache')
+                conn.commit()
+                logger.info("Verification cache cleared")
+        except Exception as e:
+            logger.error(f"Error clearing verification cache: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # ADVANCED 3-LEVEL MODE METHODS
+    # ═══════════════════════════════════════════════════════════
+
+    def store_lsh_fingerprint(self, file_path, fingerprint, signature_bands, n_bands, n_rows):
+        """
+        Store LSH fingerprint for a video (Level 1).
+
+        Args:
+            file_path: Path to the video file
+            fingerprint: LSH fingerprint (numpy array or serialized)
+            signature_bands: JSON string of LSH bands
+            n_bands: Number of bands used
+            n_rows: Number of rows per band
+
+        Returns:
+            bool: True if successful
+        """
+        try:
+            from src.core.serialization import serialize_numpy_to_json
+
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Get video ID
+                cursor.execute('SELECT id FROM video_files WHERE file_path = ?', (file_path,))
+                result = cursor.fetchone()
+                if not result:
+                    logger.warning(f"Video not found in database: {file_path}")
+                    return False
+
+                video_id = result[0]
+
+                # Serialize fingerprint
+                fingerprint_json = serialize_numpy_to_json(fingerprint)
+                fingerprint_blob = fingerprint_json.encode('utf-8')
+
+                cursor.execute('''
+                    INSERT OR REPLACE INTO lsh_fingerprints
+                    (video_id, fingerprint, signature_bands, n_bands, n_rows, computed_at)
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (video_id, fingerprint_blob, signature_bands, n_bands, n_rows))
+
+                conn.commit()
+                logger.debug(f"LSH fingerprint stored for {os.path.basename(file_path)}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error storing LSH fingerprint: {e}")
+            return False
+
+    def get_lsh_fingerprint(self, file_path):
+        """
+        Retrieve LSH fingerprint for a video.
+
+        Args:
+            file_path: Path to the video file
+
+        Returns:
+            dict: {'fingerprint', 'bands', 'n_bands', 'n_rows'} or None
+        """
+        try:
+            from src.core.serialization import deserialize_numpy_from_json
+
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                    SELECT lsh.fingerprint, lsh.signature_bands, lsh.n_bands, lsh.n_rows
+                    FROM lsh_fingerprints lsh
+                    JOIN video_files v ON lsh.video_id = v.id
+                    WHERE v.file_path = ?
+                ''', (file_path,))
+
+                result = cursor.fetchone()
+                if result:
+                    fp_blob, bands_json, n_bands, n_rows = result
+                    fingerprint = deserialize_numpy_from_json(fp_blob.decode('utf-8'))
+
+                    return {
+                        'fingerprint': fingerprint,
+                        'bands': bands_json,
+                        'n_bands': n_bands,
+                        'n_rows': n_rows
+                    }
+
+        except Exception as e:
+            logger.error(f"Error retrieving LSH fingerprint: {e}")
+
+        return None
+
+    def store_level2_result(self, file1_path, file2_path, similarity_score, window_duration, window_start=0.0):
+        """
+        Store Level 2 long-period audio comparison result.
+
+        Args:
+            file1_path: First video path
+            file2_path: Second video path
+            similarity_score: Similarity score (0.0-1.0)
+            window_duration: Duration of analyzed window (seconds)
+            window_start: Start time of window (seconds)
+
+        Returns:
+            bool: True if successful
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Get IDs
+                cursor.execute('''
+                    SELECT
+                        (SELECT id FROM video_files WHERE file_path = ?) as id1,
+                        (SELECT id FROM video_files WHERE file_path = ?) as id2
+                ''', (file1_path, file2_path))
+
+                result = cursor.fetchone()
+                if not result or not result[0] or not result[1]:
+                    return False
+
+                file1_id, file2_id = result
+
+                # Ensure order
+                if file1_id > file2_id:
+                    file1_id, file2_id = file2_id, file1_id
+
+                # Create pair ID
+                pair_id = f"{file1_id}_{file2_id}"
+
+                cursor.execute('''
+                    INSERT OR REPLACE INTO level2_long_audio
+                    (pair_id, file1_id, file2_id, similarity_score, window_duration,
+                     window_start, compared_at)
+                    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (pair_id, file1_id, file2_id, similarity_score, window_duration, window_start))
+
+                conn.commit()
+                logger.debug(f"Level 2 result stored: {similarity_score:.3f}")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error storing Level 2 result: {e}")
+            return False
+
+    def store_level3_result(self, file1_path, file2_path, phash_distance,
+                           frames_compared, frames_similar, frame_indices=None):
+        """
+        Store Level 3 pHash visual comparison result.
+
+        Args:
+            file1_path: First video path
+            file2_path: Second video path
+            phash_distance: Average Hamming distance
+            frames_compared: Number of frames compared
+            frames_similar: Number of similar frames
+            frame_indices: List of frame indices used (optional)
+
+        Returns:
+            bool: True if successful
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Get IDs
+                cursor.execute('''
+                    SELECT
+                        (SELECT id FROM video_files WHERE file_path = ?) as id1,
+                        (SELECT id FROM video_files WHERE file_path = ?) as id2
+                ''', (file1_path, file2_path))
+
+                result = cursor.fetchone()
+                if not result or not result[0] or not result[1]:
+                    return False
+
+                file1_id, file2_id = result
+
+                # Ensure order
+                if file1_id > file2_id:
+                    file1_id, file2_id = file2_id, file1_id
+
+                # Create pair ID
+                pair_id = f"{file1_id}_{file2_id}"
+
+                # Calculate similarity rate
+                similarity_rate = frames_similar / frames_compared if frames_compared > 0 else 0.0
+
+                # Serialize frame indices
+                frame_indices_json = json.dumps(frame_indices) if frame_indices else None
+
+                cursor.execute('''
+                    INSERT OR REPLACE INTO level3_phash
+                    (pair_id, file1_id, file2_id, phash_distance, frames_compared,
+                     frames_similar, similarity_rate, frame_indices, compared_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (pair_id, file1_id, file2_id, phash_distance, frames_compared,
+                      frames_similar, similarity_rate, frame_indices_json))
+
+                conn.commit()
+                logger.debug(f"Level 3 result stored: {frames_similar}/{frames_compared} similar frames")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error storing Level 3 result: {e}")
+            return False
+
+    def store_advanced_duplicate(self, file1_path, file2_path, level1_score,
+                                 level2_score, level3_score, confidence='high'):
+        """
+        Store a validated duplicate from 3-level analysis.
+
+        Args:
+            file1_path: First video path
+            file2_path: Second video path
+            level1_score: LSH similarity score
+            level2_score: Long audio similarity score
+            level3_score: pHash similarity rate
+            confidence: Confidence level ('high', 'medium', 'low')
+
+        Returns:
+            bool: True if successful
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Get IDs
+                cursor.execute('''
+                    SELECT
+                        (SELECT id FROM video_files WHERE file_path = ?) as id1,
+                        (SELECT id FROM video_files WHERE file_path = ?) as id2
+                ''', (file1_path, file2_path))
+
+                result = cursor.fetchone()
+                if not result or not result[0] or not result[1]:
+                    return False
+
+                file1_id, file2_id = result
+
+                # Ensure order
+                if file1_id > file2_id:
+                    file1_id, file2_id = file2_id, file1_id
+
+                # Create pair ID
+                pair_id = f"{file1_id}_{file2_id}"
+
+                cursor.execute('''
+                    INSERT OR REPLACE INTO advanced_duplicates
+                    (pair_id, file1_id, file2_id, level1_score, level2_score,
+                     level3_score, confidence, status, validated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', CURRENT_TIMESTAMP)
+                ''', (pair_id, file1_id, file2_id, level1_score, level2_score,
+                      level3_score, confidence))
+
+                conn.commit()
+                logger.info(f"Advanced duplicate stored: {os.path.basename(file1_path)} <-> "
+                           f"{os.path.basename(file2_path)} ({confidence})")
+                return True
+
+        except Exception as e:
+            logger.error(f"Error storing advanced duplicate: {e}")
+            return False
+
+    def get_pending_advanced_duplicates(self, limit=1000, offset=0):
+        """
+        Get pending duplicates from advanced 3-level analysis.
+
+        Args:
+            limit: Maximum number to retrieve
+            offset: Number to skip
+
+        Returns:
+            List of tuples: (file1_path, file2_path, l1_score, l2_score, l3_score, confidence, id)
+        """
+        try:
+            duplicates = []
+
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                cursor.execute('''
+                    SELECT v1.file_path, v2.file_path, ad.level1_score, ad.level2_score,
+                           ad.level3_score, ad.confidence, ad.id
+                    FROM advanced_duplicates ad
+                    JOIN video_files v1 ON ad.file1_id = v1.id
+                    JOIN video_files v2 ON ad.file2_id = v2.id
+                    WHERE ad.status = 'pending'
+                    ORDER BY ad.confidence DESC, ad.level3_score DESC, ad.validated_at DESC
+                    LIMIT ? OFFSET ?
+                ''', (limit, offset))
+
+                for row in cursor.fetchall():
+                    file1, file2, l1, l2, l3, conf, dup_id = row
+                    if os.path.exists(file1) and os.path.exists(file2):
+                        duplicates.append((file1, file2, l1, l2, l3, conf, dup_id))
+
+                return duplicates
+
+        except Exception as e:
+            logger.error(f"Error retrieving advanced duplicates: {e}")
+            return []
+
+    def get_advanced_mode_statistics(self):
+        """
+        Get statistics about advanced 3-level mode analysis.
+
+        Returns:
+            dict: Statistics for each level and overall
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Level 1: LSH fingerprints
+                cursor.execute('SELECT COUNT(*) FROM lsh_fingerprints')
+                lsh_count = cursor.fetchone()[0]
+
+                # Level 2: Long audio comparisons
+                cursor.execute('SELECT COUNT(*), AVG(similarity_score) FROM level2_long_audio')
+                result = cursor.fetchone()
+                level2_count, level2_avg = result[0] or 0, result[1] or 0.0
+
+                # Level 3: pHash comparisons
+                cursor.execute('SELECT COUNT(*), AVG(similarity_rate) FROM level3_phash')
+                result = cursor.fetchone()
+                level3_count, level3_avg = result[0] or 0, result[1] or 0.0
+
+                # Advanced duplicates
+                cursor.execute('''
+                    SELECT
+                        COUNT(*) as total,
+                        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
+                        SUM(CASE WHEN confidence = 'high' THEN 1 ELSE 0 END) as high_conf,
+                        SUM(CASE WHEN confidence = 'medium' THEN 1 ELSE 0 END) as med_conf,
+                        SUM(CASE WHEN confidence = 'low' THEN 1 ELSE 0 END) as low_conf
+                    FROM advanced_duplicates
+                ''')
+
+                result = cursor.fetchone()
+                total, pending, high, medium, low = result
+
+                return {
+                    'lsh_fingerprints': lsh_count or 0,
+                    'level2_comparisons': level2_count,
+                    'level2_avg_similarity': level2_avg,
+                    'level3_comparisons': level3_count,
+                    'level3_avg_similarity': level3_avg,
+                    'total_duplicates': total or 0,
+                    'pending_duplicates': pending or 0,
+                    'high_confidence': high or 0,
+                    'medium_confidence': medium or 0,
+                    'low_confidence': low or 0
+                }
+
+        except Exception as e:
+            logger.error(f"Error retrieving advanced mode stats: {e}")
+            return {
+                'lsh_fingerprints': 0,
+                'level2_comparisons': 0,
+                'level2_avg_similarity': 0.0,
+                'level3_comparisons': 0,
+                'level3_avg_similarity': 0.0,
+                'total_duplicates': 0,
+                'pending_duplicates': 0,
+                'high_confidence': 0,
+                'medium_confidence': 0,
+                'low_confidence': 0
+            }

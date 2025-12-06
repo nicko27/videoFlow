@@ -550,22 +550,42 @@ class SubsequenceDetector:
                     'verification_result': None
                 }
 
-            # PHASE 3: Strategy 3 Verification (Scene Cuts Veto + DCT)
+            # PHASE 3: Strategy 3 Verification (Scene Cuts Veto + DCT) with caching
             verification_result = None
-            if self.enable_verification and self.verifier is not None:
-                logger.info(f"Initial match {best_match_ratio*100:.1f}% - running Strategy 3 verification...")
+            from_cache = False
 
+            if self.enable_verification and self.verifier is not None:
                 # Calculate start time in long video
                 # Convert frame index to time using sampling interval
                 start_time = best_start_idx * self.sample_interval_seconds
 
-                verification_result = self.verifier.verify_with_strategy3(
-                    short_video=short_video,
-                    long_video=long_video,
-                    start_time=start_time,
-                    duration=dur_short,
-                    sequence_score=best_match_ratio * 100.0  # Convert to percentage
+                # Check cache first
+                cached_result = self.db.get_cached_verification(
+                    short_video, long_video, start_time
                 )
+
+                if cached_result:
+                    logger.info(f"✓ Using cached verification result")
+                    verification_result = cached_result
+                    from_cache = True
+                else:
+                    logger.info(f"Initial match {best_match_ratio*100:.1f}% - running Strategy 3 verification...")
+
+                    # Run verification
+                    verification_result = self.verifier.verify_with_strategy3(
+                        short_video=short_video,
+                        long_video=long_video,
+                        start_time=start_time,
+                        duration=dur_short,
+                        sequence_score=best_match_ratio * 100.0  # Convert to percentage
+                    )
+
+                    # Store in cache for future runs
+                    self.db.store_verification_result(
+                        short_video, long_video, start_time,
+                        dur_short, best_match_ratio * 100.0,
+                        verification_result
+                    )
 
                 # Update is_subsequence based on verification
                 is_subsequence = verification_result['accepted']
@@ -595,7 +615,8 @@ class SubsequenceDetector:
                 'long_duration': dur_long,
                 'refined': refined,
                 'verified': self.enable_verification,
-                'verification_result': verification_result
+                'verification_result': verification_result,
+                'from_cache': from_cache
             }
 
         except Exception as e:

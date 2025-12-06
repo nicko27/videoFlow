@@ -6,6 +6,7 @@ and file operations for duplicate management.
 """
 import os
 from typing import List, Tuple, Optional
+from threading import Lock
 from send2trash import send2trash
 
 from PyQt6.QtWidgets import QDialog, QMessageBox
@@ -54,6 +55,8 @@ class DuplicateHandler(QObject):
         self.file_handler = file_handler
         self.potential_duplicates: List[Tuple[str, str, float]] = []
         self.pending_subsequences: List[Tuple[str, str, dict]] = []
+        # Protection contre les race conditions sur processing_stopped
+        self._lock = Lock()
         self.processing_stopped = False
         logger.info("Duplicate handler initialized")
 
@@ -117,7 +120,8 @@ class DuplicateHandler(QObject):
             parent_window: Parent window for dialogs.
             comparison_dialog_class: Class to instantiate for comparison dialogs.
         """
-        self.processing_stopped = False
+        with self._lock:
+            self.processing_stopped = False
 
         if not self.potential_duplicates:
             logger.info("No duplicates to process")
@@ -142,8 +146,12 @@ class DuplicateHandler(QObject):
             parent_window: Parent window for dialogs.
             comparison_dialog_class: Class for comparison dialogs.
         """
-        if not self.potential_duplicates or self.processing_stopped:
-            if not self.processing_stopped:
+        # Vérification thread-safe de processing_stopped
+        with self._lock:
+            stopped = self.processing_stopped
+
+        if not self.potential_duplicates or stopped:
+            if not stopped:
                 logger.info("All duplicates processed")
                 self.all_duplicates_processed.emit()
             return
@@ -179,15 +187,18 @@ class DuplicateHandler(QObject):
             )
         elif result == QDialog.DialogCode.Rejected or dialog.result == "quit":
             # User chose to quit
-            self.processing_stopped = True
+            with self._lock:
+                self.processing_stopped = True
             logger.info("Duplicate processing stopped by user")
             return
 
         # Remove processed duplicate
         self.potential_duplicates.pop(0)
 
-        # Process next duplicate
-        if not self.processing_stopped:
+        # Process next duplicate (vérification thread-safe)
+        with self._lock:
+            stopped = self.processing_stopped
+        if not stopped:
             self._process_next_duplicate(parent_window, comparison_dialog_class)
 
     def handle_duplicate_choice(
@@ -267,7 +278,8 @@ class DuplicateHandler(QObject):
         """
         Stop processing duplicates.
         """
-        self.processing_stopped = True
+        with self._lock:
+            self.processing_stopped = True
         logger.info("Duplicate processing stopped")
 
     def resume_processing(
@@ -289,7 +301,8 @@ class DuplicateHandler(QObject):
             logger.info("No duplicates to resume")
             return False
 
-        self.processing_stopped = False
+        with self._lock:
+            self.processing_stopped = False
         logger.info(f"Resuming duplicate processing: {len(self.potential_duplicates)} remaining")
         self._process_next_duplicate(parent_window, comparison_dialog_class)
         return True
@@ -318,9 +331,11 @@ class DuplicateHandler(QObject):
         Returns:
             Dictionary with statistics.
         """
+        with self._lock:
+            stopped = self.processing_stopped
         return {
             'pending_count': len(self.potential_duplicates),
-            'processing_stopped': self.processing_stopped
+            'processing_stopped': stopped
         }
 
     # ========== Subsequence Processing Methods ==========
@@ -371,7 +386,8 @@ class DuplicateHandler(QObject):
             parent_window: Parent window for dialogs.
             comparison_dialog_class: Class to instantiate for comparison dialogs.
         """
-        self.processing_stopped = False
+        with self._lock:
+            self.processing_stopped = False
 
         if not self.pending_subsequences:
             logger.info("No subsequences to process")
@@ -393,8 +409,12 @@ class DuplicateHandler(QObject):
             parent_window: Parent window for dialogs.
             comparison_dialog_class: Class for comparison dialogs.
         """
-        if not self.pending_subsequences or self.processing_stopped:
-            if not self.processing_stopped:
+        # Vérification thread-safe de processing_stopped
+        with self._lock:
+            stopped = self.processing_stopped
+
+        if not self.pending_subsequences or stopped:
+            if not stopped:
                 logger.info("All subsequences processed")
                 self.all_subsequences_processed.emit()
             return
@@ -427,8 +447,10 @@ class DuplicateHandler(QObject):
         # Remove processed subsequence
         self.pending_subsequences.pop(0)
 
-        # Process next subsequence
-        if not self.processing_stopped:
+        # Process next subsequence (vérification thread-safe)
+        with self._lock:
+            stopped = self.processing_stopped
+        if not stopped:
             self._process_next_subsequence(parent_window, comparison_dialog_class)
 
     def handle_subsequence_choice(

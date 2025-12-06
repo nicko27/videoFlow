@@ -106,6 +106,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.stats_counter = None
         self.file_progress = None
         self.duplicate_progress = None
+        self.verification_progress = None
         self.config_tabs = None
         self.analyze_btn = None
         self.stop_btn = None
@@ -225,6 +226,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.file_progress = right_widgets['file_progress']
         self.duplicate_progress = right_widgets['duplicate_progress']
         self.audio_progress = right_widgets.get('audio_progress')  # New audio hash progress
+        self.verification_progress = right_widgets.get('verification_progress')  # Subsequence verification progress
 
         # Create layout selector widget (no longer in header)
         layout_selector_widget = self._create_layout_selector()
@@ -359,6 +361,9 @@ class DuplicateFinderWindow(QMainWindow):
 
         if hasattr(self, 'duplicate_progress') and self.duplicate_progress:
             self.duplicate_progress.progress_bar.setStyleSheet(theme.get_progress_style())
+
+        if hasattr(self, 'verification_progress') and self.verification_progress:
+            self.verification_progress.progress_bar.setStyleSheet(theme.get_progress_style())
 
         # Force UI refresh
         if hasattr(self, 'centralWidget') and self.centralWidget():
@@ -1032,15 +1037,20 @@ class DuplicateFinderWindow(QMainWindow):
                 # Analysis completed successfully
                 logger.info("Advanced 3-level analysis completed successfully")
 
+                # Load duplicates from database
+                duplicates = self.video_hasher.db.get_pending_duplicates()
+                self.duplicate_handler.clear_duplicates()
+                for file1, file2, similarity in duplicates:
+                    self.duplicate_handler.add_duplicate(file1, file2, similarity)
+
                 # Show success message
+                duplicate_count = len(duplicates)
                 QMessageBox.information(
                     self, "Analyse Terminée",
-                    "✅ Détection de scènes terminée !\n\n"
-                    "Les doublons détectés sont disponibles dans l'onglet Résultats."
+                    f"✅ Détection de scènes terminée !\n\n"
+                    f"Doublons trouvés: {duplicate_count}\n\n"
+                    "Les résultats sont disponibles dans l'onglet Résultats."
                 )
-
-                # Refresh duplicate handler to load new results
-                self.duplicate_handler.load_duplicates()
 
             else:
                 # Analysis was cancelled

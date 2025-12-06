@@ -1,0 +1,114 @@
+{
+  "language_name": "English",
+  "language_code": "en",
+
+  "ui": {
+    "presets": {
+      "title": "Quick Presets",
+      "speed": "Maximum Speed",
+      "speed_tooltip": "All optimizations enabled, fastest speed\n(May have slight precision trade-offs)",
+      "balanced": "Balanced (Recommended)",
+      "balanced_tooltip": "Best balance of speed and accuracy\n(Recommended for most users)",
+      "quality": "Maximum Quality",
+      "quality_tooltip": "All comparisons, maximum precision\n(Slower but 100% accurate)"
+    },
+
+    "audio": {
+      "title": "Audio Fingerprinting (Primary Filter)",
+      "threshold": "Audio similarity threshold:",
+      "threshold_tooltip": "Videos with audio similarity below this threshold are rejected\nLower = More candidates (slower but catches more)\nHigher = Fewer candidates (faster but may miss some)\nRecommended: 70%",
+      "precision": "Precision mode:",
+      "precision_fast": "Fast (2-5s/video, 95%)",
+      "precision_balanced": "Balanced (5-15s/video, 99%)",
+      "precision_maximum": "Maximum (10-30s/video, 99.9%)",
+      "precision_tooltip": "Fast: Quick extraction, good for most cases\nBalanced: Better precision, moderate speed\nMaximum: Best precision, slower",
+      "workers": "Audio workers:",
+      "workers_tooltip": "Number of parallel workers for audio extraction",
+      "cache_size": "Audio cache size:",
+      "cache_size_tooltip": "Maximum audio fingerprints to cache in memory",
+      "cache_size_suffix": " items",
+      "fallback": "Enable fallback for videos without audio",
+      "fallback_tooltip": "If enabled, videos without audio will be compared using video hashing only\nIf disabled, videos without audio will be skipped",
+      "info": "Audio fingerprinting filters 85-90% of video pairs before video comparison.\nRequires fpcalc (chromaprint): brew install chromaprint (macOS) or apt install chromaprint-tools (Linux)"
+    },
+
+    "lsh": {
+      "title": "LSH (Locality Sensitive Hashing)",
+      "enable": "Enable LSH (Recommended for 500+ videos)",
+      "enable_tooltip": "LSH reduces O(N²) comparisons to O(N·k) by grouping similar items\nProvides 20-50x speedup on large datasets",
+      "bands": "LSH bands:",
+      "bands_tooltip": "More bands = More buckets = Better precision but slower",
+      "rows": "Rows per band:",
+      "rows_tooltip": "More rows = Stricter matching = Fewer false positives",
+      "no_audio": "Use LSH for no-audio videos",
+      "no_audio_tooltip": "Apply LSH optimization to videos without audio",
+      "info": "LSH groups similar fingerprints into buckets, comparing only within buckets.\nExample: 1000 videos → 499,500 pairs reduced to ~40,000 pairs (90% reduction)"
+    },
+
+    "multi_resolution": {
+      "title": "Multi-Resolution Comparison",
+      "enable": "Enable multi-resolution (Coarse → Medium → Fine)",
+      "enable_tooltip": "Compare audio progressively: short sample → medium → full\nProvides 2-3x speedup by rejecting early",
+      "coarse_duration": "Coarse duration:",
+      "coarse_duration_tooltip": "Duration of quick test sample",
+      "coarse_threshold": "Coarse threshold:",
+      "coarse_threshold_tooltip": "Reject if quick test is below this threshold",
+      "medium_duration": "Medium duration:",
+      "medium_duration_tooltip": "Duration of medium test sample",
+      "medium_threshold": "Medium threshold:",
+      "medium_threshold_tooltip": "Reject if medium test is below this threshold",
+      "info": "Progressive filtering: Most pairs rejected in coarse phase (fastest),\nfewer reach medium phase, only best candidates get full comparison."
+    },
+
+    "metadata": {
+      "title": "Metadata Quick Filter (Optional)",
+      "enable": "Enable metadata pre-filter",
+      "enable_tooltip": "⚠️ WARNING: May create false negatives if videos are re-encoded!\nFilters by duration and file size before audio comparison.\nOnly enable if you're sure videos have not been re-encoded.",
+      "duration_tolerance": "Duration tolerance:",
+      "duration_tolerance_tooltip": "Reject if duration difference > this percentage",
+      "size_ratio": "Min size ratio:",
+      "size_ratio_tooltip": "Reject if size ratio < this value",
+      "warning": "⚠️ Metadata filter can miss re-encoded duplicates with different sizes/durations.\nOnly enable if you need maximum speed and are sure videos are identical copies."
+    },
+
+    "video_hash": {
+      "title": "Video Hashing (Selective)",
+      "method": "Hash method:",
+      "method_phash": "pHash (Precise, slower)",
+      "method_dhash": "dHash (Balanced)",
+      "method_ahash": "aHash (Fast, less precise)",
+      "method_tooltip": "pHash: Most accurate (DCT-based), ~1s per video\ndHash: Good balance (gradient-based), ~0.5s per video\naHash: Fastest (average-based), ~0.2s per video",
+      "workers": "Hash workers:",
+      "workers_tooltip": "Parallel workers for video hashing",
+      "timeout": "Hash timeout:",
+      "timeout_tooltip": "Timeout per video for hash computation",
+      "cache_size": "Video cache size:",
+      "cache_size_tooltip": "Maximum video hashes to cache in memory",
+      "cache_size_suffix": " items",
+      "info": "Videos are hashed ONLY if their audio similarity is above threshold.\nSelective hashing saves 70-90% of video processing time!"
+    },
+
+    "video_comparison": {
+      "title": "Video Comparison",
+      "threshold": "Video similarity threshold:",
+      "threshold_tooltip": "Videos with similarity above this threshold are marked as duplicates\nRecommended: 90%",
+      "flip_detection": "Enable flip detection (mirror/horizontal flip)",
+      "flip_detection_tooltip": "Detect videos that are horizontally flipped (mirrored)\nCommon on social media to avoid copyright detection",
+      "workers": "Comparison workers:",
+      "workers_tooltip": "Parallel workers for video comparison",
+      "batch_size": "Batch size:",
+      "batch_size_tooltip": "Number of comparisons per batch",
+      "timeout": "Comparison timeout:",
+      "timeout_tooltip": "Timeout per comparison",
+      "cache_size": "Comparison cache:",
+      "cache_size_tooltip": "Maximum comparisons to cache",
+      "cache_size_suffix": " items"
+    },
+
+    "common": {
+      "sec": " sec",
+      "percent": "%",
+      "items": " items"
+    }
+  }
+}

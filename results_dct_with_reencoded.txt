@@ -1,0 +1,465 @@
+================================================================================
+DCT-BASED SUBSEQUENCE DETECTION
+================================================================================
+
+Method: Adaptive Signatures + DCT Verification
+  • Signature threshold: 85.0%
+  • DCT verification threshold: 80.0%
+  • Expected: 100% precision, 70% recall
+
+Found 22 video files
+
+================================================================================
+BUILDING ADAPTIVE SIGNATURE INDICES
+================================================================================
+
+  A.avi                                                         83 sigs
+  Aisling Franciosi - The Abandons - S01E05 - 1.mp4              2 sigs
+  Aisling Franciosi - The Abandons - S01E05 - 2.mp4              5 sigs
+  Aur_Flo - Couple hétéro (1).mp4                               32 sigs
+  Aur_Flo - Couple hétéro.mp4                                   76 sigs
+  DSSDDFDS.avi                                                 109 sigs
+  Das Monster und die Schone.mp4                               169 sigs
+  Das Monster und die Schone_1.mp4                              31 sigs
+  Das Monster und die Schone_2.mp4                              42 sigs
+  Das Monster und die Schone_3.mkv                              25 sigs
+  Das Monster und die Schone_3.mp4                              25 sigs
+  Das Monster und die Schone_4-mac.mp4                          31 sigs
+  Das Monster und die Schone_4.mp4                              31 sigs
+  Das Monster und die Schone_5.mp4                              31 sigs
+  Das Monster und die Schone_6.mp4                              31 sigs
+  Das Monster und die Schone_7.mp4                              31 sigs
+  Das Monster und die Schone_8.mp4                              31 sigs
+  Das Monster und die Schone_9.mp4                              18 sigs
+  JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4  76 sigs
+  JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4  90 sigs
+  Rocco's Initiations 5 (1).avi                                270 sigs
+  gsdgdsgsdgsdsggds.avi                                         79 sigs
+
+================================================================================
+SEARCHING FOR SEQUENCE MATCHES
+================================================================================
+
+[1/231] 'A.avi' in 'DSSDDFDS.avi'... Candidate at 36m30s (seq: 88.3%) → ❌ REJECTED (76.6%)
+[2/231] 'A.avi' in 'Das Monster und die Schone.mp4'... Candidate at 42m30s (seq: 91.4%) → ❌ REJECTED (75.2%)
+[3/231] 'A.avi' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... ❌ No sequence match
+[4/231] 'A.avi' in 'Rocco's Initiations 5 (1).avi'... Candidate at 7m00s (seq: 100.0%) → ✅ VERIFIED (100.0%)
+[5/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'A.avi'... Candidate at 37m30s (seq: 88.2%) → ❌ REJECTED (70.6%)
+[6/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4'... Candidate at 0m45s (seq: 91.7%) → ❌ REJECTED (66.3%)
+[7/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Aur_Flo - Couple hétéro (1).mp4'... ❌ No sequence match
+[8/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Aur_Flo - Couple hétéro.mp4'... Candidate at 17m20s (seq: 87.7%) → ❌ REJECTED (73.6%)
+[9/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'DSSDDFDS.avi'... Candidate at 13m00s (seq: 87.3%) → ❌ REJECTED (72.4%)
+[10/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 1h03m30s (seq: 91.2%) → ❌ REJECTED (71.1%)
+[11/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Das Monster und die Schone_1.mp4'... ❌ No sequence match
+[12/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Das Monster und die Schone_2.mp4'... ❌ No sequence match
+[13/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Das Monster und die Schone_3.mkv'... Candidate at 1m00s (seq: 90.1%) → ❌ REJECTED (70.2%)
+[14/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Das Monster und die Schone_3.mp4'... Candidate at 1m00s (seq: 90.1%) → ❌ REJECTED (70.2%)
+[15/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Das Monster und die Schone_4-mac.mp4'... ❌ No sequence match
+[16/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Das Monster und die Schone_4.mp4'... ❌ No sequence match
+[17/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Das Monster und die Schone_5.mp4'... Candidate at 6m20s (seq: 90.5%) → ❌ REJECTED (77.5%)
+[18/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Das Monster und die Schone_6.mp4'... Candidate at 7m40s (seq: 87.8%) → ❌ REJECTED (65.0%)
+[19/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Das Monster und die Schone_7.mp4'... Candidate at 3m40s (seq: 92.3%) → ❌ REJECTED (70.3%)
+[20/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Das Monster und die Schone_8.mp4'... Candidate at 0m40s (seq: 86.5%) → ❌ REJECTED (75.9%)
+[21/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Das Monster und die Schone_9.mp4'... ❌ No sequence match
+[22/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... Candidate at 36m30s (seq: 88.1%) → ❌ REJECTED (66.1%)
+[23/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 21m30s (seq: 89.6%) → ❌ REJECTED (71.7%)
+[24/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 54m30s (seq: 88.4%) → ❌ REJECTED (70.9%)
+[25/231] 'Aisling Franciosi - The Abandons - S01E05 - 1.mp4' in 'gsdgdsgsdgsdsggds.avi'... Candidate at 31m30s (seq: 87.8%) → ❌ REJECTED (71.6%)
+[26/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'A.avi'... Candidate at 37m30s (seq: 88.6%) → ❌ REJECTED (73.5%)
+[27/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Aur_Flo - Couple hétéro (1).mp4'... Candidate at 0m00s (seq: 85.3%) → ❌ REJECTED (66.2%)
+[28/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Aur_Flo - Couple hétéro.mp4'... Candidate at 3m40s (seq: 89.2%) → ❌ REJECTED (75.0%)
+[29/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'DSSDDFDS.avi'... Candidate at 9m30s (seq: 91.5%) → ❌ REJECTED (69.2%)
+[30/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 1h03m30s (seq: 92.6%) → ❌ REJECTED (71.7%)
+[31/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Das Monster und die Schone_1.mp4'... ❌ No sequence match
+[32/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Das Monster und die Schone_2.mp4'... ❌ No sequence match
+[33/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Das Monster und die Schone_3.mkv'... Candidate at 1m00s (seq: 86.9%) → ❌ REJECTED (66.9%)
+[34/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Das Monster und die Schone_3.mp4'... Candidate at 1m00s (seq: 86.9%) → ❌ REJECTED (66.9%)
+[35/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Das Monster und die Schone_4-mac.mp4'... ❌ No sequence match
+[36/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Das Monster und die Schone_4.mp4'... ❌ No sequence match
+[37/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Das Monster und die Schone_5.mp4'... Candidate at 7m40s (seq: 92.8%) → ❌ REJECTED (68.4%)
+[38/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Das Monster und die Schone_6.mp4'... Candidate at 9m00s (seq: 87.7%) → ❌ REJECTED (55.7%)
+[39/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Das Monster und die Schone_7.mp4'... Candidate at 3m40s (seq: 92.5%) → ❌ REJECTED (69.7%)
+[40/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Das Monster und die Schone_8.mp4'... Candidate at 3m00s (seq: 87.3%) → ❌ REJECTED (74.9%)
+[41/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Das Monster und die Schone_9.mp4'... ❌ No sequence match
+[42/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... Candidate at 36m00s (seq: 86.1%) → ❌ REJECTED (72.5%)
+[43/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 21m30s (seq: 88.8%) → ❌ REJECTED (76.9%)
+[44/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 46m00s (seq: 92.5%) → ❌ REJECTED (72.2%)
+[45/231] 'Aisling Franciosi - The Abandons - S01E05 - 2.mp4' in 'gsdgdsgsdgsdsggds.avi'... Candidate at 31m30s (seq: 91.0%) → ❌ REJECTED (65.9%)
+[46/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'A.avi'... ❌ No sequence match
+[47/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'Aur_Flo - Couple hétéro.mp4'... Candidate at 4m20s (seq: 92.8%) → ✅ VERIFIED (81.3%)
+[48/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'DSSDDFDS.avi'... Candidate at 12m00s (seq: 92.4%) → ❌ REJECTED (73.0%)
+[49/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'Das Monster und die Schone.mp4'... Candidate at 1h03m30s (seq: 88.8%) → ❌ REJECTED (69.1%)
+[50/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'Das Monster und die Schone_1.mp4'... ❌ No sequence match
+[51/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'Das Monster und die Schone_2.mp4'... ❌ No sequence match
+[52/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'Das Monster und die Schone_4-mac.mp4'... ❌ No sequence match
+[53/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'Das Monster und die Schone_4.mp4'... ❌ No sequence match
+[54/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'Das Monster und die Schone_5.mp4'... Candidate at 7m20s (seq: 87.0%) → ❌ REJECTED (65.3%)
+[55/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'Das Monster und die Schone_6.mp4'... ❌ No sequence match
+[56/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'Das Monster und die Schone_7.mp4'... Candidate at 2m20s (seq: 90.1%) → ❌ REJECTED (58.2%)
+[57/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'Das Monster und die Schone_8.mp4'... ❌ No sequence match
+[58/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... Candidate at 6m00s (seq: 90.1%) → ❌ REJECTED (72.1%)
+[59/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 36m00s (seq: 92.4%) → ❌ REJECTED (68.3%)
+[60/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 53m00s (seq: 92.1%) → ❌ REJECTED (70.8%)
+[61/231] 'Aur_Flo - Couple hétéro (1).mp4' in 'gsdgdsgsdgsdsggds.avi'... Candidate at 22m30s (seq: 90.0%) → ❌ REJECTED (72.7%)
+[62/231] 'Aur_Flo - Couple hétéro.mp4' in 'A.avi'... ❌ No sequence match
+[63/231] 'Aur_Flo - Couple hétéro.mp4' in 'DSSDDFDS.avi'... Candidate at 5m30s (seq: 89.3%) → ❌ REJECTED (76.9%)
+[64/231] 'Aur_Flo - Couple hétéro.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 1h03m00s (seq: 87.1%) → ❌ REJECTED (78.8%)
+[65/231] 'Aur_Flo - Couple hétéro.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... Candidate at 36m00s (seq: 88.9%) → ❌ REJECTED (73.7%)
+[66/231] 'Aur_Flo - Couple hétéro.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 32m00s (seq: 89.9%) → ✅ VERIFIED (82.9%)
+[67/231] 'Aur_Flo - Couple hétéro.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 46m00s (seq: 89.0%) → ❌ REJECTED (74.4%)
+[68/231] 'Aur_Flo - Couple hétéro.mp4' in 'gsdgdsgsdgsdsggds.avi'... Candidate at 21m00s (seq: 87.3%) → ❌ REJECTED (71.4%)
+[69/231] 'DSSDDFDS.avi' in 'Das Monster und die Schone.mp4'... Candidate at 1h03m00s (seq: 91.1%) → ❌ REJECTED (76.8%)
+[70/231] 'DSSDDFDS.avi' in 'Rocco's Initiations 5 (1).avi'... Candidate at 54m30s (seq: 98.2%) → ✅ VERIFIED (90.2%)
+[71/231] 'Das Monster und die Schone.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 35m00s (seq: 91.4%) → ❌ REJECTED (75.2%)
+[72/231] 'Das Monster und die Schone_1.mp4' in 'A.avi'... Candidate at 13m30s (seq: 85.4%) → ❌ REJECTED (73.1%)
+[73/231] 'Das Monster und die Schone_1.mp4' in 'Aur_Flo - Couple hétéro.mp4'... ❌ No sequence match
+[74/231] 'Das Monster und die Schone_1.mp4' in 'DSSDDFDS.avi'... ❌ No sequence match
+[75/231] 'Das Monster und die Schone_1.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 2m00s (seq: 99.4%) → ✅ VERIFIED (99.9%)
+[76/231] 'Das Monster und die Schone_1.mp4' in 'Das Monster und die Schone_2.mp4'... Candidate at 2m20s (seq: 96.2%) → ❌ REJECTED (20.0%)
+[77/231] 'Das Monster und die Schone_1.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... ❌ No sequence match
+[78/231] 'Das Monster und die Schone_1.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... ❌ No sequence match
+[79/231] 'Das Monster und die Schone_1.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 13m30s (seq: 85.4%) → ❌ REJECTED (73.1%)
+[80/231] 'Das Monster und die Schone_1.mp4' in 'gsdgdsgsdgsdsggds.avi'... ❌ No sequence match
+[81/231] 'Das Monster und die Schone_2.mp4' in 'A.avi'... ❌ No sequence match
+[82/231] 'Das Monster und die Schone_2.mp4' in 'Aur_Flo - Couple hétéro.mp4'... ❌ No sequence match
+[83/231] 'Das Monster und die Schone_2.mp4' in 'DSSDDFDS.avi'... ❌ No sequence match
+[84/231] 'Das Monster und die Schone_2.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 13m30s (seq: 99.7%) → ❌ REJECTED (32.5%)
+[85/231] 'Das Monster und die Schone_2.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... ❌ No sequence match
+[86/231] 'Das Monster und die Schone_2.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... ❌ No sequence match
+[87/231] 'Das Monster und die Schone_2.mp4' in 'Rocco's Initiations 5 (1).avi'... ❌ No sequence match
+[88/231] 'Das Monster und die Schone_2.mp4' in 'gsdgdsgsdgsdsggds.avi'... ❌ No sequence match
+[89/231] 'Das Monster und die Schone_3.mkv' in 'A.avi'... Candidate at 32m30s (seq: 90.2%) → ❌ REJECTED (73.6%)
+[90/231] 'Das Monster und die Schone_3.mkv' in 'Aur_Flo - Couple hétéro (1).mp4'... ❌ No sequence match
+[91/231] 'Das Monster und die Schone_3.mkv' in 'Aur_Flo - Couple hétéro.mp4'... Candidate at 16m00s (seq: 85.8%) → ✅ VERIFIED (84.2%)
+[92/231] 'Das Monster und die Schone_3.mkv' in 'DSSDDFDS.avi'... Candidate at 13m30s (seq: 89.4%) → ❌ REJECTED (77.5%)
+[93/231] 'Das Monster und die Schone_3.mkv' in 'Das Monster und die Schone.mp4'... Candidate at 27m30s (seq: 99.4%) → ❌ REJECTED (79.7%)
+[94/231] 'Das Monster und die Schone_3.mkv' in 'Das Monster und die Schone_1.mp4'... Candidate at 3m00s (seq: 87.2%) → ❌ REJECTED (70.5%)
+[95/231] 'Das Monster und die Schone_3.mkv' in 'Das Monster und die Schone_2.mp4'... Candidate at 11m00s (seq: 94.4%) → ❌ REJECTED (51.2%)
+[96/231] 'Das Monster und die Schone_3.mkv' in 'Das Monster und die Schone_3.mp4'... Candidate at 1m45s (seq: 100.0%) → ✅ VERIFIED (100.0%)
+[97/231] 'Das Monster und die Schone_3.mkv' in 'Das Monster und die Schone_4-mac.mp4'... Candidate at 2m40s (seq: 97.2%) → ❌ REJECTED (72.7%)
+[98/231] 'Das Monster und die Schone_3.mkv' in 'Das Monster und die Schone_4.mp4'... Candidate at 2m40s (seq: 97.2%) → ❌ REJECTED (72.7%)
+[99/231] 'Das Monster und die Schone_3.mkv' in 'Das Monster und die Schone_5.mp4'... Candidate at 7m00s (seq: 95.5%) → ❌ REJECTED (68.5%)
+[100/231] 'Das Monster und die Schone_3.mkv' in 'Das Monster und die Schone_6.mp4'... Candidate at 6m20s (seq: 93.0%) → ❌ REJECTED (70.4%)
+[101/231] 'Das Monster und die Schone_3.mkv' in 'Das Monster und die Schone_7.mp4'... Candidate at 9m00s (seq: 94.2%) → ❌ REJECTED (79.7%)
+[102/231] 'Das Monster und die Schone_3.mkv' in 'Das Monster und die Schone_8.mp4'... Candidate at 9m20s (seq: 95.1%) → ❌ REJECTED (78.3%)
+[103/231] 'Das Monster und die Schone_3.mkv' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... Candidate at 36m30s (seq: 87.6%) → ❌ REJECTED (75.3%)
+[104/231] 'Das Monster und die Schone_3.mkv' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 21m30s (seq: 86.3%) → ✅ VERIFIED (80.3%)
+[105/231] 'Das Monster und die Schone_3.mkv' in 'Rocco's Initiations 5 (1).avi'... Candidate at 56m00s (seq: 91.0%) → ❌ REJECTED (77.0%)
+[106/231] 'Das Monster und die Schone_3.mkv' in 'gsdgdsgsdgsdsggds.avi'... Candidate at 31m30s (seq: 90.8%) → ❌ REJECTED (73.6%)
+[107/231] 'Das Monster und die Schone_3.mp4' in 'A.avi'... Candidate at 32m30s (seq: 90.2%) → ❌ REJECTED (73.6%)
+[108/231] 'Das Monster und die Schone_3.mp4' in 'Aur_Flo - Couple hétéro (1).mp4'... ❌ No sequence match
+[109/231] 'Das Monster und die Schone_3.mp4' in 'Aur_Flo - Couple hétéro.mp4'... Candidate at 16m00s (seq: 85.8%) → ✅ VERIFIED (84.2%)
+[110/231] 'Das Monster und die Schone_3.mp4' in 'DSSDDFDS.avi'... Candidate at 13m30s (seq: 89.4%) → ❌ REJECTED (77.5%)
+[111/231] 'Das Monster und die Schone_3.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 27m30s (seq: 99.4%) → ❌ REJECTED (79.7%)
+[112/231] 'Das Monster und die Schone_3.mp4' in 'Das Monster und die Schone_1.mp4'... Candidate at 3m00s (seq: 87.2%) → ❌ REJECTED (70.5%)
+[113/231] 'Das Monster und die Schone_3.mp4' in 'Das Monster und die Schone_2.mp4'... Candidate at 11m00s (seq: 94.4%) → ❌ REJECTED (51.2%)
+[114/231] 'Das Monster und die Schone_3.mp4' in 'Das Monster und die Schone_4-mac.mp4'... Candidate at 2m40s (seq: 97.2%) → ❌ REJECTED (72.7%)
+[115/231] 'Das Monster und die Schone_3.mp4' in 'Das Monster und die Schone_4.mp4'... Candidate at 2m40s (seq: 97.2%) → ❌ REJECTED (72.7%)
+[116/231] 'Das Monster und die Schone_3.mp4' in 'Das Monster und die Schone_5.mp4'... Candidate at 7m00s (seq: 95.5%) → ❌ REJECTED (68.5%)
+[117/231] 'Das Monster und die Schone_3.mp4' in 'Das Monster und die Schone_6.mp4'... Candidate at 6m20s (seq: 93.0%) → ❌ REJECTED (70.4%)
+[118/231] 'Das Monster und die Schone_3.mp4' in 'Das Monster und die Schone_7.mp4'... Candidate at 9m00s (seq: 94.2%) → ❌ REJECTED (79.7%)
+[119/231] 'Das Monster und die Schone_3.mp4' in 'Das Monster und die Schone_8.mp4'... Candidate at 9m20s (seq: 95.1%) → ❌ REJECTED (78.3%)
+[120/231] 'Das Monster und die Schone_3.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... Candidate at 36m30s (seq: 87.6%) → ❌ REJECTED (75.3%)
+[121/231] 'Das Monster und die Schone_3.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 21m30s (seq: 86.3%) → ✅ VERIFIED (80.3%)
+[122/231] 'Das Monster und die Schone_3.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 56m00s (seq: 91.0%) → ❌ REJECTED (77.0%)
+[123/231] 'Das Monster und die Schone_3.mp4' in 'gsdgdsgsdgsdsggds.avi'... Candidate at 31m30s (seq: 90.8%) → ❌ REJECTED (73.6%)
+[124/231] 'Das Monster und die Schone_4-mac.mp4' in 'A.avi'... Candidate at 34m00s (seq: 90.5%) → ❌ REJECTED (77.6%)
+[125/231] 'Das Monster und die Schone_4-mac.mp4' in 'Aur_Flo - Couple hétéro.mp4'... ❌ No sequence match
+[126/231] 'Das Monster und die Schone_4-mac.mp4' in 'DSSDDFDS.avi'... Candidate at 26m00s (seq: 85.9%) → ❌ REJECTED (72.8%)
+[127/231] 'Das Monster und die Schone_4-mac.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 31m00s (seq: 99.8%) → ✅ VERIFIED (96.5%)
+[128/231] 'Das Monster und die Schone_4-mac.mp4' in 'Das Monster und die Schone_1.mp4'... ❌ No sequence match
+[129/231] 'Das Monster und die Schone_4-mac.mp4' in 'Das Monster und die Schone_2.mp4'... Candidate at 10m00s (seq: 92.6%) → ❌ REJECTED (42.2%)
+[130/231] 'Das Monster und die Schone_4-mac.mp4' in 'Das Monster und die Schone_4.mp4'... Candidate at 3m00s (seq: 100.0%) → ✅ VERIFIED (100.0%)
+[131/231] 'Das Monster und die Schone_4-mac.mp4' in 'Das Monster und die Schone_5.mp4'... Candidate at 7m00s (seq: 95.2%) → ❌ REJECTED (66.5%)
+[132/231] 'Das Monster und die Schone_4-mac.mp4' in 'Das Monster und die Schone_7.mp4'... Candidate at 9m00s (seq: 94.0%) → ❌ REJECTED (73.1%)
+[133/231] 'Das Monster und die Schone_4-mac.mp4' in 'Das Monster und die Schone_8.mp4'... Candidate at 7m20s (seq: 93.9%) → ✅ VERIFIED (80.8%)
+[134/231] 'Das Monster und die Schone_4-mac.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... ❌ No sequence match
+[135/231] 'Das Monster und die Schone_4-mac.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 1m00s (seq: 85.8%) → ❌ REJECTED (75.3%)
+[136/231] 'Das Monster und die Schone_4-mac.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 34m00s (seq: 90.5%) → ❌ REJECTED (77.6%)
+[137/231] 'Das Monster und die Schone_4-mac.mp4' in 'gsdgdsgsdgsdsggds.avi'... ❌ No sequence match
+[138/231] 'Das Monster und die Schone_4.mp4' in 'A.avi'... Candidate at 34m00s (seq: 90.5%) → ❌ REJECTED (77.6%)
+[139/231] 'Das Monster und die Schone_4.mp4' in 'Aur_Flo - Couple hétéro.mp4'... ❌ No sequence match
+[140/231] 'Das Monster und die Schone_4.mp4' in 'DSSDDFDS.avi'... Candidate at 26m00s (seq: 85.9%) → ❌ REJECTED (72.8%)
+[141/231] 'Das Monster und die Schone_4.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 31m00s (seq: 99.8%) → ✅ VERIFIED (96.5%)
+[142/231] 'Das Monster und die Schone_4.mp4' in 'Das Monster und die Schone_1.mp4'... ❌ No sequence match
+[143/231] 'Das Monster und die Schone_4.mp4' in 'Das Monster und die Schone_2.mp4'... Candidate at 10m00s (seq: 92.1%) → ❌ REJECTED (42.3%)
+[144/231] 'Das Monster und die Schone_4.mp4' in 'Das Monster und die Schone_5.mp4'... Candidate at 7m00s (seq: 95.2%) → ❌ REJECTED (66.5%)
+[145/231] 'Das Monster und die Schone_4.mp4' in 'Das Monster und die Schone_7.mp4'... Candidate at 9m00s (seq: 94.0%) → ❌ REJECTED (73.1%)
+[146/231] 'Das Monster und die Schone_4.mp4' in 'Das Monster und die Schone_8.mp4'... Candidate at 7m20s (seq: 93.9%) → ✅ VERIFIED (80.8%)
+[147/231] 'Das Monster und die Schone_4.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... ❌ No sequence match
+[148/231] 'Das Monster und die Schone_4.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 1m00s (seq: 85.8%) → ❌ REJECTED (75.3%)
+[149/231] 'Das Monster und die Schone_4.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 34m00s (seq: 90.5%) → ❌ REJECTED (77.6%)
+[150/231] 'Das Monster und die Schone_4.mp4' in 'gsdgdsgsdgsdsggds.avi'... ❌ No sequence match
+[151/231] 'Das Monster und die Schone_5.mp4' in 'A.avi'... Candidate at 35m30s (seq: 92.2%) → ❌ REJECTED (76.1%)
+[152/231] 'Das Monster und die Schone_5.mp4' in 'Aur_Flo - Couple hétéro.mp4'... Candidate at 16m00s (seq: 88.3%) → ❌ REJECTED (75.2%)
+[153/231] 'Das Monster und die Schone_5.mp4' in 'DSSDDFDS.avi'... Candidate at 26m00s (seq: 90.3%) → ❌ REJECTED (74.9%)
+[154/231] 'Das Monster und die Schone_5.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 48m00s (seq: 99.5%) → ✅ VERIFIED (82.7%)
+[155/231] 'Das Monster und die Schone_5.mp4' in 'Das Monster und die Schone_1.mp4'... ❌ No sequence match
+[156/231] 'Das Monster und die Schone_5.mp4' in 'Das Monster und die Schone_2.mp4'... Candidate at 10m00s (seq: 91.3%) → ❌ REJECTED (49.7%)
+[157/231] 'Das Monster und die Schone_5.mp4' in 'Das Monster und die Schone_7.mp4'... Candidate at 9m00s (seq: 94.7%) → ❌ REJECTED (73.2%)
+[158/231] 'Das Monster und die Schone_5.mp4' in 'Das Monster und die Schone_8.mp4'... Candidate at 4m20s (seq: 95.9%) → ❌ REJECTED (72.9%)
+[159/231] 'Das Monster und die Schone_5.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... Candidate at 36m30s (seq: 88.1%) → ❌ REJECTED (76.9%)
+[160/231] 'Das Monster und die Schone_5.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... ❌ No sequence match
+[161/231] 'Das Monster und die Schone_5.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 35m30s (seq: 92.2%) → ❌ REJECTED (76.1%)
+[162/231] 'Das Monster und die Schone_5.mp4' in 'gsdgdsgsdgsdsggds.avi'... Candidate at 31m30s (seq: 89.3%) → ❌ REJECTED (73.4%)
+[163/231] 'Das Monster und die Schone_6.mp4' in 'A.avi'... Candidate at 33m30s (seq: 89.9%) → ❌ REJECTED (71.1%)
+[164/231] 'Das Monster und die Schone_6.mp4' in 'Aur_Flo - Couple hétéro.mp4'... Candidate at 16m00s (seq: 87.3%) → ❌ REJECTED (70.5%)
+[165/231] 'Das Monster und die Schone_6.mp4' in 'DSSDDFDS.avi'... Candidate at 9m30s (seq: 88.0%) → ❌ REJECTED (68.5%)
+[166/231] 'Das Monster und die Schone_6.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 51m30s (seq: 99.7%) → ❌ REJECTED (60.4%)
+[167/231] 'Das Monster und die Schone_6.mp4' in 'Das Monster und die Schone_1.mp4'... Candidate at 9m00s (seq: 86.2%) → ❌ REJECTED (58.0%)
+[168/231] 'Das Monster und die Schone_6.mp4' in 'Das Monster und die Schone_2.mp4'... Candidate at 7m40s (seq: 93.3%) → ❌ REJECTED (45.2%)
+[169/231] 'Das Monster und die Schone_6.mp4' in 'Das Monster und die Schone_4-mac.mp4'... Candidate at 2m00s (seq: 92.7%) → ❌ REJECTED (71.3%)
+[170/231] 'Das Monster und die Schone_6.mp4' in 'Das Monster und die Schone_4.mp4'... Candidate at 2m00s (seq: 92.7%) → ❌ REJECTED (71.3%)
+[171/231] 'Das Monster und die Schone_6.mp4' in 'Das Monster und die Schone_5.mp4'... Candidate at 9m00s (seq: 94.1%) → ❌ REJECTED (64.9%)
+[172/231] 'Das Monster und die Schone_6.mp4' in 'Das Monster und die Schone_7.mp4'... Candidate at 9m40s (seq: 94.3%) → ❌ REJECTED (75.8%)
+[173/231] 'Das Monster und die Schone_6.mp4' in 'Das Monster und die Schone_8.mp4'... Candidate at 9m20s (seq: 96.4%) → ❌ REJECTED (74.1%)
+[174/231] 'Das Monster und die Schone_6.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... Candidate at 30m30s (seq: 86.6%) → ❌ REJECTED (66.6%)
+[175/231] 'Das Monster und die Schone_6.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 40m00s (seq: 86.3%) → ❌ REJECTED (66.5%)
+[176/231] 'Das Monster und die Schone_6.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 33m30s (seq: 89.9%) → ❌ REJECTED (71.1%)
+[177/231] 'Das Monster und die Schone_6.mp4' in 'gsdgdsgsdgsdsggds.avi'... Candidate at 31m30s (seq: 90.5%) → ❌ REJECTED (64.8%)
+[178/231] 'Das Monster und die Schone_7.mp4' in 'A.avi'... Candidate at 34m00s (seq: 91.4%) → ❌ REJECTED (79.7%)
+[179/231] 'Das Monster und die Schone_7.mp4' in 'Aur_Flo - Couple hétéro.mp4'... Candidate at 3m20s (seq: 91.6%) → ❌ REJECTED (74.6%)
+[180/231] 'Das Monster und die Schone_7.mp4' in 'DSSDDFDS.avi'... Candidate at 9m30s (seq: 92.1%) → ❌ REJECTED (74.5%)
+[181/231] 'Das Monster und die Schone_7.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 1h06m30s (seq: 99.5%) → ✅ VERIFIED (86.2%)
+[182/231] 'Das Monster und die Schone_7.mp4' in 'Das Monster und die Schone_1.mp4'... Candidate at 8m40s (seq: 93.2%) → ❌ REJECTED (73.2%)
+[183/231] 'Das Monster und die Schone_7.mp4' in 'Das Monster und die Schone_2.mp4'... Candidate at 10m40s (seq: 88.4%) → ❌ REJECTED (42.9%)
+[184/231] 'Das Monster und die Schone_7.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... Candidate at 36m30s (seq: 89.1%) → ❌ REJECTED (64.1%)
+[185/231] 'Das Monster und die Schone_7.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 32m30s (seq: 90.7%) → ❌ REJECTED (77.2%)
+[186/231] 'Das Monster und die Schone_7.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 52m30s (seq: 92.2%) → ❌ REJECTED (75.5%)
+[187/231] 'Das Monster und die Schone_7.mp4' in 'gsdgdsgsdgsdsggds.avi'... Candidate at 20m30s (seq: 89.4%) → ❌ REJECTED (73.1%)
+[188/231] 'Das Monster und die Schone_8.mp4' in 'A.avi'... Candidate at 32m30s (seq: 90.3%) → ❌ REJECTED (79.7%)
+[189/231] 'Das Monster und die Schone_8.mp4' in 'Aur_Flo - Couple hétéro.mp4'... ❌ No sequence match
+[190/231] 'Das Monster und die Schone_8.mp4' in 'DSSDDFDS.avi'... Candidate at 26m00s (seq: 88.5%) → ✅ VERIFIED (80.7%)
+[191/231] 'Das Monster und die Schone_8.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 1h11m00s (seq: 99.7%) → ✅ VERIFIED (95.3%)
+[192/231] 'Das Monster und die Schone_8.mp4' in 'Das Monster und die Schone_1.mp4'... Candidate at 8m40s (seq: 90.3%) → ❌ REJECTED (72.8%)
+[193/231] 'Das Monster und die Schone_8.mp4' in 'Das Monster und die Schone_2.mp4'... Candidate at 11m00s (seq: 91.4%) → ❌ REJECTED (56.4%)
+[194/231] 'Das Monster und die Schone_8.mp4' in 'Das Monster und die Schone_7.mp4'... Candidate at 9m00s (seq: 96.8%) → ✅ VERIFIED (85.3%)
+[195/231] 'Das Monster und die Schone_8.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... Candidate at 33m00s (seq: 86.3%) → ✅ VERIFIED (80.5%)
+[196/231] 'Das Monster und die Schone_8.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 2m00s (seq: 87.9%) → ✅ VERIFIED (85.2%)
+[197/231] 'Das Monster und die Schone_8.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 32m30s (seq: 90.3%) → ❌ REJECTED (79.7%)
+[198/231] 'Das Monster und die Schone_8.mp4' in 'gsdgdsgsdgsdsggds.avi'... Candidate at 31m30s (seq: 85.0%) → ❌ REJECTED (75.9%)
+[199/231] 'Das Monster und die Schone_9.mp4' in 'A.avi'... ❌ No sequence match
+[200/231] 'Das Monster und die Schone_9.mp4' in 'Aur_Flo - Couple hétéro (1).mp4'... ❌ No sequence match
+[201/231] 'Das Monster und die Schone_9.mp4' in 'Aur_Flo - Couple hétéro.mp4'... ❌ No sequence match
+[202/231] 'Das Monster und die Schone_9.mp4' in 'DSSDDFDS.avi'... ❌ No sequence match
+[203/231] 'Das Monster und die Schone_9.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 1h22m00s (seq: 97.7%) → ❌ REJECTED (47.6%)
+[204/231] 'Das Monster und die Schone_9.mp4' in 'Das Monster und die Schone_1.mp4'... Candidate at 2m40s (seq: 87.3%) → ❌ REJECTED (67.7%)
+[205/231] 'Das Monster und die Schone_9.mp4' in 'Das Monster und die Schone_2.mp4'... Candidate at 9m20s (seq: 88.4%) → ❌ REJECTED (39.4%)
+[206/231] 'Das Monster und die Schone_9.mp4' in 'Das Monster und die Schone_3.mkv'... Candidate at 0m00s (seq: 90.1%) → ❌ REJECTED (61.1%)
+[207/231] 'Das Monster und die Schone_9.mp4' in 'Das Monster und die Schone_3.mp4'... Candidate at 0m00s (seq: 90.1%) → ❌ REJECTED (61.1%)
+[208/231] 'Das Monster und die Schone_9.mp4' in 'Das Monster und die Schone_4-mac.mp4'... ❌ No sequence match
+[209/231] 'Das Monster und die Schone_9.mp4' in 'Das Monster und die Schone_4.mp4'... ❌ No sequence match
+[210/231] 'Das Monster und die Schone_9.mp4' in 'Das Monster und die Schone_5.mp4'... Candidate at 0m00s (seq: 90.1%) → ❌ REJECTED (37.1%)
+[211/231] 'Das Monster und die Schone_9.mp4' in 'Das Monster und die Schone_6.mp4'... Candidate at 2m20s (seq: 85.6%) → ❌ REJECTED (39.1%)
+[212/231] 'Das Monster und die Schone_9.mp4' in 'Das Monster und die Schone_7.mp4'... ❌ No sequence match
+[213/231] 'Das Monster und die Schone_9.mp4' in 'Das Monster und die Schone_8.mp4'... Candidate at 8m20s (seq: 89.1%) → ❌ REJECTED (76.6%)
+[214/231] 'Das Monster und die Schone_9.mp4' in 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4'... ❌ No sequence match
+[215/231] 'Das Monster und die Schone_9.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... ❌ No sequence match
+[216/231] 'Das Monster und die Schone_9.mp4' in 'Rocco's Initiations 5 (1).avi'... ❌ No sequence match
+[217/231] 'Das Monster und die Schone_9.mp4' in 'gsdgdsgsdgsdsggds.avi'... ❌ No sequence match
+[218/231] 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4' in 'A.avi'... ❌ No sequence match
+[219/231] 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4' in 'DSSDDFDS.avi'... Candidate at 17m00s (seq: 91.6%) → ❌ REJECTED (74.3%)
+[220/231] 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 1h01m30s (seq: 88.4%) → ❌ REJECTED (69.3%)
+[221/231] 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 35m30s (seq: 87.4%) → ❌ REJECTED (78.9%)
+[222/231] 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 58m30s (seq: 91.0%) → ❌ REJECTED (76.3%)
+[223/231] 'JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4' in 'gsdgdsgsdgsdsggds.avi'... Candidate at 22m30s (seq: 90.5%) → ❌ REJECTED (70.0%)
+[224/231] 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4' in 'DSSDDFDS.avi'... Candidate at 29m30s (seq: 94.7%) → ❌ REJECTED (69.7%)
+[225/231] 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4' in 'Das Monster und die Schone.mp4'... Candidate at 1h03m00s (seq: 89.9%) → ✅ VERIFIED (80.8%)
+[226/231] 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4' in 'Rocco's Initiations 5 (1).avi'... Candidate at 58m30s (seq: 93.5%) → ❌ REJECTED (77.0%)
+[227/231] 'gsdgdsgsdgsdsggds.avi' in 'A.avi'... Candidate at 37m00s (seq: 90.9%) → ❌ REJECTED (79.2%)
+[228/231] 'gsdgdsgsdgsdsggds.avi' in 'DSSDDFDS.avi'... Candidate at 48m00s (seq: 96.0%) → ✅ VERIFIED (81.1%)
+[229/231] 'gsdgdsgsdgsdsggds.avi' in 'Das Monster und die Schone.mp4'... Candidate at 1h03m00s (seq: 86.7%) → ❌ REJECTED (74.1%)
+[230/231] 'gsdgdsgsdgsdsggds.avi' in 'JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4'... Candidate at 35m30s (seq: 86.3%) → ❌ REJECTED (75.3%)
+[231/231] 'gsdgdsgsdgsdsggds.avi' in 'Rocco's Initiations 5 (1).avi'... Candidate at 1h58m00s (seq: 97.5%) → ✅ VERIFIED (81.3%)
+
+================================================================================
+VALIDATED RESULTS - 25 True Subsequences
+================================================================================
+
+
+📹 Aur_Flo - Couple hétéro.mp4
+--------------------------------------------------------------------------------
+  → Aur_Flo - Couple hétéro (1).mp4                   
+     Position:           4m20s -       12m16s
+     Duration:           7m56s
+     Seq Match:    92.8%
+     Verified:     81.3% ✓ GOOD
+
+  → Das Monster und die Schone_3.mkv                  
+     Position:          16m00s -       22m02s
+     Duration:           6m02s
+     Seq Match:    85.8%
+     Verified:     84.2% ✓ GOOD
+
+  → Das Monster und die Schone_3.mp4                  
+     Position:          16m00s -       22m02s
+     Duration:           6m02s
+     Seq Match:    85.8%
+     Verified:     84.2% ✓ GOOD
+
+
+📹 DSSDDFDS.avi
+--------------------------------------------------------------------------------
+  → Das Monster und die Schone_8.mp4                  
+     Position:          26m00s -       36m00s
+     Duration:          10m00s
+     Seq Match:    88.5%
+     Verified:     80.7% ✓ GOOD
+
+  → gsdgdsgsdgsdsggds.avi                             
+     Position:          48m00s -     1h27m00s
+     Duration:          39m00s
+     Seq Match:    96.0%
+     Verified:     81.1% ✓ GOOD
+
+
+📹 Das Monster und die Schone.mp4
+--------------------------------------------------------------------------------
+  → Das Monster und die Schone_1.mp4                  
+     Position:           2m00s -       12m18s
+     Duration:          10m18s
+     Seq Match:    99.4%
+     Verified:     99.9% 🔥 HIGH
+
+  → Das Monster und die Schone_4-mac.mp4              
+     Position:          31m00s -       41m00s
+     Duration:          10m00s
+     Seq Match:    99.8%
+     Verified:     96.5% 🔥 HIGH
+
+  → Das Monster und die Schone_4.mp4                  
+     Position:          31m00s -       41m00s
+     Duration:          10m00s
+     Seq Match:    99.8%
+     Verified:     96.5% 🔥 HIGH
+
+  → Das Monster und die Schone_5.mp4                  
+     Position:          48m00s -       58m00s
+     Duration:          10m00s
+     Seq Match:    99.5%
+     Verified:     82.7% ✓ GOOD
+
+  → JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4
+     Position:        1h03m00s -     1h47m46s
+     Duration:          44m46s
+     Seq Match:    89.9%
+     Verified:     80.8% ✓ GOOD
+
+  → Das Monster und die Schone_7.mp4                  
+     Position:        1h06m30s -     1h16m30s
+     Duration:          10m00s
+     Seq Match:    99.5%
+     Verified:     86.2% ✓ GOOD
+
+  → Das Monster und die Schone_8.mp4                  
+     Position:        1h11m00s -     1h21m00s
+     Duration:          10m00s
+     Seq Match:    99.7%
+     Verified:     95.3% 🔥 HIGH
+
+
+📹 Das Monster und die Schone_3.mp4
+--------------------------------------------------------------------------------
+  → Das Monster und die Schone_3.mkv                  
+     Position:           1m45s -        7m47s
+     Duration:           6m02s
+     Seq Match:   100.0%
+     Verified:    100.0% 🔥 HIGH
+
+
+📹 Das Monster und die Schone_4.mp4
+--------------------------------------------------------------------------------
+  → Das Monster und die Schone_4-mac.mp4              
+     Position:           3m00s -       13m00s
+     Duration:          10m00s
+     Seq Match:   100.0%
+     Verified:    100.0% 🔥 HIGH
+
+
+📹 Das Monster und die Schone_7.mp4
+--------------------------------------------------------------------------------
+  → Das Monster und die Schone_8.mp4                  
+     Position:           9m00s -       19m00s
+     Duration:          10m00s
+     Seq Match:    96.8%
+     Verified:     85.3% ✓ GOOD
+
+
+📹 Das Monster und die Schone_8.mp4
+--------------------------------------------------------------------------------
+  → Das Monster und die Schone_4-mac.mp4              
+     Position:           7m20s -       17m20s
+     Duration:          10m00s
+     Seq Match:    93.9%
+     Verified:     80.8% ✓ GOOD
+
+  → Das Monster und die Schone_4.mp4                  
+     Position:           7m20s -       17m20s
+     Duration:          10m00s
+     Seq Match:    93.9%
+     Verified:     80.8% ✓ GOOD
+
+
+📹 JacquieEtMichelTV e0534 2013-mayla-19years-old-young-beurette-slut-1080p.mp4
+--------------------------------------------------------------------------------
+  → Das Monster und die Schone_8.mp4                  
+     Position:          33m00s -       43m00s
+     Duration:          10m00s
+     Seq Match:    86.3%
+     Verified:     80.5% ✓ GOOD
+
+
+📹 JacquieEtMichelTV e0535 2013-lucie-outraged-beauty-1080p.mp4
+--------------------------------------------------------------------------------
+  → Das Monster und die Schone_8.mp4                  
+     Position:           2m00s -       12m00s
+     Duration:          10m00s
+     Seq Match:    87.9%
+     Verified:     85.2% ✓ GOOD
+
+  → Das Monster und die Schone_3.mkv                  
+     Position:          21m30s -       27m32s
+     Duration:           6m02s
+     Seq Match:    86.3%
+     Verified:     80.3% ✓ GOOD
+
+  → Das Monster und die Schone_3.mp4                  
+     Position:          21m30s -       27m32s
+     Duration:           6m02s
+     Seq Match:    86.3%
+     Verified:     80.3% ✓ GOOD
+
+  → Aur_Flo - Couple hétéro.mp4                       
+     Position:          32m00s -       57m13s
+     Duration:          25m13s
+     Seq Match:    89.9%
+     Verified:     82.9% ✓ GOOD
+
+
+📹 Rocco's Initiations 5 (1).avi
+--------------------------------------------------------------------------------
+  → A.avi                                             
+     Position:           7m00s -       48m25s
+     Duration:          41m25s
+     Seq Match:   100.0%
+     Verified:    100.0% 🔥 HIGH
+
+  → DSSDDFDS.avi                                      
+     Position:          54m30s -     1h48m50s
+     Duration:          54m20s
+     Seq Match:    98.2%
+     Verified:     90.2% ✓ GOOD
+
+  → gsdgdsgsdgsdsggds.avi                             
+     Position:        1h58m00s -     2h37m00s
+     Duration:          39m00s
+     Seq Match:    97.5%
+     Verified:     81.3% ✓ GOOD
+
+================================================================================
+SUMMARY
+================================================================================
+
+  Pairs checked:        231
+  Validated matches:    25
+

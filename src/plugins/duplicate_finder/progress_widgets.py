@@ -17,6 +17,10 @@ except ImportError:
     from design_system import Colors, Spacing, Typography, Styles, get_status_colors
     from themes import get_current_theme
 
+from src.core.logger import Logger
+
+logger = Logger.get_logger('DuplicateFinder.ProgressWidgets')
+
 
 class ModernProgressWidget(QWidget):
     """Widget de progression moderne with statistics"""
@@ -73,7 +77,8 @@ class ModernProgressWidget(QWidget):
 
         # Stats box à côté
         stats_frame = QFrame()
-        stats_frame.setMaximumWidth(120)
+        stats_frame.setMaximumWidth(150)  # Augmentation pour accommoder les grands chiffres
+        stats_frame.setMinimumWidth(150)  # Assure une largeur constante
         stats_frame.setStyleSheet(f"""
             QFrame {{
                 background-color: {Colors.GRAY_50};
@@ -88,14 +93,14 @@ class ModernProgressWidget(QWidget):
 
         # Nombre actuel/total
         self.count_label = QLabel("0/0")
-        self.count_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD, QFont.Weight.Bold))
+        self.count_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_SM, QFont.Weight.Bold))  # Police légèrement plus petite
         self.count_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.count_label.setStyleSheet(f"color: {Colors.PRIMARY};")
         stats_layout.addWidget(self.count_label)
 
         # Pourcentage
         self.percent_label = QLabel("0%")
-        self.percent_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
+        self.percent_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XXS))  # Police encore plus petite
         self.percent_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.percent_label.setStyleSheet(f"color: {Colors.GRAY_600};")
         stats_layout.addWidget(self.percent_label)
@@ -133,8 +138,19 @@ class ModernProgressWidget(QWidget):
         self.progress_bar.setMaximum(maximum)
         self.progress_bar.setValue(current)
 
-        # Mise à jour des stats à côté
-        self.count_label.setText(f"{current:,}/{maximum:,}")
+        # Mise à jour des stats à côté avec format compact
+        def format_number(n):
+            """Format compact pour les grands nombres"""
+            if n >= 10000:
+                return f"{n/1000:.1f}k"
+            elif n >= 1000:
+                return f"{n/1000:.2f}k"
+            else:
+                return str(n)
+
+        current_str = format_number(current)
+        maximum_str = format_number(maximum)
+        self.count_label.setText(f"{current_str}/{maximum_str}")
 
         # Calcul et affichage du pourcentage
         if maximum > 0:
@@ -162,7 +178,7 @@ class ModernProgressWidget(QWidget):
                 minutes = int((seconds % 3600) // 60)
                 self.time_label.setText(f"Restant: {hours}h{minutes:02d}")
         else:
-            self.time_label.setText("Time: --:--")
+            self.time_label.setText("Temps : --:--")
             
     def set_speed(self, items_per_second):
         """Met à jour la speed"""
@@ -207,7 +223,7 @@ class FileListWidget(QWidget):
             bg_color=Colors.WHITE
         ) + f"padding: {Spacing.XXS}px;")
 
-        self.file_count_label = QLabel("0 file")
+        self.file_count_label = QLabel("0 fichier")
         self.file_count_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
         self.file_count_label.setStyleSheet(Styles.label(
             color=Colors.BLACK,
@@ -242,7 +258,7 @@ class FileListWidget(QWidget):
         self.files_layout.setSpacing(Spacing.XS)
 
         # Message par défaut
-        self.empty_label = QLabel("Aucun file ajouté")
+        self.empty_label = QLabel("Aucun fichier ajouté")
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD))
         self.empty_label.setStyleSheet(f"""
@@ -310,7 +326,8 @@ class FileListWidget(QWidget):
         try:
             size = os.path.getsize(file_path)
             size_text = self.format_file_size(size)
-        except:
+        except Exception as e:
+            logger.warning(f"Cannot get file size for {file_path}: {e}")
             size_text = "Error"
 
         size_label = QLabel(size_text)
@@ -324,7 +341,7 @@ class FileListWidget(QWidget):
         size_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         # STATUT - NOIR FORCÉ with PLUS DE PLACE
-        status_label = QLabel("⏳ À analyze")
+        status_label = QLabel("⏳ À analyser")
         status_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS, QFont.Weight.Bold))
         status_label.setFixedWidth(120)
         status_label.setMinimumHeight(Spacing.INPUT_HEIGHT)
@@ -436,9 +453,9 @@ class FileListWidget(QWidget):
         """Met à jour le compteur"""
         count = len(self.files)
         if count == 0:
-            self.file_count_label.setText("Aucun file")
+            self.file_count_label.setText("Aucun fichier")
         elif count == 1:
-            self.file_count_label.setText("1 file")
+            self.file_count_label.setText("1 fichier")
         else:
             self.file_count_label.setText(f"{count} files")
             
@@ -486,7 +503,7 @@ class StatusIndicator(QFrame):
         self.icon_label.setFont(QFont("Arial", 20))  # PLUS PETIT
         
         # Texte plus petit
-        self.status_label = QLabel("Ready à analyze")
+        self.status_label = QLabel("Prêt à analyser")
         self.status_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))  # PLUS PETIT
         self.status_label.setStyleSheet("color: black; font-weight: bold;")
         
@@ -552,7 +569,7 @@ class StatsCounter(QFrame):
         layout.setSpacing(20)
 
         # Title
-        title_label = QLabel("📊 Results:")
+        title_label = QLabel("📊 Résultats :")
         title_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #424242;")
         layout.addWidget(title_label)
@@ -563,7 +580,7 @@ class StatsCounter(QFrame):
         dup_layout.setContentsMargins(0, 0, 0, 0)
         dup_layout.setSpacing(2)
 
-        dup_label = QLabel("Duplicates")
+        dup_label = QLabel("Doublons")
         dup_label.setFont(QFont("Arial", 8))
         dup_label.setStyleSheet("color: #757575;")
 
@@ -588,7 +605,7 @@ class StatsCounter(QFrame):
         subseq_layout.setContentsMargins(0, 0, 0, 0)
         subseq_layout.setSpacing(2)
 
-        subseq_label = QLabel("Subsequences")
+        subseq_label = QLabel("Sous-séquences")
         subseq_label.setFont(QFont("Arial", 8))
         subseq_label.setStyleSheet("color: #757575;")
 
@@ -644,13 +661,13 @@ class HashDebugger(QFrame):
         layout.setSpacing(12)
 
         # Title
-        title_label = QLabel("🔬 Hash Debugging Tool")
+        title_label = QLabel("🔬 Outil de débogage de hash")
         title_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #B8860B; border: none; padding: 0;")
         layout.addWidget(title_label)
 
         # Description
-        desc_label = QLabel("Manually calculate and compare video hashes for debugging")
+        desc_label = QLabel("Calculer manuellement et comparer les hashs vidéo pour le débogage")
         desc_label.setFont(QFont("Arial", 9))
         desc_label.setStyleSheet("color: #666; border: none; padding: 0;")
         desc_label.setWordWrap(True)
@@ -659,7 +676,7 @@ class HashDebugger(QFrame):
         # File selection area
         file_selection_layout = QHBoxLayout()
 
-        self.select_btn = QPushButton("📁 Select Video(s)")
+        self.select_btn = QPushButton("📁 Sélectionner une/des vidéo(s)")
         self.select_btn.setMinimumHeight(32)
         self.select_btn.clicked.connect(self._select_files)
         self.select_btn.setStyleSheet("""
@@ -677,7 +694,7 @@ class HashDebugger(QFrame):
         """)
         file_selection_layout.addWidget(self.select_btn)
 
-        self.clear_btn = QPushButton("🗑️ Clear")
+        self.clear_btn = QPushButton("🗑️ Effacer")
         self.clear_btn.setMinimumHeight(32)
         self.clear_btn.clicked.connect(self._clear_files)
         self.clear_btn.setStyleSheet("""
@@ -702,7 +719,7 @@ class HashDebugger(QFrame):
         self.files_text = QTextEdit()
         self.files_text.setReadOnly(True)
         self.files_text.setMaximumHeight(80)
-        self.files_text.setPlaceholderText("No files selected")
+        self.files_text.setPlaceholderText("Aucun fichier sélectionné")
         self.files_text.setStyleSheet("""
             QTextEdit {
                 background-color: white;
@@ -716,7 +733,7 @@ class HashDebugger(QFrame):
         layout.addWidget(self.files_text)
 
         # Calculate button
-        self.calculate_btn = QPushButton("⚡ Calculate Hashes")
+        self.calculate_btn = QPushButton("⚡ Calculer les hashs")
         self.calculate_btn.setMinimumHeight(36)
         self.calculate_btn.clicked.connect(self._calculate_hashes)
         self.calculate_btn.setEnabled(False)
@@ -740,7 +757,7 @@ class HashDebugger(QFrame):
         layout.addWidget(self.calculate_btn)
 
         # Results display
-        results_label = QLabel("Results:")
+        results_label = QLabel("Résultats :")
         results_label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         results_label.setStyleSheet("color: #333; border: none; padding: 0;")
         layout.addWidget(results_label)
@@ -748,7 +765,7 @@ class HashDebugger(QFrame):
         self.results_text = QTextEdit()
         self.results_text.setReadOnly(True)
         self.results_text.setMinimumHeight(200)
-        self.results_text.setPlaceholderText("Hash results will appear here")
+        self.results_text.setPlaceholderText("Les résultats de hash apparaîtront ici")
         self.results_text.setStyleSheet("""
             QTextEdit {
                 background-color: white;
@@ -771,7 +788,7 @@ class HashDebugger(QFrame):
 
         files, _ = QFileDialog.getOpenFileNames(
             self,
-            "Select Video Files (1-2 videos)",
+            "Sélectionner des fichiers vidéo (1-2 vidéos)",
             "",
             "Video Files (*.mp4 *.avi *.mkv *.mov *.wmv *.flv *.webm);;All Files (*.*)"
         )
@@ -801,7 +818,7 @@ class HashDebugger(QFrame):
     def _calculate_hashes(self):
         """Calculate hashes for selected files."""
         if not self.video_hasher:
-            self.results_text.setPlainText("ERROR: No video hasher available")
+            self.results_text.setPlainText("ERREUR : Aucun hasher vidéo disponible")
             return
 
         if not self.selected_files:
@@ -815,7 +832,7 @@ class HashDebugger(QFrame):
         results = []
 
         results.append("=" * 70)
-        results.append("HASH CALCULATION RESULTS")
+        results.append("RÉSULTATS DU CALCUL DE HASH")
         results.append("=" * 70)
         results.append(f"Hash Method: {self.video_hasher.method}")
         results.append("")
@@ -837,7 +854,7 @@ class HashDebugger(QFrame):
                 if video_hash is not None:
                     self.hash_results[file_path] = video_hash
 
-                    results.append(f"✓ Hash calculated successfully")
+                    results.append(f"✓ Hash calculé avec succès")
                     results.append(f"  Duration: {duration:.2f}s")
                     results.append(f"  Calculation time: {calc_time:.3f}s")
                     results.append(f"  Hash shape: {video_hash.shape}")
@@ -856,7 +873,7 @@ class HashDebugger(QFrame):
                         else:
                             results.append(f"    Frame {j:2d}: {frame_hash}")
                 else:
-                    results.append(f"✗ Failed to calculate hash")
+                    results.append(f"✗ Échec du calcul du hash")
                     logger.error(f"Hash calculation failed for {file_path}")
 
             except Exception as e:
@@ -866,7 +883,7 @@ class HashDebugger(QFrame):
         # If we have 2 files, compare them
         if len(self.selected_files) == 2 and len(self.hash_results) == 2:
             results.append(f"\n{'=' * 70}")
-            results.append("COMPARISON RESULTS")
+            results.append("RÉSULTATS DE COMPARAISON")
             results.append(f"{'=' * 70}")
 
             try:
@@ -881,18 +898,18 @@ class HashDebugger(QFrame):
                 results.append(f"")
 
                 if similarity >= 90:
-                    results.append("🔴 VERY HIGH similarity - Likely duplicates")
+                    results.append("🔴 Similarité TRÈS ÉLEVÉE - Doublons probables")
                 elif similarity >= 70:
-                    results.append("🟡 MEDIUM similarity - Possible related content")
+                    results.append("🟡 Similarité MOYENNE - Contenu potentiellement lié")
                 else:
-                    results.append("🟢 LOW similarity - Different videos")
+                    results.append("🟢 Similarité FAIBLE - Vidéos différentes")
 
                 # Frame-by-frame comparison
                 hash1 = self.hash_results[file1]
                 hash2 = self.hash_results[file2]
 
                 results.append(f"\n{'─' * 70}")
-                results.append("FRAME-BY-FRAME COMPARISON (first 10 frames)")
+                results.append("COMPARAISON FRAME PAR FRAME (10 premiers frames)")
                 results.append(f"{'─' * 70}")
 
                 min_frames = min(len(hash1), len(hash2))
@@ -910,7 +927,7 @@ class HashDebugger(QFrame):
                 logger.error(f"Error comparing videos: {e}")
 
         results.append(f"\n{'=' * 70}")
-        results.append("END OF RESULTS")
+        results.append("FIN DES RÉSULTATS")
         results.append(f"{'=' * 70}")
 
         self.results_text.setPlainText("\n".join(results))
@@ -929,7 +946,7 @@ class FrameSelectorDialog(QDialog):
         self.total_frames = 0
         self.fps = 0
 
-        self.setWindowTitle(f"Select Starting Frame - {os.path.basename(video_path)}")
+        self.setWindowTitle(f"Sélectionner l'image de départ - {os.path.basename(video_path)}")
         self.setModal(True)
         self.resize(900, 700)
 
@@ -971,9 +988,9 @@ class FrameSelectorDialog(QDialog):
 
         # Frame info
         info_layout = QHBoxLayout()
-        self.frame_label = QLabel("Frame: 0")
+        self.frame_label = QLabel("Image : 0")
         self.frame_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
-        self.time_label = QLabel("Time: 0.00s")
+        self.time_label = QLabel("Temps : 0,00s")
         self.time_label.setFont(QFont("Arial", 11))
         info_layout.addWidget(self.frame_label)
         info_layout.addWidget(self.time_label)
@@ -991,7 +1008,7 @@ class FrameSelectorDialog(QDialog):
         # Control buttons
         controls_layout = QHBoxLayout()
 
-        self.play_btn = QPushButton("▶ Play")
+        self.play_btn = QPushButton("▶ Lire")
         self.play_btn.setMinimumHeight(36)
         self.play_btn.clicked.connect(self._toggle_play)
         self.play_btn.setStyleSheet("""
@@ -1008,7 +1025,7 @@ class FrameSelectorDialog(QDialog):
             }
         """)
 
-        prev_btn = QPushButton("◀ Previous")
+        prev_btn = QPushButton("◀ Précédent")
         prev_btn.setMinimumHeight(36)
         prev_btn.clicked.connect(self._prev_frame)
         prev_btn.setStyleSheet("""
@@ -1024,7 +1041,7 @@ class FrameSelectorDialog(QDialog):
             }
         """)
 
-        next_btn = QPushButton("Next ▶")
+        next_btn = QPushButton("Suivant ▶")
         next_btn.setMinimumHeight(36)
         next_btn.clicked.connect(self._next_frame)
         next_btn.setStyleSheet("""
@@ -1049,7 +1066,7 @@ class FrameSelectorDialog(QDialog):
         # Action buttons
         action_layout = QHBoxLayout()
 
-        confirm_btn = QPushButton("✓ Confirm This Frame")
+        confirm_btn = QPushButton("✓ Confirmer cette image")
         confirm_btn.setMinimumHeight(44)
         confirm_btn.clicked.connect(self.accept)
         confirm_btn.setStyleSheet("""
@@ -1067,7 +1084,7 @@ class FrameSelectorDialog(QDialog):
             }
         """)
 
-        cancel_btn = QPushButton("✗ Cancel")
+        cancel_btn = QPushButton("✗ Annuler")
         cancel_btn.setMinimumHeight(44)
         cancel_btn.clicked.connect(self.reject)
         cancel_btn.setStyleSheet("""
@@ -1125,9 +1142,9 @@ class FrameSelectorDialog(QDialog):
             self.video_label.setPixmap(pixmap)
 
         # Update labels
-        self.frame_label.setText(f"Frame: {frame_num} / {self.total_frames}")
+        self.frame_label.setText(f"Image : {frame_num} / {self.total_frames}")
         time_sec = frame_num / self.fps if self.fps > 0 else 0
-        self.time_label.setText(f"Time: {time_sec:.2f}s")
+        self.time_label.setText(f"Temps : {time_sec:.2f}s")
 
         # Update slider without triggering signal
         self.frame_slider.blockSignals(True)
@@ -1147,7 +1164,7 @@ class FrameSelectorDialog(QDialog):
             interval = int(1000 / self.fps) if self.fps > 0 else 33
             self.play_timer.start(interval)
         else:
-            self.play_btn.setText("▶ Play")
+            self.play_btn.setText("▶ Lire")
             self.play_timer.stop()
 
     def _next_frame(self):
@@ -1182,7 +1199,7 @@ class ResultsDialog(QDialog):
         super().__init__(parent)
         self.results_text = results_text
 
-        self.setWindowTitle("Hash Debugging Results")
+        self.setWindowTitle("Résultats du débogage de hash")
         self.setModal(False)  # Allow interaction with main window
         self.resize(1000, 700)
 
@@ -1194,13 +1211,13 @@ class ResultsDialog(QDialog):
         layout.setSpacing(12)
 
         # Title
-        title = QLabel("📊 Hash Debugging Results - Ready to Copy/Paste")
+        title = QLabel("📊 Résultats du débogage de hash - Prêt à copier/coller")
         title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         title.setStyleSheet("color: #1E3A8A; padding: 8px;")
         layout.addWidget(title)
 
         # Instructions
-        instructions = QLabel("Select all (Ctrl+A) and copy (Ctrl+C) to share these results")
+        instructions = QLabel("Sélectionner tout (Ctrl+A) et copier (Ctrl+C) pour partager ces résultats")
         instructions.setFont(QFont("Arial", 9))
         instructions.setStyleSheet("color: #64748B; padding: 4px;")
         layout.addWidget(instructions)
@@ -1225,7 +1242,7 @@ class ResultsDialog(QDialog):
         # Buttons
         button_layout = QHBoxLayout()
 
-        copy_btn = QPushButton("📋 Copy to Clipboard")
+        copy_btn = QPushButton("📋 Copier dans le presse-papiers")
         copy_btn.setMinimumHeight(40)
         copy_btn.clicked.connect(self._copy_to_clipboard)
         copy_btn.setStyleSheet("""
@@ -1243,7 +1260,7 @@ class ResultsDialog(QDialog):
             }
         """)
 
-        select_all_btn = QPushButton("✓ Select All")
+        select_all_btn = QPushButton("✓ Sélectionner tout")
         select_all_btn.setMinimumHeight(40)
         select_all_btn.clicked.connect(self.text_display.selectAll)
         select_all_btn.setStyleSheet("""
@@ -1261,7 +1278,7 @@ class ResultsDialog(QDialog):
             }
         """)
 
-        close_btn = QPushButton("✗ Close")
+        close_btn = QPushButton("✗ Fermer")
         close_btn.setMinimumHeight(40)
         close_btn.clicked.connect(self.accept)
         close_btn.setStyleSheet("""
@@ -1319,13 +1336,13 @@ class HashDebuggerV2(QFrame):
         main_layout.setSpacing(16)
 
         # Title
-        title_label = QLabel("🎬 Interactive Hash Debugger")
+        title_label = QLabel("🎬 Débogeur de hash interactif")
         title_label.setFont(QFont("Arial", 13, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #1E3A8A; border: none;")
         main_layout.addWidget(title_label)
 
         # Description
-        desc_label = QLabel("Add videos, then start the debug session. You'll visually select the starting frame for each video, and see a comparison table.")
+        desc_label = QLabel("Ajouter des vidéos, puis démarrer la session de débogage. Vous sélectionnerez visuellement l'image de départ pour chaque vidéo et verrez un tableau de comparaison.")
         desc_label.setFont(QFont("Arial", 9))
         desc_label.setStyleSheet("color: #475569; border: none;")
         desc_label.setWordWrap(True)
@@ -1334,7 +1351,7 @@ class HashDebuggerV2(QFrame):
         # Video selection
         select_layout = QHBoxLayout()
 
-        self.add_video_btn = QPushButton("➕ Add Video")
+        self.add_video_btn = QPushButton("➕ Ajouter une vidéo")
         self.add_video_btn.setMinimumHeight(36)
         self.add_video_btn.clicked.connect(self._add_video)
         self.add_video_btn.setStyleSheet("""
@@ -1352,7 +1369,7 @@ class HashDebuggerV2(QFrame):
         """)
         select_layout.addWidget(self.add_video_btn)
 
-        self.clear_all_btn = QPushButton("🗑️ Clear All")
+        self.clear_all_btn = QPushButton("🗑️ Effacer tout")
         self.clear_all_btn.setMinimumHeight(36)
         self.clear_all_btn.clicked.connect(self._clear_all)
         self.clear_all_btn.setStyleSheet("""
@@ -1395,7 +1412,7 @@ class HashDebuggerV2(QFrame):
         main_layout.addWidget(scroll_area)
 
         # Start Debug Session button
-        self.start_btn = QPushButton("🎬 Start Debug Session")
+        self.start_btn = QPushButton("🎬 Démarrer la session de débogage")
         self.start_btn.setMinimumHeight(50)
         self.start_btn.clicked.connect(self._start_debug_session)
         self.start_btn.setEnabled(False)
@@ -1419,7 +1436,7 @@ class HashDebuggerV2(QFrame):
         main_layout.addWidget(self.start_btn)
 
         # Info label
-        info_label = QLabel("💡 Click the button above to start the debug session.\nYou'll select frames visually, then see results in a new window.")
+        info_label = QLabel("💡 Cliquez sur le bouton ci-dessus pour démarrer la session de débogage.\nVous sélectionnerez les images visuellement, puis verrez les résultats dans une nouvelle fenêtre.")
         info_label.setFont(QFont("Arial", 9))
         info_label.setStyleSheet("color: #64748B; border: none; padding: 8px;")
         info_label.setWordWrap(True)
@@ -1443,7 +1460,7 @@ class HashDebuggerV2(QFrame):
         # Allow multiple selection
         file_paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Select Video File(s) - Multiple selection allowed",
+            "Sélectionner un/des fichier(s) vidéo - Sélection multiple autorisée",
             last_folder,
             "Video Files (*.mp4 *.avi *.mkv *.mov *.wmv *.flv *.webm);;All Files (*.*)"
         )
@@ -1520,7 +1537,7 @@ class HashDebuggerV2(QFrame):
         action_layout = QHBoxLayout()
 
         # Status label (will be updated after frame selection)
-        status_label = QLabel("⏳ Waiting for debug session...")
+        status_label = QLabel("⏳ En attente de la session de débogage...")
         status_label.setStyleSheet("color: #F59E0B; border: none; font-weight: bold;")
         action_layout.addWidget(status_label)
 
@@ -1595,7 +1612,7 @@ class HashDebuggerV2(QFrame):
 
             # Update status
             widget = video['widget']
-            widget.status_label.setText(f"🎬 Selecting starting frame...")
+            widget.status_label.setText(f"🎬 Sélection de l'image de départ...")
             widget.status_label.setStyleSheet("color: #3B82F6; border: none; font-weight: bold;")
             QApplication.processEvents()  # Force UI update
 
@@ -1610,17 +1627,17 @@ class HashDebuggerV2(QFrame):
                     video['start_frame'] = start_frame
 
                     # Update status
-                    widget.status_label.setText(f"✓ Frame {start_frame} selected")
+                    widget.status_label.setText(f"✓ Image {start_frame} sélectionnée")
                     widget.status_label.setStyleSheet("color: #10B981; border: none; font-weight: bold;")
                 else:
                     # User cancelled - abort the session
-                    widget.status_label.setText("✗ Session cancelled")
+                    widget.status_label.setText("✗ Session annulée")
                     widget.status_label.setStyleSheet("color: #EF4444; border: none; font-weight: bold;")
 
                     # Reset all previous statuses
                     for i in range(idx - 1):
                         prev_widget = self.video_data[i]['widget']
-                        prev_widget.status_label.setText("⏳ Waiting for debug session...")
+                        prev_widget.status_label.setText("⏳ En attente de la session de débogage...")
                         prev_widget.status_label.setStyleSheet("color: #F59E0B; border: none; font-weight: bold;")
 
                     logger.info("Debug session cancelled by user")
@@ -1637,7 +1654,7 @@ class HashDebuggerV2(QFrame):
 
         results = []
         results.append("=" * 100)
-        results.append("HASH DEBUGGING TABLE - COPY/PASTE READY")
+        results.append("TABLEAU DE DÉBOGAGE DE HASH - PRÊT À COPIER/COLLER")
         results.append("=" * 100)
         results.append(f"Hash Method: {self.video_hasher.method}")
         results.append(f"Number of videos: {len(self.video_data)}")
@@ -1653,7 +1670,7 @@ class HashDebuggerV2(QFrame):
 
             # Update status
             widget = video['widget']
-            widget.status_label.setText(f"⚡ Calculating hashes...")
+            widget.status_label.setText(f"⚡ Calcul des hashs...")
             widget.status_label.setStyleSheet("color: #8B5CF6; border: none; font-weight: bold;")
             QApplication.processEvents()
 
@@ -1668,8 +1685,8 @@ class HashDebuggerV2(QFrame):
                 cap = cv2.VideoCapture(file_path)
 
                 if not cap.isOpened():
-                    results.append("✗ ERROR: Cannot open video")
-                    widget.status_label.setText("✗ Error opening video")
+                    results.append("✗ ERREUR : Impossible d'ouvrir la vidéo")
+                    widget.status_label.setText("✗ Erreur lors de l'ouverture de la vidéo")
                     widget.status_label.setStyleSheet("color: #EF4444; border: none; font-weight: bold;")
                     continue
 
@@ -1710,10 +1727,10 @@ class HashDebuggerV2(QFrame):
                         formatted_bits = ' '.join([bits[j:j+8] for j in range(0, 64, 8)])
                         results.append(f"{frame_num:5d} | {formatted_bits}")
 
-                    widget.status_label.setText("✓ Hashes calculated")
+                    widget.status_label.setText("✓ Hashs calculés")
                     widget.status_label.setStyleSheet("color: #10B981; border: none; font-weight: bold;")
                 else:
-                    widget.status_label.setText("✗ Hash calculation incomplete")
+                    widget.status_label.setText("✗ Calcul de hash incomplet")
                     widget.status_label.setStyleSheet("color: #EF4444; border: none; font-weight: bold;")
 
             except Exception as e:
@@ -1725,7 +1742,7 @@ class HashDebuggerV2(QFrame):
         # Comparison section if we have multiple videos
         if len(all_hashes) >= 2:
             results.append(f"\n{'=' * 100}")
-            results.append("FRAME-BY-FRAME COMPARISON MATRIX")
+            results.append("MATRICE DE COMPARAISON FRAME PAR FRAME")
             results.append(f"{'=' * 100}")
 
             video_names = list(all_hashes.keys())
@@ -1760,9 +1777,9 @@ class HashDebuggerV2(QFrame):
                     results.append(f"\nAverage similarity: {avg_similarity:.2f}%")
 
         results.append(f"\n{'=' * 100}")
-        results.append("END OF TABLE")
+        results.append("FIN DU TABLEAU")
         results.append(f"{'=' * 100}")
-        results.append("\nYou can copy/paste this entire table to share for debugging.")
+        results.append("\nVous pouvez copier/coller ce tableau entier pour partager à des fins de débogage.")
 
         # Step 3: Open results dialog
         results_text = "\n".join(results)
@@ -1795,15 +1812,15 @@ class AudioFingerprintDebugger(QFrame):
         main_layout.setSpacing(16)
 
         # Title
-        title_label = QLabel("🎵 Audio Fingerprint Debugger (Scene Detection)")
+        title_label = QLabel("🎵 Débogeur d'empreinte audio (Détection de scène)")
         title_label.setFont(QFont("Arial", 13, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #C2410C; border: none;")
         main_layout.addWidget(title_label)
 
         # Description
         desc_label = QLabel(
-            "Test audio fingerprinting for scene detection. Add 2+ videos, "
-            "extract audio fingerprints, and see similarity scores."
+            "Tester l'empreinte audio pour la détection de scène. Ajouter 2+ vidéos, "
+            "extraire les empreintes audio et voir les scores de similitude."
         )
         desc_label.setFont(QFont("Arial", 9))
         desc_label.setStyleSheet("color: #78350F; border: none;")
@@ -1812,14 +1829,14 @@ class AudioFingerprintDebugger(QFrame):
 
         # Precision mode selector
         mode_layout = QHBoxLayout()
-        mode_label = QLabel("Precision Mode:")
+        mode_label = QLabel("Mode de précision :")
         mode_label.setStyleSheet("border: none; color: #78350F;")
         mode_layout.addWidget(mode_label)
 
         self.precision_combo = QComboBox()
-        self.precision_combo.addItem("🎯 Maximum (99.9%, slowest)", "maximum")
-        self.precision_combo.addItem("⚖️ Balanced (99%, recommended)", "balanced")
-        self.precision_combo.addItem("⚡ Fast (95%, fastest)", "fast")
+        self.precision_combo.addItem("🎯 Maximum (99,9%, plus lent)", "maximum")
+        self.precision_combo.addItem("⚖️ Équilibré (99%, recommandé)", "balanced")
+        self.precision_combo.addItem("⚡ Rapide (95%, plus rapide)", "fast")
         self.precision_combo.setCurrentIndex(1)  # Balanced
         self.precision_combo.setStyleSheet("""
             QComboBox {
@@ -1836,7 +1853,7 @@ class AudioFingerprintDebugger(QFrame):
         # Video selection
         select_layout = QHBoxLayout()
 
-        self.add_video_btn = QPushButton("➕ Add Video")
+        self.add_video_btn = QPushButton("➕ Ajouter une vidéo")
         self.add_video_btn.setMinimumHeight(36)
         self.add_video_btn.clicked.connect(self._add_video)
         self.add_video_btn.setStyleSheet("""
@@ -1890,7 +1907,7 @@ class AudioFingerprintDebugger(QFrame):
         main_layout.addWidget(self.video_list)
 
         # Extract fingerprints button
-        self.extract_btn = QPushButton("🎵 Extract Audio Fingerprints")
+        self.extract_btn = QPushButton("🎵 Extraire les empreintes audio")
         self.extract_btn.setMinimumHeight(44)
         self.extract_btn.clicked.connect(self._extract_fingerprints)
         self.extract_btn.setEnabled(False)
@@ -1914,7 +1931,7 @@ class AudioFingerprintDebugger(QFrame):
         main_layout.addWidget(self.extract_btn)
 
         # Compare button
-        self.compare_btn = QPushButton("📊 Compare Fingerprints")
+        self.compare_btn = QPushButton("📊 Comparer les empreintes")
         self.compare_btn.setMinimumHeight(44)
         self.compare_btn.clicked.connect(self._compare_fingerprints)
         self.compare_btn.setEnabled(False)
@@ -1939,8 +1956,8 @@ class AudioFingerprintDebugger(QFrame):
 
         # Info label
         info_label = QLabel(
-            "💡 Add 2+ videos → Extract fingerprints → Compare\n"
-            "Requires: fpcalc (brew install chromaprint on Mac)"
+            "💡 Ajouter 2+ vidéos → Extraire les empreintes → Comparer\n"
+            "Requiert : fpcalc (brew install chromaprint sur Mac)"
         )
         info_label.setFont(QFont("Arial", 9))
         info_label.setStyleSheet("color: #78350F; border: none; padding: 8px;")
@@ -1954,7 +1971,7 @@ class AudioFingerprintDebugger(QFrame):
 
         file_paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Select Video File(s)",
+            "Sélectionner un/des fichier(s) vidéo",
             "",
             "Videos (*.mp4 *.avi *.mkv *.mov *.wmv *.flv *.m4v);;All files (*.*)"
         )
@@ -1999,8 +2016,8 @@ class AudioFingerprintDebugger(QFrame):
         if not self.scene_detector.fpcalc_available:
             QMessageBox.critical(
                 self,
-                "fpcalc Not Found",
-                "Cannot extract audio fingerprints!\n\n"
+                "fpcalc introuvable",
+                "Impossible d'extraire les empreintes audio !\n\n"
                 "Install chromaprint-tools:\n"
                 "• macOS: brew install chromaprint\n"
                 "• Linux: sudo apt install chromaprint-tools\n"
@@ -2009,7 +2026,7 @@ class AudioFingerprintDebugger(QFrame):
             return
 
         # Progress dialog
-        progress = QProgressDialog("Extracting audio fingerprints...", "Cancel", 0, len(self.videos), self)
+        progress = QProgressDialog("Extraction des empreintes audio...", "Annuler", 0, len(self.videos), self)
         progress.setWindowModality(Qt.WindowModality.WindowModal)
         progress.setMinimumDuration(0)
 
@@ -2054,12 +2071,12 @@ class AudioFingerprintDebugger(QFrame):
         # Build comparison table
         results = []
         results.append("=" * 100)
-        results.append("AUDIO FINGERPRINT COMPARISON TABLE (Scene Detection)")
+        results.append("TABLEAU DE COMPARAISON D'EMPREINTE AUDIO (Détection de scène)")
         results.append("=" * 100)
         results.append("")
 
         # List videos
-        results.append("VIDEOS:")
+        results.append("VIDÉOS :")
         for i, video in enumerate(self.videos):
             if video['fingerprint']:
                 results.append(f"  [{i}] {os.path.basename(video['path'])}")
@@ -2069,8 +2086,8 @@ class AudioFingerprintDebugger(QFrame):
         results.append("")
 
         # Pairwise comparison
-        results.append("PAIRWISE COMPARISONS:")
-        results.append(f"{'Video A':<40} | {'Video B':<40} | {'Similarity':>10} | {'Scene?':>8}")
+        results.append("COMPARAISONS PAR PAIRES :")
+        results.append(f"{'Vidéo A':<40} | {'Vidéo B':<40} | {'Similarité':>10} | {'Scène ?':>8}")
         results.append("-" * 100)
 
         for i in range(len(self.videos)):
@@ -2115,7 +2132,7 @@ class AudioFingerprintDebugger(QFrame):
 
         # Show results dialog
         dialog = QDialog(self)
-        dialog.setWindowTitle("Audio Fingerprint Comparison Results")
+        dialog.setWindowTitle("Résultats de comparaison d'empreinte audio")
         dialog.setMinimumSize(900, 600)
 
         layout = QVBoxLayout(dialog)
@@ -2126,7 +2143,7 @@ class AudioFingerprintDebugger(QFrame):
         text_edit.setFont(QFont("Courier", 10))
         layout.addWidget(text_edit)
 
-        close_btn = QPushButton("Close")
+        close_btn = QPushButton("Fermer")
         close_btn.clicked.connect(dialog.close)
         layout.addWidget(close_btn)
 

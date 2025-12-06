@@ -33,27 +33,31 @@ class VideoPreviewWidget(QWidget):
         
     def setup_ui(self):
         """Configure the user interface"""
+        from PyQt6.QtWidgets import QSizePolicy
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.setSpacing(5)
+        layout.setContentsMargins(0, 0, 0, 0)  # Marges supprimées
+        layout.setSpacing(0)  # Espacement supprimé
 
         # Main preview area
         self.preview_label = QLabel()
-        self.preview_label.setMinimumSize(350, 280)
+        self.preview_label.setMinimumHeight(648)  # Augmenté de 50px (598 → 648)
+        self.preview_label.setMaximumHeight(648)  # Force la hauteur maximale
+        self.preview_label.setFixedHeight(648)  # Force la hauteur fixe augmentée
+        # Pas de contrainte de largeur - prend toute la largeur disponible
+        self.preview_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        # Pas de bordure sur la vidéo - seul le container parent (zone 3/4) est entouré
         self.preview_label.setStyleSheet("""
             QLabel {
-                border: 2px solid #DDDDDD;
-                border-radius: 8px;
+                border: none;
                 background-color: #000000;
             }
         """)
         self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_label.setText("Loading...")
+        self.preview_label.setScaledContents(True)  # Scale l'image pour fitter
+        self.preview_label.setText("Chargement...")
         layout.addWidget(self.preview_label)
 
-        # Compact information section
-        info_frame = self.create_info_section()
-        layout.addWidget(info_frame)
+        # Section d'info supprimée - les infos sont affichées au-dessus par le parent
         
     def create_info_section(self):
         """Create the information section"""
@@ -107,24 +111,20 @@ class VideoPreviewWidget(QWidget):
                 self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
                 self.duration = self.total_frames / self.fps if self.fps > 0 else 0
 
-                # Update info display
-                duration_text = self.format_duration(self.duration)
-                self.info_label.setText(f"{size_text} • {duration_text}")
+                # Info label supprimé - pas besoin de mettre à jour
 
                 # Show frame at 10% from the start
                 frame_at_10_percent = int(self.total_frames * 0.1) if self.total_frames > 0 else 0
                 self.show_frame(frame_at_10_percent)
 
             else:
-                self.info_label.setText(f"{size_text} • Read error")
-                self.preview_label.setText("❌ Cannot open")
+                self.preview_label.setText("❌ Impossible d'ouvrir")
 
             cv2.setLogLevel(1)
 
         except Exception as e:
             logger.error(f"Error loading {self.video_path}: {e}")
-            self.info_label.setText("Error")
-            self.preview_label.setText("❌ Loading error")
+            self.preview_label.setText("❌ Erreur de chargement")
     
     def show_frame(self, frame_number):
         """Display a specific frame"""
@@ -147,13 +147,13 @@ class VideoPreviewWidget(QWidget):
                     self.preview_label.setPixmap(pixmap)
                     self.frame_loaded.emit(frame_number)
                 else:
-                    self.preview_label.setText("Conversion error")
+                    self.preview_label.setText("Erreur de conversion")
             else:
-                self.preview_label.setText(f"Frame {frame_number} unavailable")
+                self.preview_label.setText(f"Image {frame_number} non disponible")
 
         except Exception as e:
             logger.error(f"Error displaying frame {frame_number}: {e}")
-            self.preview_label.setText("Display error")
+            self.preview_label.setText("Erreur d'affichage")
     
     def seek_to_position(self, position):
         """Seek to a relative position (0.0 to 1.0)"""

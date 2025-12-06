@@ -63,7 +63,7 @@ class SubsequenceComparisonDialog(QDialog):
         # Load video properties
         self._load_video_properties()
 
-        self.setWindowTitle(f"Subsequence Comparison - Match: {match_info.get('match_ratio', 0)*100:.1f}%")
+        self.setWindowTitle(f"Comparaison de sous-séquence - Correspondance : {match_info.get('match_ratio', 0)*100:.1f}%")
         self.setWindowState(Qt.WindowState.WindowMaximized)
         self.setModal(True)
 
@@ -150,7 +150,7 @@ class SubsequenceComparisonDialog(QDialog):
         layout.setSpacing(10)
 
         # Title
-        title = QLabel("🎬 Subsequence Detected")
+        title = QLabel("🎬 Sous-séquence détectée")
         title.setFont(QFont("Arial", 14, QFont.Weight.Bold))
         title.setStyleSheet("color: #1976D2; background: transparent; border: none;")
         layout.addWidget(title, 0, 0, 1, 3)
@@ -163,7 +163,7 @@ class SubsequenceComparisonDialog(QDialog):
 
         # Start position in long video
         start_time = self.start_frame_idx / self.long_fps if self.long_fps > 0 else 0
-        position_label = QLabel(f"Starts at: {self._format_time(start_time)} in long video")
+        position_label = QLabel(f"Commence à : {self._format_time(start_time)} dans la longue vidéo")
         position_label.setStyleSheet("color: #666; background: transparent; border: none;")
         layout.addWidget(position_label, 1, 1)
 
@@ -242,7 +242,7 @@ class SubsequenceComparisonDialog(QDialog):
         layout.setSpacing(10)
 
         # Label
-        label = QLabel("🔍 Navigate in matched section:")
+        label = QLabel("🔍 Naviguer dans la section correspondante :")
         label.setFont(QFont("Arial", 10, QFont.Weight.Bold))
         layout.addWidget(label)
 
@@ -257,7 +257,7 @@ class SubsequenceComparisonDialog(QDialog):
         layout.addWidget(self.position_slider)
 
         # Position info
-        self.position_info_label = QLabel("Position: 0%")
+        self.position_info_label = QLabel("Position : 0%")
         self.position_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.position_info_label)
 
@@ -278,25 +278,25 @@ class SubsequenceComparisonDialog(QDialog):
         layout.setSpacing(15)
 
         # Keep short button
-        keep_short_btn = QPushButton("✅ Keep Short (Delete Long)")
+        keep_short_btn = QPushButton("✅ Conserver court (Supprimer long)")
         keep_short_btn.setMinimumHeight(45)
         keep_short_btn.setStyleSheet(self._get_button_style("#4CAF50", "#45A049"))
         keep_short_btn.clicked.connect(lambda: self.set_result("keep_short"))
 
         # Keep long button
-        keep_long_btn = QPushButton("✅ Keep Long (Delete Short)")
+        keep_long_btn = QPushButton("✅ Conserver long (Supprimer court)")
         keep_long_btn.setMinimumHeight(45)
         keep_long_btn.setStyleSheet(self._get_button_style("#2196F3", "#1976D2"))
         keep_long_btn.clicked.connect(lambda: self.set_result("keep_long"))
 
         # Keep both button
-        keep_both_btn = QPushButton("📂 Keep Both")
+        keep_both_btn = QPushButton("📂 Conserver les deux")
         keep_both_btn.setMinimumHeight(45)
         keep_both_btn.setStyleSheet(self._get_button_style("#FF9800", "#F57C00"))
         keep_both_btn.clicked.connect(lambda: self.set_result("keep_both"))
 
         # Skip button
-        skip_btn = QPushButton("⏭️ Skip")
+        skip_btn = QPushButton("⏭️ Passer")
         skip_btn.setMinimumHeight(45)
         skip_btn.setStyleSheet(self._get_button_style("#9E9E9E", "#757575"))
         skip_btn.clicked.connect(lambda: self.set_result("skip"))

@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QFrame, QSlider, QProgressBar
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QEvent
 from PyQt6.QtGui import QFont
 
 # Import video widget
@@ -39,11 +39,14 @@ class ComparisonDialog(QDialog):
         # Arrange files intelligently
         self.arrange_files_by_name()
 
-        self.setWindowTitle(f"Duplicate Comparison - Similarity: {self.similarity:.1f}%")
+        self.setWindowTitle(f"Comparaison de doublons - Similarité : {self.similarity:.1f}%")
 
         # Open maximized
         self.setWindowState(Qt.WindowState.WindowMaximized)
         self.setModal(True)
+
+        # Install event filter to intercept arrow keys before child widgets
+        self.installEventFilter(self)
 
         self.setup_ui()
 
@@ -51,24 +54,39 @@ class ComparisonDialog(QDialog):
         QTimer.singleShot(500, self.show_initial_position)
 
     def arrange_files_by_name(self):
-        """Place file without numbering on the left"""
+        """Place best file on the left (no numbering, lighter file)"""
         try:
             file1_name = os.path.basename(self.file1)
             file2_name = os.path.basename(self.file2)
 
+            # Get file sizes
+            try:
+                file1_size = os.path.getsize(self.file1)
+                file2_size = os.path.getsize(self.file2)
+            except (OSError, FileNotFoundError) as e:
+                logger.warning(f"Impossible d'obtenir la taille des fichiers: {e}")
+                file1_size = file2_size = 0
+
             # Numbering/copy patterns
-            patterns = [r'\(\d+\)', r'_\d+', r' - Copy', r'Copy of ', r'Copy de ']
+            patterns = [r'\(\d+\)', r'_\d+', r' - Copy', r'Copy of ', r'Copy de ', r'copie']
 
-            file1_has_pattern = any(re.search(pattern, file1_name) for pattern in patterns)
-            file2_has_pattern = any(re.search(pattern, file2_name) for pattern in patterns)
+            file1_has_pattern = any(re.search(pattern, file1_name, re.IGNORECASE) for pattern in patterns)
+            file2_has_pattern = any(re.search(pattern, file2_name, re.IGNORECASE) for pattern in patterns)
 
-            # If only file1 has a pattern, swap
+            # Priority 1: File without numbering/copy pattern on the left
             if file1_has_pattern and not file2_has_pattern:
                 self.file1, self.file2 = self.file2, self.file1
             elif not file1_has_pattern and not file2_has_pattern:
-                # Alphabetical order if no pattern
-                if file1_name > file2_name:
+                # Priority 2: Lighter file on the left (if sizes are different)
+                if file1_size > 0 and file2_size > 0 and file1_size > file2_size:
                     self.file1, self.file2 = self.file2, self.file1
+                elif file1_size == file2_size:
+                    # Priority 3: Alphabetical order
+                    if file1_name > file2_name:
+                        self.file1, self.file2 = self.file2, self.file1
+
+            logger.info(f"Files arranged: LEFT={os.path.basename(self.file1)} ({file1_size/1024/1024:.1f}MB), "
+                       f"RIGHT={os.path.basename(self.file2)} ({file2_size/1024/1024:.1f}MB)")
 
         except Exception as e:
             logger.error(f"Error arranging files: {e}")
@@ -76,21 +94,10 @@ class ComparisonDialog(QDialog):
     def setup_ui(self):
         """Configure the interface"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(15)
+        layout.setContentsMargins(0, 0, 0, 0)  # Marges supprimées
+        layout.setSpacing(5)  # Espacement minimal
 
-        # Keyboard shortcuts help (small banner at top)
-        help_label = QLabel("💡 Shortcuts: 1=Keep A | 2=Keep B | 3=Both | S=Skip | I=Ignore | Esc=Quit | ←→=Navigate | Q/H/T=25%/50%/75% | P=Play Both | R=Re-sync")
-        help_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XXS))
-        help_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        help_label.setStyleSheet(f"""
-            background-color: {Colors.INFO_LIGHTER};
-            color: {Colors.BLACK};
-            padding: {Spacing.XS}px;
-            border-radius: {Spacing.RADIUS_SM}px;
-            border: 1px solid {Colors.INFO};
-        """)
-        layout.addWidget(help_label)
+        # Zone 1 supprimée - plus de bannière d'aide
 
         # Similarity indicator
         similarity_frame = self.create_similarity_indicator()
@@ -98,6 +105,7 @@ class ComparisonDialog(QDialog):
 
         # Main comparison area
         comparison_layout = QHBoxLayout()
+        comparison_layout.setContentsMargins(15, 0, 15, 0)  # Marges gauche/droite pour zones 3 et 4
         comparison_layout.setSpacing(30)
 
         # Video A (left)
@@ -116,9 +124,9 @@ class ComparisonDialog(QDialog):
         nav_controls = self.create_navigation_controls()
         layout.addWidget(nav_controls)
 
-        # Synchronization controls
-        sync_controls = self.create_sync_controls()
-        layout.addWidget(sync_controls)
+        # Synchronization controls - SUPPRIMÉ (zone 12 inutile)
+        # sync_controls = self.create_sync_controls()
+        # layout.addWidget(sync_controls)
 
         # Action buttons
         action_buttons = self.create_action_buttons()
@@ -127,112 +135,114 @@ class ComparisonDialog(QDialog):
     def create_similarity_indicator(self):
         """Create the similarity indicator"""
         frame = QFrame()
-        frame.setFixedHeight(60)
+        frame.setFixedHeight(20)  # Divisé par 3 (60 -> 20)
 
         # Color according to level
         if self.similarity >= 95:
-            bg_color, bar_color, text_color = Colors.SUCCESS_LIGHTER, Colors.GREEN, Colors.GREEN_DARK
-            level = "VERY HIGH"
+            text_color = Colors.GREEN_DARK
+            level = "TRÈS ÉLEVÉE"
         elif self.similarity >= 85:
-            bg_color, bar_color, text_color = Colors.WARNING_LIGHTER, Colors.ORANGE, Colors.ORANGE_DARKER
-            level = "HIGH"
+            text_color = Colors.ORANGE_DARKER
+            level = "ÉLEVÉE"
         else:
-            bg_color, bar_color, text_color = Colors.DANGER_LIGHTER, Colors.DANGER, Colors.DANGER_DARKER
-            level = "MODERATE"
+            text_color = Colors.DANGER_DARKER
+            level = "MODÉRÉE"
 
-        frame.setStyleSheet(Styles.frame(
-            bg_color=bg_color,
-            border_color=bar_color,
-            border_width=2,
-            radius=Spacing.RADIUS_MD
-        ))
+        # Pas de style de frame - juste un container transparent
+        frame.setStyleSheet("background: transparent; border: none;")
 
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(Spacing.XXL, Spacing.MD, Spacing.XXL, Spacing.MD)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        # Similarity text
-        similarity_text = QLabel(f"Similarity: {self.similarity:.1f}% ({level})")
+        # Similarity text - TEXTE SIMPLE SANS OVALE/CADRE
+        similarity_text = QLabel(f"Similarité : {self.similarity:.1f}% ({level})")
         similarity_text.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XL, QFont.Weight.Bold))
-        similarity_text.setStyleSheet(f"color: {text_color};")
-
-        # Progress bar
-        progress_bar = QProgressBar()
-        progress_bar.setMaximumWidth(250)
-        progress_bar.setMaximumHeight(28)
-        progress_bar.setValue(int(self.similarity))
-        progress_bar.setTextVisible(False)
-        progress_bar.setStyleSheet(f"""
-            QProgressBar {{
-                border: 2px solid {bar_color};
-                border-radius: 14px;
-                background-color: {Colors.GRAY_100};
-            }}
-            QProgressBar::chunk {{
-                background-color: {bar_color};
-                border-radius: 11px;
-                margin: 2px;
-            }}
+        similarity_text.setStyleSheet(f"""
+            color: {text_color};
+            background: transparent;
+            padding: 0px;
+            margin: 0px;
+            border: none;
         """)
+        similarity_text.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
 
         layout.addWidget(similarity_text)
-        layout.addStretch()
-        layout.addWidget(progress_bar)
 
         return frame
 
     def create_video_frame(self, label, video_path, color):
         """Create a frame for a video"""
         container = QFrame()
-        container.setMinimumSize(600, 650)
+        container.setMinimumSize(600, 700)  # Augmenté de 50px pour vidéo (650 → 700)
+        container.setMaximumHeight(700)  # Force la hauteur maximale
+        # Bordure colorée autour de la zone comme demandé
         container.setStyleSheet(Styles.video_frame(color))
 
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(Spacing.LG, Spacing.LG, Spacing.LG, Spacing.LG)
-        layout.setSpacing(Spacing.LG)
+        layout.setContentsMargins(10, 10, 10, 10)  # Marges forcées autour du contenu
+        layout.setSpacing(5)  # Petit espacement entre éléments
 
-        # Title
-        title = QLabel(f"VIDEO {label}")
-        title.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_LG, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet(f"color: {color}; padding: {Spacing.SM}px;")
-        title.setMaximumHeight(35)
-        layout.addWidget(title)
+        # Video label (Video A / Video B) - Centré
+        import os
+        video_label = QLabel(f"Vidéo {label}")
+        video_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_LG + 2, QFont.Weight.Bold))  # +2px
+        video_label.setMaximumHeight(14)  # Augmenté pour le texte plus grand
+        video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Centré
+        video_label.setStyleSheet(f"""
+            color: {Colors.BLACK};
+            background: transparent;
+            padding: 0px;
+            margin: 0px;
+            border: none;
+            border-radius: 0px;
+        """)
+        layout.addWidget(video_label)
+
+        # Video path - Centré, taille +4px, multi-lignes si long
+        path_label = QLabel(video_path)
+        path_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_SM + 4))  # +4px (était +2)
+        path_label.setMaximumHeight(45)  # Augmenté pour texte plus grand
+        path_label.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Centré
+        path_label.setStyleSheet(f"""
+            color: {Colors.GRAY_600};
+            background: transparent;
+            padding: 0px;
+            margin: 0px;
+            border: none;
+            border-radius: 0px;
+        """)
+        path_label.setWordWrap(True)  # Permet le retour à la ligne
+        layout.addWidget(path_label)
+
+        # Video size - Hauteur réduite, AUCUN ovale
+        try:
+            size_bytes = os.path.getsize(video_path)
+            if size_bytes >= 1_000_000_000:
+                size_str = f"{size_bytes / 1_000_000_000:.2f} GB"
+            else:
+                size_str = f"{size_bytes / 1_000_000:.2f} MB"
+        except:
+            size_str = "Taille inconnue"
+
+        size_label = QLabel(f"Taille : {size_str}")
+        size_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_SM + 4))  # +4px (était +2)
+        size_label.setMaximumHeight(14)  # Augmenté pour texte plus grand
+        size_label.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Centré
+        size_label.setStyleSheet(f"""
+            color: {Colors.GRAY_600};
+            background: transparent;
+            padding: 0px;
+            margin: 0px;
+            border: none;
+            border-radius: 0px;
+        """)
+        layout.addWidget(size_label)
 
         # Video widget
         video_widget = VideoPreviewWidget(video_path, f"Video {label}")
         layout.addWidget(video_widget)
 
-        # Selection button - determine hover/pressed colors
-        if label == "A":
-            hover_color = Colors.GREEN_DARK
-            pressed_color = hover_color
-            select_btn = QPushButton(f"✅ CHOOSE {label}")
-            select_btn.clicked.connect(lambda: self.make_choice("keep_left"))
-        else:
-            hover_color = Colors.ORANGE_DARK
-            pressed_color = Colors.ORANGE_DARKER
-            select_btn = QPushButton(f"✅ CHOOSE {label}")
-            select_btn.clicked.connect(lambda: self.make_choice("keep_right"))
-
-        select_btn.setMinimumHeight(Spacing.BUTTON_HEIGHT_LG)
-        select_btn.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_LG, QFont.Weight.Bold))
-        select_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {color};
-                color: white;
-                border: none;
-                border-radius: {Spacing.RADIUS_LG}px;
-                padding: {Spacing.LG}px;
-            }}
-            QPushButton:hover {{
-                background-color: {hover_color};
-            }}
-            QPushButton:pressed {{
-                background-color: {pressed_color};
-            }}
-        """)
-
-        layout.addWidget(select_btn)
+        # Pas de bouton de sélection sous la vidéo - supprimé comme demandé
 
         return container, video_widget
 
@@ -252,13 +262,13 @@ class ComparisonDialog(QDialog):
         layout.setSpacing(Spacing.LG)
 
         # Sync info label
-        sync_label = QLabel("🔄 Video Synchronization:")
+        sync_label = QLabel("🔄 Synchronisation vidéo :")
         sync_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD, QFont.Weight.Bold))
         sync_label.setStyleSheet(f"color: {Colors.PRIMARY_DARKER};")
         layout.addWidget(sync_label)
 
         # Play both button
-        play_both_btn = QPushButton("▶️ Play Both")
+        play_both_btn = QPushButton("▶️ Lire les deux")
         play_both_btn.setMinimumWidth(140)
         play_both_btn.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD))
         play_both_btn.clicked.connect(self.play_both_videos)
@@ -277,7 +287,7 @@ class ComparisonDialog(QDialog):
         layout.addWidget(play_both_btn)
 
         # Pause both button
-        pause_both_btn = QPushButton("⏸️ Pause Both")
+        pause_both_btn = QPushButton("⏸️ Pause les deux")
         pause_both_btn.setMinimumWidth(140)
         pause_both_btn.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD))
         pause_both_btn.clicked.connect(self.pause_both_videos)
@@ -296,7 +306,7 @@ class ComparisonDialog(QDialog):
         layout.addWidget(pause_both_btn)
 
         # Sync position button
-        sync_btn = QPushButton("🔄 Re-sync Position")
+        sync_btn = QPushButton("🔄 Re-synchroniser")
         sync_btn.setMinimumWidth(160)
         sync_btn.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD))
         sync_btn.clicked.connect(lambda: self.sync_video_position(self.position_slider.value() / 1000.0))
@@ -321,23 +331,15 @@ class ComparisonDialog(QDialog):
     def create_navigation_controls(self):
         """Create navigation controls"""
         frame = QFrame()
-        frame.setMaximumHeight(110)
-        frame.setStyleSheet(Styles.frame(
-            bg_color=Colors.GRAY_50,
-            border_color=Colors.BORDER_LIGHT,
-            border_width=2,
-            radius=Spacing.RADIUS_LG
-        ))
+        frame.setMaximumHeight(80)  # Réduit car pas de titre
+        # Pas de bordure/ovale - transparent
+        frame.setStyleSheet("background: transparent; border: none;")
 
         layout = QVBoxLayout(frame)
-        layout.setContentsMargins(Spacing.XXL, Spacing.LG, Spacing.XXL, Spacing.LG)
-        layout.setSpacing(Spacing.LG)
+        layout.setContentsMargins(Spacing.MD, Spacing.SM, Spacing.MD, Spacing.SM)
+        layout.setSpacing(Spacing.SM)
 
-        # Title
-        title = QLabel("🎹 Synchronized Navigation")
-        title.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_LG, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        # Titre supprimé comme demandé
 
         # Slider with time zones
         slider_layout = QHBoxLayout()
@@ -389,13 +391,13 @@ class ComparisonDialog(QDialog):
 
         for label, pos in [("⏮️", 0), ("25%", 0.25), ("50%", 0.5), ("75%", 0.75), ("⏭️", 1.0)]:
             btn = QPushButton(label)
-            btn.setFixedSize(70, 35)
-            btn.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD))
+            btn.setFixedSize(50, 28)  # Réduit de 70x35 à 50x28
+            btn.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_SM))  # Police plus petite
             btn.setStyleSheet(Styles.button(
                 bg_color=Colors.PRIMARY,
                 hover_color=Colors.PRIMARY_DARK,
                 pressed_color=Colors.PRIMARY_DARKER,
-                height=35,
+                height=28,
                 radius=Spacing.RADIUS_SM
             ))
             btn.clicked.connect(lambda checked, p=pos: self.seek_to_position(p))
@@ -410,23 +412,23 @@ class ComparisonDialog(QDialog):
     def create_action_buttons(self):
         """Create the 5 action buttons"""
         frame = QFrame()
-        frame.setMaximumHeight(120)
+        frame.setMaximumHeight(140)  # Augmenté pour voir boutons avec marges (110 -> 140)
         frame.setStyleSheet(Styles.frame(
             bg_color=Colors.WHITE,
             border_color=Colors.BORDER_LIGHT,
             border_width=2,
             radius=Spacing.RADIUS_LG,
-            padding=Spacing.XL
+            padding=Spacing.SM
         ))
 
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(Spacing.XXL, Spacing.XL, Spacing.XXL, Spacing.XL)
-        layout.setSpacing(Spacing.XL)
+        layout.setContentsMargins(15, 15, 15, 15)  # Marges forcées entre boutons et cadre
+        layout.setSpacing(10)  # Espacement entre boutons
 
         # Keep A button - Green
-        keep_a_btn = QPushButton("✅ KEEP A")
-        keep_a_btn.setMinimumHeight(Spacing.BUTTON_HEIGHT_LG)
-        keep_a_btn.setMinimumWidth(160)
+        keep_a_btn = QPushButton("✅ CONSERVER A (1 ou ←)")
+        keep_a_btn.setMinimumHeight(45)  # Augmenté proportionnellement
+        keep_a_btn.setMinimumWidth(180)  # Plus large pour le raccourci
         keep_a_btn.setStyleSheet(Styles.action_button(
             bg_color=Colors.SUCCESS,
             hover_color=Colors.SUCCESS_DARK,
@@ -435,9 +437,9 @@ class ComparisonDialog(QDialog):
         keep_a_btn.clicked.connect(lambda: self.make_choice("keep_left"))
 
         # Keep B button - Orange
-        keep_b_btn = QPushButton("✅ KEEP B")
-        keep_b_btn.setMinimumHeight(Spacing.BUTTON_HEIGHT_LG)
-        keep_b_btn.setMinimumWidth(160)
+        keep_b_btn = QPushButton("✅ CONSERVER B (2 ou →)")
+        keep_b_btn.setMinimumHeight(45)  # Augmenté proportionnellement
+        keep_b_btn.setMinimumWidth(180)  # Plus large pour le raccourci
         keep_b_btn.setStyleSheet(Styles.action_button(
             bg_color=Colors.ORANGE,
             hover_color=Colors.ORANGE_DARK,
@@ -446,9 +448,9 @@ class ComparisonDialog(QDialog):
         keep_b_btn.clicked.connect(lambda: self.make_choice("keep_right"))
 
         # Skip button - Blue
-        skip_btn = QPushButton("⏭️ SKIP")
-        skip_btn.setMinimumHeight(Spacing.BUTTON_HEIGHT_LG)
-        skip_btn.setMinimumWidth(160)
+        skip_btn = QPushButton("⏭️ PASSER (S)")
+        skip_btn.setMinimumHeight(45)  # Augmenté proportionnellement
+        skip_btn.setMinimumWidth(130)
         skip_btn.setStyleSheet(Styles.action_button(
             bg_color=Colors.PRIMARY,
             hover_color=Colors.PRIMARY_DARK,
@@ -457,9 +459,9 @@ class ComparisonDialog(QDialog):
         skip_btn.clicked.connect(lambda: self.make_choice("ignore_temp"))
 
         # Ignore permanently button - Red
-        ignore_btn = QPushButton("❌ IGNORE")
-        ignore_btn.setMinimumHeight(Spacing.BUTTON_HEIGHT_LG)
-        ignore_btn.setMinimumWidth(160)
+        ignore_btn = QPushButton("❌ IGNORER (I)")
+        ignore_btn.setMinimumHeight(45)  # Augmenté proportionnellement
+        ignore_btn.setMinimumWidth(130)
         ignore_btn.setStyleSheet(Styles.action_button(
             bg_color=Colors.DANGER,
             hover_color=Colors.DANGER_DARK,
@@ -468,9 +470,9 @@ class ComparisonDialog(QDialog):
         ignore_btn.clicked.connect(lambda: self.make_choice("ignore_perm"))
 
         # Quit button - Dark gray
-        quit_btn = QPushButton("🚪 QUIT")
-        quit_btn.setMinimumHeight(Spacing.BUTTON_HEIGHT_LG)
-        quit_btn.setMinimumWidth(160)
+        quit_btn = QPushButton("🚪 QUITTER (Esc)")
+        quit_btn.setMinimumHeight(45)  # Augmenté proportionnellement
+        quit_btn.setMinimumWidth(140)
         quit_btn.setStyleSheet(Styles.action_button(
             bg_color=Colors.SECONDARY,
             hover_color=Colors.SECONDARY_DARK,
@@ -608,11 +610,31 @@ class ComparisonDialog(QDialog):
         # Shorter delay for other actions
         QTimer.singleShot(200, self.accept)
 
+    def eventFilter(self, obj, event):
+        """Filter events to intercept arrow keys before child widgets"""
+        if event.type() == QEvent.Type.KeyPress:
+            key = event.key()
+            modifiers = event.modifiers()
+
+            # Intercept bare arrow keys for Tinder-style choosing
+            if modifiers == Qt.KeyboardModifier.NoModifier:
+                if key == Qt.Key.Key_Left:
+                    self.make_choice("keep_left")
+                    return True  # Event handled, don't propagate
+                elif key == Qt.Key.Key_Right:
+                    self.make_choice("keep_right")
+                    return True  # Event handled, don't propagate
+
+            # Let Ctrl+Arrow keys pass through to keyPressEvent for navigation
+
+        return super().eventFilter(obj, event)
+
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts."""
         key = event.key()
+        modifiers = event.modifiers()
 
-        # Action shortcuts
+        # Number keys for choosing
         if key == KeyboardShortcuts.COMPARISON_KEEP_LEFT:
             self.make_choice("keep_left")
         elif key == KeyboardShortcuts.COMPARISON_KEEP_RIGHT:
@@ -626,7 +648,15 @@ class ComparisonDialog(QDialog):
         elif key == KeyboardShortcuts.COMPARISON_QUIT:
             self.make_choice("quit")
 
-        # Navigation shortcuts
+        # Navigation shortcuts (with Ctrl modifier for arrow keys)
+        elif key == Qt.Key.Key_Left and modifiers == Qt.KeyboardModifier.ControlModifier:
+            # Move back 5% with Ctrl+Left
+            current = self.position_slider.value() / 1000.0
+            self.seek_to_position(max(0.0, current - 0.05))
+        elif key == Qt.Key.Key_Right and modifiers == Qt.KeyboardModifier.ControlModifier:
+            # Move forward 5% with Ctrl+Right
+            current = self.position_slider.value() / 1000.0
+            self.seek_to_position(min(1.0, current + 0.05))
         elif key == KeyboardShortcuts.NAV_START:
             self.seek_to_position(0.0)
         elif key == KeyboardShortcuts.NAV_END:
@@ -637,14 +667,6 @@ class ComparisonDialog(QDialog):
             self.seek_to_position(0.5)
         elif key == KeyboardShortcuts.NAV_THREE_QUARTERS:
             self.seek_to_position(0.75)
-        elif key == KeyboardShortcuts.NAV_PREV:
-            # Move back 5%
-            current = self.position_slider.value() / 1000.0
-            self.seek_to_position(max(0.0, current - 0.05))
-        elif key == KeyboardShortcuts.NAV_NEXT:
-            # Move forward 5%
-            current = self.position_slider.value() / 1000.0
-            self.seek_to_position(min(1.0, current + 0.05))
 
         # Synchronization shortcuts
         elif key == KeyboardShortcuts.SYNC_PLAY_BOTH:
