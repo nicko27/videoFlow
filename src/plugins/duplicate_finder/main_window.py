@@ -15,7 +15,7 @@ import os
 from typing import Optional, Dict, Any
 
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QMessageBox,
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QMessageBox,
     QSplitter, QApplication, QLabel
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
@@ -32,10 +32,13 @@ try:
     from .handlers.file_handler import FileHandler
     from .handlers.analysis_handler import AnalysisHandler
     from .handlers.duplicate_handler import DuplicateHandler
-    from .theme_selector import ThemeSelector
+    from .handlers.audio_first_handler import AudioFirstHandler
+    from .audio_config import AudioFirstConfig
     from .themes import get_current_theme
     from .layouts import LayoutManager, LayoutType
     from .audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
+    from .advanced_progress_dialog import AdvancedProgressDialog
+    from .analysis import AdvancedDuplicatePipeline
 except ImportError:
     # Fallback for direct imports
     from video_hasher import VideoHasher
@@ -47,10 +50,13 @@ except ImportError:
     from handlers.file_handler import FileHandler
     from handlers.analysis_handler import AnalysisHandler
     from handlers.duplicate_handler import DuplicateHandler
-    from theme_selector import ThemeSelector
+    from handlers.audio_first_handler import AudioFirstHandler
+    from audio_config import AudioFirstConfig
     from themes import get_current_theme
     from layouts import LayoutManager, LayoutType
     from audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
+    from advanced_progress_dialog import AdvancedProgressDialog
+    from analysis import AdvancedDuplicatePipeline
 
 from src.core.logger import Logger
 
@@ -88,7 +94,7 @@ class DuplicateFinderWindow(QMainWindow):
         Initialize the main window and all components.
         """
         super().__init__()
-        self.setWindowTitle("🔍 Video Duplicate Detector")
+        self.setWindowTitle("🔍 Détecteur de doublons vidéo")
         self.setMinimumSize(1000, 800)
 
         # Initialize core components (video_hasher will be created after settings load)
@@ -100,7 +106,6 @@ class DuplicateFinderWindow(QMainWindow):
         self.stats_counter = None
         self.file_progress = None
         self.duplicate_progress = None
-        self.subsequence_progress = None
         self.config_tabs = None
         self.analyze_btn = None
         self.stop_btn = None
@@ -166,12 +171,16 @@ class DuplicateFinderWindow(QMainWindow):
         self.file_handler = FileHandler(self.file_list_widget)
         self.analysis_handler = AnalysisHandler(self.video_hasher)
         self.duplicate_handler = DuplicateHandler(self.video_hasher, self.file_handler)
+        self.audio_first_handler = AudioFirstHandler(self.video_hasher, self.analysis_handler)
 
         # Connect analysis handler signals
         self._connect_analysis_signals()
 
         # Connect duplicate handler signals
         self._connect_duplicate_handler_signals()
+
+        # Connect audio-first handler signals
+        self._connect_audio_first_signals()
 
         # Connect settings change signals
         self._connect_settings_signals()
@@ -199,6 +208,10 @@ class DuplicateFinderWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
+        # Create title bar at the very top
+        title_bar = self._create_title_bar()
+        main_layout.addWidget(title_bar)
+
         # Create file list widget (needed for both panels)
         self.file_list_widget = FileListWidget()
 
@@ -211,20 +224,22 @@ class DuplicateFinderWindow(QMainWindow):
         self.stats_counter = right_widgets['stats_counter']
         self.file_progress = right_widgets['file_progress']
         self.duplicate_progress = right_widgets['duplicate_progress']
-        self.subsequence_progress = right_widgets['subsequence_progress']
+        self.audio_progress = right_widgets.get('audio_progress')  # New audio hash progress
 
-        # Header with title, layout selector and theme selector
-        header = self._create_header()
+        # Create layout selector widget (no longer in header)
+        layout_selector_widget = self._create_layout_selector()
 
-        # Use LayoutManager to create the layout
+        # Use LayoutManager to create the layout (without header)
         layout_container = self.layout_manager.create_layout(
             self.current_layout,
             left_panel,
             right_panel,
-            header
+            layout_selector_widget
         )
 
         main_layout.addWidget(layout_container)
+        # CRITIQUE: Définir le stretch factor pour que le container s'étende et remplisse tout l'espace disponible
+        main_layout.setStretch(1, 1)  # Index 1 = layout_container (index 0 = title_bar)
 
         # Initial button states
         if self.analyze_btn:
@@ -235,36 +250,53 @@ class DuplicateFinderWindow(QMainWindow):
         # Apply initial theme
         self.apply_theme()
 
-    def _create_header(self) -> QWidget:
+    def _create_title_bar(self) -> QWidget:
         """
-        Create header with title, layout selector and theme selector.
+        Create compact title bar at the very top.
 
         Returns:
-            QWidget containing the header.
+            QWidget containing just the title.
+        """
+        theme = get_current_theme()
+
+        title_widget = QWidget()
+        title_widget.setMaximumHeight(18)  # Limite stricte de la hauteur totale
+        title_layout = QHBoxLayout(title_widget)
+        title_layout.setContentsMargins(5, 0, 5, 0)  # Aucune marge verticale
+        title_layout.setSpacing(0)
+
+        title = QLabel("🔍 Détecteur de doublons vidéo")
+        title.setFont(QFont("Arial", 9, QFont.Weight.Bold))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_style = theme.get_title_style()
+        # Suppression complète du padding vertical et limitation stricte de la hauteur
+        title.setStyleSheet(title_style + " QLabel { padding: 0px 5px; margin: 0px; max-height: 18px; line-height: 18px; }")
+        title_layout.addWidget(title)
+
+        return title_widget
+
+    def _create_layout_selector(self) -> QWidget:
+        """
+        Create layout selector widget (separate from title).
+
+        Returns:
+            QWidget containing the layout selector.
         """
         from PyQt6.QtWidgets import QHBoxLayout, QComboBox
         from .design_system import Colors, Spacing, Typography
 
-        header = QWidget()
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.setSpacing(15)
+        selector_widget = QWidget()
+        selector_layout = QHBoxLayout(selector_widget)
+        selector_layout.setContentsMargins(5, 5, 5, 5)
+        selector_layout.setSpacing(10)
 
-        # Title
-        theme = get_current_theme()
-
-        title = QLabel("🔍 Video Duplicate Detector")
-        title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet(theme.get_title_style())
-        header_layout.addWidget(title, stretch=1)
-
-        # Layout selector
+        # Layout selector label
         layout_label = QLabel("📐 Disposition:")
         layout_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
         layout_label.setStyleSheet(f"color: {Colors.GRAY_700};")
-        header_layout.addWidget(layout_label)
+        selector_layout.addWidget(layout_label)
 
+        # Layout selector combo
         self.layout_selector = QComboBox()
         self.layout_selector.setMinimumWidth(180)
         self.layout_selector.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
@@ -303,15 +335,10 @@ class DuplicateFinderWindow(QMainWindow):
                 break
 
         self.layout_selector.currentIndexChanged.connect(self.on_layout_changed)
-        header_layout.addWidget(self.layout_selector)
+        selector_layout.addWidget(self.layout_selector)
+        selector_layout.addStretch()
 
-        # Theme selector
-        self.theme_selector = ThemeSelector()
-        self.theme_selector.setMaximumWidth(300)
-        self.theme_selector.theme_changed.connect(self.on_theme_changed)
-        header_layout.addWidget(self.theme_selector)
-
-        return header
+        return selector_widget
 
     def apply_theme(self) -> None:
         """
@@ -430,6 +457,7 @@ class DuplicateFinderWindow(QMainWindow):
             'stop': self.stop_analysis,
             'show_stats': self.show_statistics,
             'show_pending': self.show_pending_duplicates,
+            'run_advanced_mode': self.run_advanced_mode,
             'close': self.close
         }
 
@@ -437,31 +465,45 @@ class DuplicateFinderWindow(QMainWindow):
         panel = UIPanels.create_left_panel(self.file_list_widget, callbacks)
 
         # Extract references to parameter widgets and buttons
-        # The parameters tab is the second tab (index 1)
-        self.config_tabs = panel.findChild(QWidget.__class__)
+        # Find the QTabWidget first
+        from PyQt6.QtWidgets import QTabWidget
+        config_tabs = panel.findChild(QTabWidget)
+        self.config_tabs = config_tabs
+
+        # Get tabs by index (Files=0, Settings=1, Debug=2)
         params_tab = None
         debug_tab = None
-        for child in panel.findChildren(QWidget):
-            if hasattr(child, 'threshold_spin'):
-                params_tab = child
-            if hasattr(child, 'hash_debugger_v2'):
-                debug_tab = child
+        if config_tabs:
+            params_tab = config_tabs.widget(1)  # Settings tab
+            debug_tab = config_tabs.widget(2)   # Debug tab
 
         if params_tab:
-            self.threshold_spin = params_tab.threshold_spin
-            self.hash_method_combo = params_tab.hash_method_combo
-            self.hash_workers_spin = params_tab.hash_workers_spin
-            self.comparison_workers_spin = params_tab.comparison_workers_spin
-            self.batch_size_spin = params_tab.batch_size_spin
-            self.comparison_algorithm_combo = params_tab.comparison_algorithm_combo
-            self.hash_timeout_spin = params_tab.hash_timeout_spin
-            self.comparison_timeout_spin = params_tab.comparison_timeout_spin
-            self.enable_scene_check = params_tab.enable_scene_check
-            self.scene_precision_combo = params_tab.scene_precision_combo
-            self.scene_algorithm_combo = params_tab.scene_algorithm_combo
-            self.scene_min_match_spin = params_tab.scene_min_match_spin
-            self.scene_min_duration_spin = params_tab.scene_min_duration_spin
-            self.scene_cache_size_spin = params_tab.scene_cache_size_spin
+            # Debug: log available attributes
+            logger.debug(f"params_tab attributes: {[attr for attr in dir(params_tab) if not attr.startswith('_')]}")
+
+            # Video comparison widgets (renamed in new version)
+            self.threshold_spin = getattr(params_tab, 'video_threshold_spin', None)
+            self.hash_method_combo = getattr(params_tab, 'hash_method_combo', None)
+            self.hash_workers_spin = getattr(params_tab, 'hash_workers_spin', None)
+            self.comparison_workers_spin = getattr(params_tab, 'comparison_workers_spin', None)
+            self.batch_size_spin = getattr(params_tab, 'batch_size_spin', None)
+            self.comparison_algorithm_combo = None  # Removed in new version
+            self.hash_timeout_spin = getattr(params_tab, 'hash_timeout_spin', None)
+            self.comparison_timeout_spin = getattr(params_tab, 'comparison_timeout_spin', None)
+
+            # Scene detection widgets (may not exist in new version)
+            self.enable_scene_check = getattr(params_tab, 'enable_scene_check', None)
+            self.scene_precision_combo = getattr(params_tab, 'scene_precision_combo', None)
+            self.scene_algorithm_combo = getattr(params_tab, 'scene_algorithm_combo', None)
+            self.scene_min_match_spin = getattr(params_tab, 'scene_min_match_spin', None)
+            self.scene_min_duration_spin = getattr(params_tab, 'scene_min_duration_spin', None)
+            self.scene_cache_size_spin = getattr(params_tab, 'scene_cache_size_spin', None)
+
+            # Log which widgets were found
+            logger.debug(f"threshold_spin: {self.threshold_spin}")
+            logger.debug(f"hash_method_combo: {self.hash_method_combo}")
+        else:
+            logger.error("params_tab is None! Cannot extract widget references")
 
         if debug_tab:
             self.hash_debugger_v2 = debug_tab.hash_debugger_v2
@@ -493,6 +535,25 @@ class DuplicateFinderWindow(QMainWindow):
         if self.duplicate_handler:
             self.duplicate_handler.all_duplicates_processed.connect(self._on_all_duplicates_processed)
             self.duplicate_handler.all_subsequences_processed.connect(self._on_all_subsequences_processed)
+
+    def _connect_audio_first_signals(self) -> None:
+        """Connect audio-first handler signals to UI updates."""
+        if self.audio_first_handler:
+            # Phase 1: Audio extraction
+            self.audio_first_handler.audio_progress.connect(self._on_audio_extraction_progress)
+            self.audio_first_handler.audio_finished.connect(self._on_audio_extraction_finished)
+
+            # Phase 2: Audio comparison
+            self.audio_first_handler.audio_comparison_progress.connect(self._on_audio_comparison_progress)
+            self.audio_first_handler.audio_comparison_finished.connect(self._on_audio_comparison_finished)
+
+            # Phase 3: Video hashing
+            self.audio_first_handler.video_hash_progress.connect(self._on_video_hash_progress)
+            self.audio_first_handler.video_hash_finished.connect(self._on_video_hash_finished)
+
+            # Errors and status
+            self.audio_first_handler.analysis_error.connect(self.handle_error)
+            self.audio_first_handler.status_update.connect(self._on_status_update)
 
     def _connect_settings_signals(self) -> None:
         """
@@ -674,8 +735,8 @@ class DuplicateFinderWindow(QMainWindow):
         else:
             QMessageBox.warning(
                 self,
-                "Folder not found",
-                f"The last folder no longer exists:\n{last_folder}"
+                "Dossier introuvable",
+                f"Le dernier dossier n'existe plus :\n{last_folder}"
             )
             # Clear invalid last folder
             self.settings_manager.save_last_folder("")
@@ -729,7 +790,7 @@ class DuplicateFinderWindow(QMainWindow):
             )
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Cannot clear cache: {e}")
+            QMessageBox.critical(self, "Erreur", f"Impossible de vider le cache : {e}")
 
     def reset_folder(self) -> None:
         """
@@ -754,7 +815,11 @@ class DuplicateFinderWindow(QMainWindow):
         message = self.settings_manager.apply_preset(preset_type, widgets)
 
         # Show confirmation
-        icon = {"fast": "⚡", "balanced": "⚖️", "quality": "🎯"}[preset_type]
+        icon = {
+            "maximum_speed": "⚡",
+            "balanced": "⚖️",
+            "maximum_quality": "🎯"
+        }[preset_type]
         self.status_indicator.update_status(icon, message)
 
     def get_analysis_config(self) -> Dict[str, Any]:
@@ -776,8 +841,8 @@ class DuplicateFinderWindow(QMainWindow):
 
         if file_count < 2:
             QMessageBox.warning(
-                self, "Warning",
-                "At least 2 files are required to detect duplicates"
+                self, "Attention",
+                "Au moins 2 fichiers sont requis pour détecter les doublons"
             )
             return
 
@@ -785,7 +850,7 @@ class DuplicateFinderWindow(QMainWindow):
         valid_files, invalid_files = self.file_handler.validate_files_for_analysis()
 
         if len(valid_files) < 2:
-            QMessageBox.warning(self, "Error", "Not enough valid files")
+            QMessageBox.warning(self, "Erreur", "Pas assez de fichiers valides")
             return
 
         # Set UI to analysis mode
@@ -806,22 +871,30 @@ class DuplicateFinderWindow(QMainWindow):
         # Get analysis configuration
         config = self.get_analysis_config()
 
-        # Scene detection will be created after comparison analysis if enabled
-        # (no need for pre-computation with audio fingerprinting)
+        # Get configuration from UI for audio-first analysis
+        params_tab = self._get_params_tab()
+        if params_tab is None:
+            logger.error("Could not find parameters tab")
+            QMessageBox.critical(self, "Erreur", "Impossible de charger les paramètres d'analyse")
+            self.set_analysis_mode(False)
+            return
 
-        # Start hash analysis
-        self.analysis_handler.start_hash_analysis(
+        audio_config = AudioFirstConfig.from_ui_widgets(params_tab)
+
+        # Start audio-first analysis
+        logger.info("Starting audio-first workflow")
+        self.audio_first_handler.start_analysis(
             valid_files,
-            config,
-            progress_callback=self.update_file_progress,
-            file_processed_callback=self.update_file_processed,
-            current_file_callback=self.update_current_file_display,
-            progress_details_callback=self.update_hash_progress_details
+            audio_config,
+            progress_callbacks={
+                'audio_progress': self._on_audio_extraction_progress
+            }
         )
 
-        # Initialize progress display
-        self.file_progress.update_progress(0, len(valid_files), "Computing hashes...")
-        self.file_progress.set_status("Starting", "#FFC107")
+        # Initialize progress displays
+        if self.audio_progress:
+            self.audio_progress.update_progress(0, len(valid_files), "Starting audio extraction...")
+            self.audio_progress.set_status("Starting", "#FFC107")
 
     def stop_analysis(self) -> None:
         """
@@ -829,13 +902,17 @@ class DuplicateFinderWindow(QMainWindow):
         """
         reply = QMessageBox.question(
             self, "Confirmation",
-            "Do you really want to stop the current analysis?",
+            "Voulez-vous vraiment arrêter l'analyse en cours ?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
 
         if reply == QMessageBox.StandardButton.Yes:
             # Stop hash and comparison workers
             self.analysis_handler.stop_analysis()
+
+            # Stop audio-first handler
+            if self.audio_first_handler:
+                self.audio_first_handler.stop_analysis()
 
             # Stop scene detection worker
             if self.scene_worker and self.scene_worker.isRunning():
@@ -856,6 +933,133 @@ class DuplicateFinderWindow(QMainWindow):
             self.status_indicator.update_status(
                 "⏹️", "Analysis stopped by user",
                 "#DC3545", "#F8D7DA", "#DC3545"
+            )
+
+    def run_advanced_mode(self) -> None:
+        """
+        Run the advanced 3-level duplicate detection analysis.
+
+        This mode performs a thorough 3-level analysis:
+        - Level 1: LSH audio fingerprinting (loose filtering)
+        - Level 2: Long-period audio comparison (refined filtering)
+        - Level 3: pHash visual confirmation (final validation)
+        """
+        # Check file count
+        file_count = self.file_handler.get_file_count()
+
+        if file_count < 2:
+            QMessageBox.warning(
+                self, "Attention",
+                "Au moins 2 fichiers sont requis pour détecter les doublons"
+            )
+            return
+
+        # Get configuration
+        config = self.get_analysis_config()
+
+        # Check if advanced mode is enabled in settings
+        if 'advanced_mode' not in config or not config['advanced_mode'].get('enabled', False):
+            reply = QMessageBox.warning(
+                self, "Détection de Scènes",
+                "La détection de scènes n'est pas activée.\n\n"
+                "Activer maintenant ?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+
+            if reply == QMessageBox.StandardButton.No:
+                return
+
+            # Enable advanced mode in settings
+            params_tab = self._get_params_tab()
+            if params_tab and hasattr(params_tab, 'enable_advanced_mode'):
+                params_tab.enable_advanced_mode.setChecked(True)
+                # Save settings
+                widgets = self._get_widget_dict()
+                self.settings_manager.save_settings(widgets, self)
+                config = self.get_analysis_config()
+
+        # Get advanced mode configuration
+        advanced_config = config.get('advanced_mode', {})
+
+        # Show confirmation dialog
+        msg = QMessageBox(self)
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setWindowTitle("Détection de Scènes")
+        msg.setText(
+            f"🎬 Analyse de {file_count} vidéos\n\n"
+            f"Cette détection utilise :\n"
+            f"• Audio (empreintes courtes et longues)\n"
+            f"• Analyse visuelle (frames)\n"
+            f"• Confirmation multi-critères\n\n"
+            f"Cela peut prendre plusieurs minutes."
+        )
+        msg.setInformativeText("Lancer l'analyse ?")
+        msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        msg.setDefaultButton(QMessageBox.StandardButton.Yes)
+
+        if msg.exec() != QMessageBox.StandardButton.Yes:
+            return
+
+        # Get valid files for analysis
+        valid_files, invalid_files = self.file_handler.validate_files_for_analysis()
+
+        if not valid_files:
+            QMessageBox.warning(
+                self, "Aucun fichier valide",
+                "Aucun fichier valide n'a été trouvé pour l'analyse.\n\n"
+                f"Fichiers invalides : {len(invalid_files)}"
+            )
+            return
+
+        logger.info(f"Starting advanced 3-level mode with {len(valid_files)} valid files")
+        logger.info(f"Advanced config: {advanced_config}")
+
+        try:
+            # Create the advanced pipeline
+            pipeline = AdvancedDuplicatePipeline(
+                config=advanced_config,
+                db_manager=self.video_hasher.db
+            )
+
+            # Create and show progress dialog
+            progress_dialog = AdvancedProgressDialog(self)
+            progress_dialog.start_analysis(pipeline, valid_files)
+
+            # Execute dialog (blocks until analysis completes or is cancelled)
+            result = progress_dialog.exec()
+
+            if result == progress_dialog.DialogCode.Accepted:
+                # Analysis completed successfully
+                logger.info("Advanced 3-level analysis completed successfully")
+
+                # Show success message
+                QMessageBox.information(
+                    self, "Analyse Terminée",
+                    "✅ Détection de scènes terminée !\n\n"
+                    "Les doublons détectés sont disponibles dans l'onglet Résultats."
+                )
+
+                # Refresh duplicate handler to load new results
+                self.duplicate_handler.load_duplicates()
+
+            else:
+                # Analysis was cancelled
+                logger.info("Advanced 3-level analysis was cancelled by user")
+
+        except ImportError as e:
+            logger.error(f"Missing dependencies for advanced mode: {e}")
+            QMessageBox.critical(
+                self, "Dépendances Manquantes",
+                "❌ Bibliothèques requises manquantes.\n\n"
+                f"Erreur : {e}\n\n"
+                "Installation :\n"
+                "pip install datasketch librosa soundfile scipy"
+            )
+        except Exception as e:
+            logger.error(f"Error starting advanced mode: {e}", exc_info=True)
+            QMessageBox.critical(
+                self, "Erreur",
+                f"❌ Une erreur s'est produite lors du démarrage de l'analyse :\n\n{e}"
             )
 
     def set_analysis_mode(self, analyzing: bool) -> None:
@@ -1007,7 +1211,8 @@ class DuplicateFinderWindow(QMainWindow):
             # Connect signals
             def on_progress(current: int, total: int, message: str):
                 """Update progress display."""
-                self.subsequence_progress.update_progress(current, total, message)
+                if self.duplicate_progress:
+                    self.duplicate_progress.update_progress(current, total, message)
                 self.force_ui_update()
 
             def on_scene_found(short_video: str, long_video: str, result: dict):
@@ -1042,9 +1247,9 @@ class DuplicateFinderWindow(QMainWindow):
                 logger.error(f"Error during scene detection: {error_msg}")
                 QMessageBox.warning(
                     self,
-                    "Scene Detection Error",
-                    f"An error occurred during scene detection:\n{error_msg}\n\n"
-                    f"Continuing with duplicate results..."
+                    "Erreur de détection de scènes",
+                    f"Une erreur s'est produite lors de la détection de scènes :\n{error_msg}\n\n"
+                    f"Poursuite avec les résultats de doublons..."
                 )
 
                 # Clean up worker reference
@@ -1065,9 +1270,9 @@ class DuplicateFinderWindow(QMainWindow):
             logger.error(f"Error setting up scene detection: {e}")
             QMessageBox.warning(
                 self,
-                "Scene Detection Error",
-                f"An error occurred setting up scene detection:\n{str(e)}\n\n"
-                f"Continuing with duplicate results..."
+                "Erreur de détection de scènes",
+                f"Une erreur s'est produite lors de la configuration de la détection de scènes :\n{str(e)}\n\n"
+                f"Poursuite avec les résultats de doublons..."
             )
             self._finish_analysis()
 
@@ -1109,18 +1314,17 @@ class DuplicateFinderWindow(QMainWindow):
         else:
             # No duplicates or subsequences
             self.status_indicator.update_status(
-                "✅", "Analysis complete - No duplicates or subsequences found",
+                "✅", "Analysis complete - No duplicates found",
                 "#28A745", "#D4EDDA", "#28A745"
             )
 
-            threshold_duplicates = self.threshold_spin.value()
-            threshold_scenes = self.scene_min_match_spin.value() if self.scene_min_match_spin else 85.0
+            threshold_duplicates = self.threshold_spin.value() if self.threshold_spin else 90.0
             QMessageBox.information(
-                self, "Analysis complete",
-                f"No duplicates or scenes detected\n\n"
-                f"Duplicate threshold: {threshold_duplicates}%\n"
-                f"Scene threshold: {threshold_scenes}%\n"
-                f"Total time: {elapsed:.1f} seconds"
+                self, "Analyse terminée",
+                f"Aucun doublon détecté\n\n"
+                f"Seuil de similarité : {threshold_duplicates}%\n"
+                f"Fichiers analysés : {len(self.file_handler.get_all_files())}\n"
+                f"Temps total : {elapsed:.1f} secondes"
             )
 
         self.set_analysis_mode(False)
@@ -1128,26 +1332,11 @@ class DuplicateFinderWindow(QMainWindow):
     def _on_all_duplicates_processed(self) -> None:
         """
         Called when all duplicates have been processed.
-        Start subsequence processing if any exist.
+        Show final completion message.
         """
-        logger.info("All duplicates processed, checking for subsequences")
-
-        subsequence_count = self.duplicate_handler.get_subsequence_count()
-
-        if subsequence_count > 0:
-            # Start processing subsequences
-            logger.info(f"Starting subsequence processing: {subsequence_count} subsequences")
-            self.status_indicator.update_status(
-                "🎬", f"Processing {subsequence_count} subsequence(s)...",
-                "#17A2B8", "#D1ECF1", "#17A2B8"
-            )
-
-            QTimer.singleShot(500, lambda: self.duplicate_handler.process_subsequences(
-                self, SubsequenceComparisonDialog
-            ))
-        else:
-            # No subsequences, show final message
-            self._show_final_completion_message()
+        logger.info("All duplicates processed")
+        # Show final completion message
+        self._show_final_completion_message()
 
     def _on_all_subsequences_processed(self) -> None:
         """
@@ -1168,10 +1357,12 @@ class DuplicateFinderWindow(QMainWindow):
             "#28A745", "#D4EDDA", "#28A745"
         )
 
+        duplicate_count = self.duplicate_handler.get_duplicate_count()
         QMessageBox.information(
-            self, "Processing Complete",
-            f"All duplicate and subsequence processing complete!\n\n"
-            f"Total time: {elapsed:.1f} seconds"
+            self, "Traitement terminé",
+            f"Traitement de tous les doublons terminé !\n\n"
+            f"Doublons trouvés : {duplicate_count}\n"
+            f"Temps total : {elapsed:.1f} secondes"
         )
 
     def _on_duplicate_found(self, file1: str, file2: str, similarity: float) -> None:
@@ -1187,8 +1378,109 @@ class DuplicateFinderWindow(QMainWindow):
 
         count = self.duplicate_handler.get_duplicate_count()
         self.status_indicator.update_status(
-            "🔍", f"Analysis in progress... {count} duplicate(s) found"
+            "🔍", f"Analyse en cours... {count} doublon(s) trouvé(s)"
         )
+
+        # CRITIQUE: Mettre à jour le compteur EN TEMPS RÉEL
+        if self.stats_counter:
+            self.stats_counter.update_duplicates(count)
+
+    # Audio-first callbacks
+    def _on_audio_extraction_progress(self, current: int, total: int, video_path: str) -> None:
+        """Update audio extraction progress."""
+        if self.audio_progress:
+            self.audio_progress.update_progress(current, total, f"🎵 {current}/{total}")
+            short_name = os.path.basename(video_path)[:30]
+            if len(short_name) < len(os.path.basename(video_path)):
+                short_name += "..."
+            self.audio_progress.set_status(f"🎵 {short_name}", "#17A2B8")
+
+    def _on_audio_extraction_finished(self) -> None:
+        """Handle audio extraction completion."""
+        if self.audio_progress:
+            self.audio_progress.set_status("Complete", "#28A745")
+        logger.info("Phase 1 complete: Audio extraction finished")
+
+    def _on_audio_comparison_progress(self, current: int, total: int) -> None:
+        """Update audio comparison progress."""
+        if self.duplicate_progress:
+            # Initialiser le maximum une seule fois
+            if self.duplicate_progress.progress_bar.maximum() != total:
+                self.duplicate_progress.progress_bar.setMaximum(total)
+
+            self.duplicate_progress.update_progress(current, total, f"🔍 {current}/{total}")
+
+            # Feedback textuel avec pourcentage
+            pct = (current / total * 100) if total > 0 else 0
+            self.duplicate_progress.set_status(f"Comparaison audio... {pct:.0f}%", "#007BFF")
+
+    def _on_audio_comparison_finished(self, matches: list) -> None:
+        """Handle audio comparison completion."""
+        logger.info(f"Phase 2 complete: {len(matches)} audio candidates found")
+        if self.duplicate_progress:
+            self.duplicate_progress.set_status("Audio matches found", "#17A2B8")
+
+    def _on_video_hash_progress(self, current: int, total: int) -> None:
+        """Update video hash progress."""
+        if self.file_progress:
+            # Initialiser le maximum une seule fois
+            if self.file_progress.progress_bar.maximum() != total:
+                self.file_progress.progress_bar.setMaximum(total)
+
+            self.file_progress.update_progress(current, total, f"📊 {current}/{total}")
+
+            # Feedback textuel
+            self.file_progress.set_status(f"Hash {current}/{total} vidéos", "#007BFF")
+
+    def _on_video_hash_finished(self) -> None:
+        """Handle selective video hashing completion."""
+        logger.info("Phase 3 complete: Selective video hashing finished")
+        if self.file_progress:
+            self.file_progress.set_status("Complete", "#28A745")
+        # Now start video comparison on candidates
+        self._start_video_comparison_on_candidates()
+
+    def _on_status_update(self, status: str) -> None:
+        """Handle status updates from audio-first handler."""
+        if self.status_indicator:
+            self.status_indicator.update_status("🎵", status, "#17A2B8", "#D1ECF1", "#17A2B8")
+
+    def _start_video_comparison_on_candidates(self) -> None:
+        """Start video comparison on audio candidates."""
+        candidates = self.audio_first_handler.audio_candidates
+
+        if not candidates:
+            logger.info("No audio candidates, finishing analysis")
+            self._finish_analysis()
+            return
+
+        logger.info(f"Phase 4: Starting video comparison on {len(candidates)} candidate pairs")
+
+        # Extract unique videos that need comparison
+        unique_videos = set()
+        for v1, v2, _ in candidates:
+            unique_videos.add(v1)
+            unique_videos.add(v2)
+
+        # Use existing comparison logic
+        config = self.get_analysis_config()
+        self.analysis_handler.start_comparison_analysis(
+            list(unique_videos),
+            config,
+            duplicate_callback=self._on_duplicate_found,
+            progress_callback=self.update_duplicate_progress,
+            status_callback=self.update_comparison_status,
+            total_comparisons_callback=self.set_comparison_total,
+            comparison_details_callback=self.update_comparison_details
+        )
+
+    def _get_params_tab(self):
+        """Get parameters tab widget with all the audio-first parameters."""
+        # Find the params tab from config tabs
+        for child in self.findChildren(QWidget):
+            if hasattr(child, 'audio_threshold_spin'):
+                return child
+        return None
 
     # Progress update methods
     def update_file_progress(self, current: int) -> None:
@@ -1261,8 +1553,8 @@ class DuplicateFinderWindow(QMainWindow):
             total: Total comparison count.
         """
         self.duplicate_progress.progress_bar.setMaximum(total)
-        self.duplicate_progress.update_progress(0, total, "Comparisons in progress...")
-        self.duplicate_progress.set_status("Comparisons", "#007BFF")
+        self.duplicate_progress.update_progress(0, total, "Comparaisons en cours...")
+        self.duplicate_progress.set_status("Comparaisons", "#007BFF")
 
     def update_hash_progress_details(
         self,
@@ -1315,10 +1607,10 @@ class DuplicateFinderWindow(QMainWindow):
             error_msg: Error message.
         """
         self.stop_ui_updates()
-        QMessageBox.critical(self, "Error", f"Error during analysis: {error_msg}")
+        QMessageBox.critical(self, "Erreur", f"Erreur durant l'analyse : {error_msg}")
         self.set_analysis_mode(False)
         self.status_indicator.update_status(
-            "❌", "Error during analysis",
+            "❌", "Erreur durant l'analyse",
             "#DC3545", "#F8D7DA", "#DC3545"
         )
 
@@ -1386,10 +1678,10 @@ class DuplicateFinderWindow(QMainWindow):
 ⏱️ TIME SAVED
    Estimation: {stats.get('time_saved_seconds', 0):.0f} seconds"""
 
-            QMessageBox.information(self, "Statistics", message)
+            QMessageBox.information(self, "Statistiques", message)
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Cannot retrieve statistics: {e}")
+            QMessageBox.critical(self, "Erreur", f"Impossible de récupérer les statistiques : {e}")
 
     def show_pending_duplicates(self) -> None:
         """
@@ -1399,13 +1691,13 @@ class DuplicateFinderWindow(QMainWindow):
             count = self.duplicate_handler.load_pending_duplicates()
 
             if count == 0:
-                QMessageBox.information(self, "No duplicates", "No pending duplicates.")
+                QMessageBox.information(self, "Aucun doublon", "Aucun doublon en attente.")
                 return
 
             reply = QMessageBox.question(
-                self, "Pending duplicates",
-                f"There are {count} pending duplicates.\n\n"
-                f"Do you want to resume processing?",
+                self, "Doublons en attente",
+                f"Il y a {count} doublon(s) en attente.\n\n"
+                f"Voulez-vous reprendre le traitement ?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
 
@@ -1416,7 +1708,7 @@ class DuplicateFinderWindow(QMainWindow):
                 self.duplicate_handler.process_duplicates(self, ComparisonDialog)
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Cannot retrieve duplicates: {e}")
+            QMessageBox.critical(self, "Erreur", f"Impossible de récupérer les doublons : {e}")
 
     def cleanup_resources(self) -> None:
         """
@@ -1444,6 +1736,10 @@ class DuplicateFinderWindow(QMainWindow):
             if self.analysis_handler:
                 self.analysis_handler.cleanup()
 
+            # Cleanup audio-first handler
+            if self.audio_first_handler:
+                self.audio_first_handler.stop_analysis()
+
             # Close database connections
             if self.video_hasher and self.video_hasher.db:
                 logger.info("Closing database connections...")
@@ -1470,8 +1766,8 @@ class DuplicateFinderWindow(QMainWindow):
             if self.analysis_handler.is_analyzing():
                 reply = QMessageBox.question(
                     self, "Confirmation",
-                    "An analysis is in progress. Do you really want to quit?\n\n"
-                    "Already computed results will be kept in cache.",
+                    "Une analyse est en cours. Voulez-vous vraiment quitter ?\n\n"
+                    "Les résultats déjà calculés seront conservés en cache.",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
                 )
 
@@ -1498,7 +1794,7 @@ class DuplicateFinderWindow(QMainWindow):
             try:
                 widgets = self._get_widget_dict()
                 self.settings_manager.save_settings(widgets, self)
-            except:
-                pass
+            except Exception as save_error:
+                logger.error(f"Cannot save settings on close: {save_error}")
             event.accept()
             self.closed.emit()

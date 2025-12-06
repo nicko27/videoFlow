@@ -11,6 +11,7 @@ from typing import Optional, Tuple, List, Dict
 from .video_hasher import VideoHasher
 from .database_manager import VideoDatabase
 from .lru_cache import MemoryBoundedLRUCache
+from .analysis.subsequence_verification import SubsequenceVerificationMethods
 from src.core.logger import Logger
 
 logger = Logger.get_logger('DuplicateFinder.SubsequenceDetector')
@@ -44,7 +45,11 @@ class SubsequenceDetector:
         min_match_ratio: float = 0.70,
         temporal_window_frames: int = 5,
         sliding_window_tolerance: int = 3,
-        enable_adaptive_refinement: bool = False  # DISABLED by default - can be VERY slow
+        enable_adaptive_refinement: bool = False,  # DISABLED by default - can be VERY slow
+        enable_verification: bool = True,  # NEW: Enable Strategy 3 verification
+        verification_dct_threshold: float = 75.0,  # NEW: DCT threshold for verification
+        verification_sequence_threshold: float = 95.0,  # NEW: Sequence threshold for verification
+        verification_workers: int = 2  # NEW: Workers for parallel verification
     ):
         """Initialize subsequence detector with temporal desynchronization handling.
 
@@ -55,7 +60,11 @@ class SubsequenceDetector:
             min_match_ratio: Minimum match ratio to consider a subsequence (default: 0.70)
             temporal_window_frames: Number of frames for temporal averaging (default: 5) - SOLUTION 4
             sliding_window_tolerance: Frame tolerance for sliding window (default: 3) - SOLUTION 1
-            enable_adaptive_refinement: Enable adaptive refinement (default: True) - SOLUTION 5
+            enable_adaptive_refinement: Enable adaptive refinement (default: False) - SOLUTION 5
+            enable_verification: Enable Strategy 3 verification (default: True)
+            verification_dct_threshold: DCT threshold for verification (default: 75.0%)
+            verification_sequence_threshold: Sequence threshold for verification (default: 95.0%)
+            verification_workers: Number of workers for parallel verification (default: 2)
         """
         self.hasher = hasher
         self.db = hasher.db
@@ -65,12 +74,24 @@ class SubsequenceDetector:
         self.temporal_window_frames = temporal_window_frames
         self.sliding_window_tolerance = sliding_window_tolerance
         self.enable_adaptive_refinement = enable_adaptive_refinement
+        self.enable_verification = enable_verification
         self._cancelled = False  # Cancellation flag
+
+        # Initialize verification methods (Strategy 3: Scene Cuts Veto)
+        if enable_verification:
+            self.verifier = SubsequenceVerificationMethods(
+                dct_threshold=verification_dct_threshold,
+                sequence_threshold=verification_sequence_threshold,
+                max_workers=verification_workers
+            )
+        else:
+            self.verifier = None
 
         logger.info(f"SubsequenceDetector initialized: {sample_interval_seconds}s intervals, "
                    f"{max_cache_memory_mb}MB cache limit, {min_match_ratio*100}% min match, "
                    f"temporal_window={temporal_window_frames}, tolerance=±{sliding_window_tolerance}, "
-                   f"adaptive_refinement={enable_adaptive_refinement}")
+                   f"adaptive_refinement={enable_adaptive_refinement}, "
+                   f"verification={enable_verification} (dct={verification_dct_threshold}%, seq={verification_sequence_threshold}%)")
 
     def _is_frame_blank(self, frame: np.ndarray, threshold: float = 0.1) -> bool:
         """
@@ -513,13 +534,57 @@ class SubsequenceDetector:
                 else:
                     logger.info(f"Adaptive refinement did not improve match (stayed at {best_match_ratio*100:.1f}%)")
 
-            # Check if it's a valid subsequence
+            # Check if it's a valid subsequence (initial threshold)
             is_subsequence = best_match_ratio >= min_ratio
 
-            if is_subsequence:
-                logger.info(f"Subsequence detected: {os.path.basename(short_video)} "
-                          f"in {os.path.basename(long_video)} "
-                          f"(match: {best_match_ratio*100:.1f}%, frame {best_start_idx}, refined={refined})")
+            if not is_subsequence:
+                return {
+                    'is_subsequence': False,
+                    'match_ratio': best_match_ratio,
+                    'start_frame_idx': best_start_idx,
+                    'confidence': best_match_ratio,
+                    'short_duration': dur_short,
+                    'long_duration': dur_long,
+                    'refined': refined,
+                    'verified': False,
+                    'verification_result': None
+                }
+
+            # PHASE 3: Strategy 3 Verification (Scene Cuts Veto + DCT)
+            verification_result = None
+            if self.enable_verification and self.verifier is not None:
+                logger.info(f"Initial match {best_match_ratio*100:.1f}% - running Strategy 3 verification...")
+
+                # Calculate start time in long video
+                # Convert frame index to time using sampling interval
+                start_time = best_start_idx * self.sample_interval_seconds
+
+                verification_result = self.verifier.verify_with_strategy3(
+                    short_video=short_video,
+                    long_video=long_video,
+                    start_time=start_time,
+                    duration=dur_short,
+                    sequence_score=best_match_ratio * 100.0  # Convert to percentage
+                )
+
+                # Update is_subsequence based on verification
+                is_subsequence = verification_result['accepted']
+
+                if is_subsequence:
+                    logger.info(f"✅ Subsequence VERIFIED: {os.path.basename(short_video)} "
+                              f"in {os.path.basename(long_video)} "
+                              f"(seq: {best_match_ratio*100:.1f}%, "
+                              f"scene: {verification_result['scene_cuts_score']:.1f}%, "
+                              f"dct: {verification_result['dct_score']:.1f}%, "
+                              f"frame {best_start_idx}, refined={refined})")
+                else:
+                    logger.info(f"❌ Subsequence REJECTED by verification: {verification_result['rejection_reason']}")
+            else:
+                # No verification - trust initial match
+                if is_subsequence:
+                    logger.info(f"Subsequence detected (no verification): {os.path.basename(short_video)} "
+                              f"in {os.path.basename(long_video)} "
+                              f"(match: {best_match_ratio*100:.1f}%, frame {best_start_idx}, refined={refined})")
 
             return {
                 'is_subsequence': is_subsequence,
@@ -528,7 +593,9 @@ class SubsequenceDetector:
                 'confidence': best_match_ratio,
                 'short_duration': dur_short,
                 'long_duration': dur_long,
-                'refined': refined
+                'refined': refined,
+                'verified': self.enable_verification,
+                'verification_result': verification_result
             }
 
         except Exception as e:
