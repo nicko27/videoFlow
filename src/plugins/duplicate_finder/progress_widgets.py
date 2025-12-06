@@ -23,16 +23,49 @@ logger = Logger.get_logger('DuplicateFinder.ProgressWidgets')
 
 
 class ModernProgressWidget(QWidget):
-    """Widget de progression moderne with statistics"""
-    
+    """Modern progress widget with real-time statistics and time estimation.
+
+    Displays a progress bar with accompanying statistics including:
+    - Current/maximum count with smart number formatting (e.g., 1.2k)
+    - Percentage completion
+    - Time remaining estimation
+    - Processing speed (items/second)
+
+    Features:
+        - Clean, modern UI design with minimal visual clutter
+        - Smart number formatting for large counts (1000 → 1k)
+        - Compact statistics panel next to progress bar
+        - Real-time updates without blocking UI
+
+    Example:
+        >>> progress = ModernProgressWidget("Processing Videos")
+        >>> progress.update_progress(50, 100)
+        >>> progress.set_speed(2.5)  # 2.5 items/second
+        >>> progress.set_time_remaining(20)  # 20 seconds
+    """
+
     def __init__(self, title, parent=None):
+        """Initialize modern progress widget.
+
+        Args:
+            title: Title displayed in the header
+            parent: Parent widget (optional)
+        """
         super().__init__(parent)
         self.title = title
         self.start_time = None
         self.setup_ui()
         
     def setup_ui(self):
-        """Configure l'interface"""
+        """Configure the widget user interface.
+
+        Sets up the complete UI hierarchy:
+        - Header with title and status labels
+        - Progress bar with statistics panel
+        - Details row with time remaining and processing speed
+
+        Uses design system theme for consistent styling.
+        """
         theme = get_current_theme()
         spacing = theme.get_spacing()
 
@@ -134,13 +167,33 @@ class ModernProgressWidget(QWidget):
         layout.addLayout(details_layout)
         
     def update_progress(self, current, maximum, custom_text=None):
-        """Met à jour la progression"""
+        """Update progress bar and statistics displays.
+
+        Updates the progress bar value and all statistics labels (count, percentage).
+        Uses smart number formatting for large values (1000 → 1k, 1500 → 1.5k).
+
+        Args:
+            current: Current progress value (e.g., files processed)
+            maximum: Maximum progress value (e.g., total files)
+            custom_text: Optional custom text to display (currently unused)
+
+        Example:
+            >>> widget.update_progress(1234, 5678)
+            # Displays "1.23k/5.68k" with "22%" percentage
+        """
         self.progress_bar.setMaximum(maximum)
         self.progress_bar.setValue(current)
 
         # Mise à jour des stats à côté avec format compact
         def format_number(n):
-            """Format compact pour les grands nombres"""
+            """Format numbers compactly for display.
+
+            Args:
+                n: Number to format
+
+            Returns:
+                Formatted string (e.g., 1234 → "1.23k", 50 → "50")
+            """
             if n >= 10000:
                 return f"{n/1000:.1f}k"
             elif n >= 1000:
@@ -160,12 +213,36 @@ class ModernProgressWidget(QWidget):
             self.percent_label.setText("0%")
             
     def set_status(self, status, color="black"):
-        """Change le statut with couleur"""
+        """Update the status label text and color.
+
+        Args:
+            status: Status text to display (e.g., "Processing...", "Complete")
+            color: CSS color for the status text (default: "black")
+
+        Example:
+            >>> widget.set_status("Processing...", "blue")
+            >>> widget.set_status("Error", "red")
+            >>> widget.set_status("Complete", "green")
+        """
         self.status_label.setText(status)
         self.status_label.setStyleSheet(f"color: {color}; font-weight: bold; font-size: 10px;")
         
     def set_time_remaining(self, seconds):
-        """Met à jour le time remaining"""
+        """Update the time remaining estimate display.
+
+        Formats time intelligently based on duration:
+        - < 1 minute: Shows seconds (e.g., "Restant: 45s")
+        - < 1 hour: Shows MM:SS (e.g., "Restant: 12:34")
+        - >= 1 hour: Shows HhMM (e.g., "Restant: 2h15")
+
+        Args:
+            seconds: Estimated seconds remaining (0 or negative = unknown)
+
+        Example:
+            >>> widget.set_time_remaining(45)     # "Restant: 45s"
+            >>> widget.set_time_remaining(754)    # "Restant: 12:34"
+            >>> widget.set_time_remaining(8100)   # "Restant: 2h15"
+        """
         if seconds > 0:
             if seconds < 60:
                 self.time_label.setText(f"Restant: {int(seconds)}s")
@@ -181,7 +258,23 @@ class ModernProgressWidget(QWidget):
             self.time_label.setText("Temps : --:--")
             
     def set_speed(self, items_per_second):
-        """Met à jour la speed"""
+        """Update the processing speed display.
+
+        Formats speed intelligently based on rate:
+        - >= 1000 items/s: Shows "k/s" (e.g., "Speed: 1.2k/s")
+        - >= 10 items/s: Shows whole numbers (e.g., "Speed: 25/s")
+        - >= 1 item/s: Shows decimals (e.g., "Speed: 2.5/s")
+        - < 1 item/s: Shows time per item (e.g., "Speed: 3.2s/item")
+
+        Args:
+            items_per_second: Processing rate in items/second (0 = unknown)
+
+        Example:
+            >>> widget.set_speed(1500)    # "Speed: 1.5k/s"
+            >>> widget.set_speed(25.7)    # "Speed: 26/s"
+            >>> widget.set_speed(2.5)     # "Speed: 2.5/s"
+            >>> widget.set_speed(0.3)     # "Speed: 3.3s/item"
+        """
         if items_per_second > 0:
             if items_per_second >= 1000:
                 self.speed_label.setText(f"Speed: {items_per_second/1000:.1f}k/s")
@@ -197,16 +290,48 @@ class ModernProgressWidget(QWidget):
 
 
 class FileListWidget(QWidget):
-    """Widget de liste de files - TEXTE NOIR GARANTI"""
-    
+    """Scrollable file list widget with status indicators.
+
+    Displays a scrollable list of video files with individual status indicators.
+    Each file can have its status updated independently (e.g., processing, complete, error).
+
+    Features:
+        - Scrollable list for large file collections
+        - Individual status indicators per file
+        - File count display in header
+        - Black text guaranteed for visibility
+        - Smart truncation for long filenames
+
+    Attributes:
+        files: List of file paths currently displayed
+        file_items: Dict mapping file paths to their QLabel widgets
+
+    Example:
+        >>> file_list = FileListWidget()
+        >>> file_list.add_files(['/path/to/video1.mp4', '/path/to/video2.mp4'])
+        >>> file_list.update_file_status('/path/to/video1.mp4', 'Processing...')
+        >>> file_list.update_file_status('/path/to/video1.mp4', 'Complete ✓')
+    """
+
     def __init__(self, parent=None):
+        """Initialize file list widget.
+
+        Args:
+            parent: Parent widget (optional)
+        """
         super().__init__(parent)
         self.files = []
         self.file_items = {}
         self.setup_ui()
         
     def setup_ui(self):
-        """Configure l'interface"""
+        """Configure the file list user interface.
+
+        Creates:
+        - Header with title and file count
+        - Scrollable area for file list
+        - Container widget for file items
+        """
         layout = QVBoxLayout(self)
         layout.setContentsMargins(Spacing.MD, Spacing.MD, Spacing.MD, Spacing.MD)
         layout.setSpacing(Spacing.MD)
@@ -274,7 +399,21 @@ class FileListWidget(QWidget):
         layout.addWidget(self.scroll_area)
         
     def add_files(self, file_paths):
-        """Adds des files"""
+        """Add new files to the list widget.
+
+        Only adds files that aren't already in the list (duplicates are skipped).
+        Creates a visual item for each new file with filename, size, and status.
+
+        Args:
+            file_paths: List of file paths to add
+
+        Returns:
+            Number of new files actually added (excludes duplicates)
+
+        Example:
+            >>> count = file_list.add_files(['/path/video1.mp4', '/path/video2.mp4'])
+            >>> print(f"Added {count} new files")
+        """
         new_count = 0
         for file_path in file_paths:
             if file_path not in self.files:
@@ -282,18 +421,35 @@ class FileListWidget(QWidget):
                 item_widget = self.create_file_item(file_path)
                 self.file_items[file_path] = item_widget
                 new_count += 1
-                
+
         if new_count > 0 and self.empty_label.isVisible():
             self.empty_label.hide()
-            
+
         self.update_file_count()
         self.files_widget.updateGeometry()
         self.update()
-        
+
         return new_count
         
     def create_file_item(self, file_path):
-        """Crée un item de file with TEXTE NOIR FORCÉ"""
+        """Create a visual item widget for a file.
+
+        Creates a horizontal frame containing:
+        - Filename (truncated if > 40 chars)
+        - File size (formatted, e.g., "125.3 MB")
+        - Status label (default: "⏳ À analyser")
+
+        All text is forced to black color for maximum visibility.
+
+        Args:
+            file_path: Full path to the file
+
+        Returns:
+            QLabel widget representing the file's status (stored for later updates)
+
+        Note:
+            The returned status_label is stored in self.file_items for updates.
+        """
         import os
 
         # Frame with bordure visible - HAUTEUR PLUS GÉNÉREUSE
@@ -375,7 +531,25 @@ class FileListWidget(QWidget):
         return item_frame
         
     def update_file_status(self, file_path, status):
-        """Met à jour le statut with couleur noire forcée"""
+        """Update the status label for a specific file.
+
+        Updates the status text and applies color-coded styling based on status:
+        - Success (✅, "cache", "analysé"): Green background
+        - Error (❌, "failed"): Red background
+        - Processing (🔄, "cours"): Blue background
+        - Pending (⏳): Yellow background
+        - Default: Gray background
+
+        Text color is always forced to black for maximum visibility.
+
+        Args:
+            file_path: Path to the file to update
+            status: New status text (e.g., "✅ Complete", "🔄 Processing...", "❌ Error")
+
+        Example:
+            >>> file_list.update_file_status('/path/video.mp4', '🔄 Hashing...')
+            >>> file_list.update_file_status('/path/video.mp4', '✅ Complete')
+        """
         if file_path in self.file_items:
             item_widget = self.file_items[file_path]
             if hasattr(item_widget, 'status_label'):
@@ -431,26 +605,37 @@ class FileListWidget(QWidget):
         return False
                     
     def clear_files(self):
-        """Vide the list des files"""
+        """Clear all files from the list.
+
+        Removes all file items from the widget and shows the empty state message.
+        Properly cleans up widgets to prevent memory leaks.
+
+        Example:
+            >>> file_list.clear_files()
+            # All files removed, shows "Aucun fichier ajouté"
+        """
         self.files.clear()
         self.file_items.clear()
-        
+
         # Removes tous les items sauf le label vide
         items_to_remove = []
         for i in range(self.files_layout.count()):
             item = self.files_layout.itemAt(i)
             if item and item.widget() and item.widget() != self.empty_label:
                 items_to_remove.append(item.widget())
-        
+
         for widget in items_to_remove:
             self.files_layout.removeWidget(widget)
             widget.deleteLater()
-                
+
         self.empty_label.show()
         self.update_file_count()
         
     def update_file_count(self):
-        """Met à jour le compteur"""
+        """Update the file count label in the header.
+
+        Updates the display to show current number of files with proper French pluralization.
+        """
         count = len(self.files)
         if count == 0:
             self.file_count_label.setText("Aucun fichier")
@@ -460,11 +645,28 @@ class FileListWidget(QWidget):
             self.file_count_label.setText(f"{count} files")
             
     def get_files(self):
-        """Returns the list des files"""
+        """Get a copy of the current file list.
+
+        Returns:
+            List of file paths (copy, not reference)
+        """
         return self.files.copy()
-        
+
     def format_file_size(self, size_bytes):
-        """Formate la size de file"""
+        """Format file size in human-readable format.
+
+        Args:
+            size_bytes: File size in bytes
+
+        Returns:
+            Formatted string (e.g., "125.3 MB", "1.5 GB", "42 B")
+
+        Example:
+            >>> format_file_size(1024)
+            "1.0 KB"
+            >>> format_file_size(1536000)
+            "1.5 MB"
+        """
         if size_bytes < 1024:
             return f"{size_bytes} B"
         elif size_bytes < 1024 * 1024:
