@@ -4,7 +4,7 @@ Worker for parallel audio fingerprint extraction.
 Extracts audio fingerprints from multiple videos in parallel using thread pool.
 """
 from PyQt6.QtCore import QThread, pyqtSignal
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
 from typing import List, Dict, Callable, Optional
 import numpy as np
 from src.core.logger import Logger
@@ -32,7 +32,8 @@ class AudioExtractionWorker(QThread):
         audio_detector,  # AudioFingerprintDetector instance
         num_workers: int = 4,
         precision_mode: str = 'fast',
-        database=None  # VideoDatabase instance for caching
+        database=None,  # VideoDatabase instance for caching
+        extraction_timeout: int = 60  # Timeout per file in seconds
     ):
         """
         Initialize audio extraction worker.
@@ -43,6 +44,7 @@ class AudioExtractionWorker(QThread):
             num_workers: Number of parallel workers
             precision_mode: Precision mode ('fast', 'balanced', 'maximum')
             database: VideoDatabase instance for caching (optional)
+            extraction_timeout: Timeout per file extraction in seconds (default 60)
         """
         super().__init__()
         self.video_files = video_files
@@ -50,6 +52,7 @@ class AudioExtractionWorker(QThread):
         self.num_workers = num_workers
         self.precision_mode = precision_mode
         self.database = database
+        self.extraction_timeout = extraction_timeout
         self._stop_flag = False
         self._cached_count = 0
         self._extracted_count = 0
@@ -86,7 +89,8 @@ class AudioExtractionWorker(QThread):
                     processed += 1
 
                     try:
-                        result = future.result()
+                        # Get result with timeout protection
+                        result = future.result(timeout=self.extraction_timeout)
                         if result is not None:
                             fingerprint, is_cached = result
                             fingerprints[video_path] = fingerprint
@@ -101,8 +105,14 @@ class AudioExtractionWorker(QThread):
                         # Emit progress with status
                         self.progress.emit(processed, total, display_path)
 
+                    except FutureTimeoutError:
+                        logger.warning(f"⏱ Timeout extraction audio ({self.extraction_timeout}s): {video_path}")
+                        self.progress.emit(processed, total, f"{video_path} (Timeout)")
+                        # Continue with other files
+
                     except Exception as e:
                         logger.error(f"Erreur extraction audio de {video_path}: {e}")
+                        self.progress.emit(processed, total, f"{video_path} (Erreur)")
                         # Continue with other files
 
             logger.info(f"Extraction audio terminée: {len(fingerprints)}/{total} fichiers "
@@ -125,6 +135,11 @@ class AudioExtractionWorker(QThread):
             Tuple (fingerprint, is_cached) or None if extraction failed
         """
         try:
+            # Check if stop requested before starting
+            if self._stop_flag:
+                logger.debug(f"Extraction skipped (stop requested): {video_path}")
+                return None
+
             # Check database cache first if available
             if self.database:
                 cached_fingerprint = self.database.get_audio_fingerprint(video_path)

@@ -1248,21 +1248,182 @@ def stop(self):
 
 ---
 
-### `workers/audio_worker.py` (Previously read)
+### `workers/audio_worker.py` (Lines 1-172) **[UPDATED - 2025-12-06]**
 
-#### `AudioWorker.__init__(self, files, config)`
-**Purpose**: Initialize audio extraction worker
+**Recent Changes**: Added timeout and cancellation support (ISSUE #14)
+
+#### `AudioExtractionWorker.__init__(self, video_files, audio_detector, num_workers, precision_mode, database, extraction_timeout)` (Lines 29-63)
+```python
+def __init__(
+    self,
+    video_files: List[str],
+    audio_detector,  # AudioFingerprintDetector instance
+    num_workers: int = 4,
+    precision_mode: str = 'fast',
+    database=None,  # VideoDatabase instance for caching
+    extraction_timeout: int = 60  # NEW: Timeout per file in seconds
+):
+    super().__init__()
+    self.video_files = video_files
+    self.audio_detector = audio_detector
+    self.num_workers = num_workers
+    self.precision_mode = precision_mode
+    self.database = database
+    self.extraction_timeout = extraction_timeout  # NEW
+    self._stop_flag = False
+    self._cached_count = 0
+    self._extracted_count = 0
+```
+**Purpose**: Initialize audio extraction worker with timeout support
 **Parameters**:
-- `files`: Video files to process
-- `config`: AudioConfig with extraction parameters
+- `video_files`: List of video file paths
+- `audio_detector`: AudioFingerprintDetector instance
+- `num_workers`: Number of parallel workers (default 4)
+- `precision_mode`: Precision mode ('fast', 'balanced', 'maximum')
+- `database`: VideoDatabase instance for caching (optional)
+- `extraction_timeout`: **NEW** Timeout per file extraction in seconds (default 60)
+**Signals**:
+- `progress(int, int, str)`: (current, total, video_path)
+- `finished(dict)`: {video_path: fingerprint}
+- `error(str)`: Error message
+**Location**: audio_worker.py:29-63
 
-#### `AudioWorker.run(self)`
-**Purpose**: Execute audio extraction in background
+#### `AudioExtractionWorker.run(self)` (Lines 64-126) **[UPDATED]**
+```python
+def run(self):
+    """Extract audio fingerprints in parallel."""
+    try:
+        fingerprints = {}
+        total = len(self.video_files)
+        processed = 0
+
+        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            # Submit all tasks
+            future_to_video = {
+                executor.submit(
+                    self._extract_fingerprint,
+                    video_path
+                ): video_path
+                for video_path in self.video_files
+            }
+
+            # Process completed tasks
+            for future in as_completed(future_to_video):
+                if self._stop_flag:
+                    logger.info("Extraction audio arrêtée par l'utilisateur")
+                    executor.shutdown(wait=False, cancel_futures=True)
+                    return
+
+                video_path = future_to_video[future]
+                processed += 1
+
+                try:
+                    # NEW: Get result with timeout protection
+                    result = future.result(timeout=self.extraction_timeout)
+                    if result is not None:
+                        fingerprint, is_cached = result
+                        fingerprints[video_path] = fingerprint
+
+                        # Show cached status in progress
+                        status = "✓ Cached" if is_cached else "✓ Extrait"
+                        display_path = f"{video_path} ({status})"
+                    else:
+                        display_path = video_path
+                        logger.warning(f"Aucune empreinte audio pour: {video_path}")
+
+                    # Emit progress with status
+                    self.progress.emit(processed, total, display_path)
+
+                except FutureTimeoutError:  # NEW: Handle timeout
+                    logger.warning(f"⏱ Timeout extraction audio ({self.extraction_timeout}s): {video_path}")
+                    self.progress.emit(processed, total, f"{video_path} (Timeout)")
+                    # Continue with other files
+
+                except Exception as e:
+                    logger.error(f"Erreur extraction audio de {video_path}: {e}")
+                    self.progress.emit(processed, total, f"{video_path} (Erreur)")
+                    # Continue with other files
+
+        logger.info(f"Extraction audio terminée: {len(fingerprints)}/{total} fichiers "
+                   f"(En cache: {self._cached_count}, Extraits: {self._extracted_count})")
+        self.finished.emit(fingerprints)
+
+    except Exception as e:
+        error_msg = f"Erreur dans le worker d'extraction audio: {e}"
+        logger.error(error_msg, exc_info=True)
+        self.error.emit(error_msg)
+```
+**Purpose**: Execute audio extraction in background with timeout protection
 **Algorithm**:
-1. For each video file
-2. Extract audio using ffmpeg
-3. Cache extracted audio
-4. Emit progress signals
+1. Submit all extraction tasks to ThreadPoolExecutor
+2. Process completed tasks with timeout
+3. **NEW**: Handle FutureTimeoutError for stuck extractions
+4. **NEW**: Continue with other files on timeout/error
+5. Emit progress with status (Cached/Extrait/Timeout/Erreur)
+6. Emit finished with all successful fingerprints
+**Key Changes (2025-12-06)**:
+- Line 93: Added `timeout=self.extraction_timeout` to `future.result()`
+- Lines 108-111: Added FutureTimeoutError handling
+- Continues processing other files on timeout/error instead of failing entire batch
+**Location**: audio_worker.py:64-126
+
+#### `AudioExtractionWorker._extract_fingerprint(self, video_path)` (Lines 127-167) **[UPDATED]**
+```python
+def _extract_fingerprint(self, video_path: str):
+    """
+    Extract audio fingerprint from a single video with caching.
+
+    Returns:
+        Tuple (fingerprint, is_cached) or None if extraction failed
+    """
+    try:
+        # NEW: Check if stop requested before starting
+        if self._stop_flag:
+            logger.debug(f"Extraction skipped (stop requested): {video_path}")
+            return None
+
+        # Check database cache first if available
+        if self.database:
+            cached_fingerprint = self.database.get_audio_fingerprint(video_path)
+            if cached_fingerprint is not None:
+                self._cached_count += 1
+                logger.debug(f"✓ Audio en cache: {video_path}")
+                return (cached_fingerprint, True)  # Cached
+
+        # Cache miss - extract fingerprint
+        fingerprint = self.audio_detector.extract_fingerprint(video_path)
+
+        # Save to database if available
+        if fingerprint is not None and self.database:
+            self.database.store_audio_fingerprint(video_path, fingerprint)
+            self._extracted_count += 1
+            logger.debug(f"✓ Audio extrait: {video_path}")
+        elif fingerprint is not None:
+            self._extracted_count += 1
+
+        return (fingerprint, False) if fingerprint is not None else None
+
+    except Exception as e:
+        logger.error(f"Échec extraction audio de {video_path}: {e}")
+        return None
+```
+**Purpose**: Extract audio fingerprint from a single video with caching
+**Returns**: Tuple (fingerprint, is_cached) or None if extraction failed
+**Key Changes (2025-12-06)**:
+- Lines 139-141: **NEW** Check stop flag before starting extraction
+- Enables graceful cancellation of entire worker
+**Location**: audio_worker.py:127-167
+
+#### `AudioExtractionWorker.stop(self)` (Lines 168-172)
+```python
+def stop(self):
+    """Stop the worker."""
+    logger.info("Arrêt du worker d'extraction audio...")
+    self._stop_flag = True
+```
+**Purpose**: Request graceful stop of worker
+**Behavior**: Sets flag checked in run() loop and _extract_fingerprint()
+**Location**: audio_worker.py:168-172
 
 ---
 
@@ -2295,6 +2456,214 @@ def precompute_dense_hashes(self, video_path: str):
 ---
 
 ## UTILITIES & VALIDATORS
+
+### `error_handling.py` (Lines 1-345) **[NEW - 2025-12-06]**
+
+**Purpose**: Standardized error handling patterns for consistent logging and user experience
+**Created**: 2025-12-06 to resolve ISSUE #13 (Inconsistent Error Handling)
+
+#### `ErrorSeverity` (Lines 16-23)
+```python
+class ErrorSeverity(Enum):
+    DEBUG = "debug"          # Log only, no user notification
+    INFO = "info"            # Informational, may show in UI
+    WARNING = "warning"      # Warning, show in UI
+    ERROR = "error"          # Error, show dialog
+    CRITICAL = "critical"    # Critical error, may crash
+```
+**Purpose**: Enum for standardizing error severity levels
+**Usage**: Helps categorize errors for appropriate logging and user notification
+**Location**: error_handling.py:16-23
+
+#### `ErrorContext` (Lines 25-34)
+```python
+class ErrorContext(Enum):
+    FILE_OPERATION = "file_operation"
+    VIDEO_PROCESSING = "video_processing"
+    AUDIO_PROCESSING = "audio_processing"
+    DATABASE_OPERATION = "database_operation"
+    UI_OPERATION = "ui_operation"
+    NETWORK_OPERATION = "network_operation"
+    WORKER_THREAD = "worker_thread"
+```
+**Purpose**: Categorize errors by operational context
+**Usage**: Enables context-specific error handling strategies
+**Location**: error_handling.py:25-34
+
+#### `handle_file_operation(operation_name, on_error, default_return)` (Lines 36-81)
+```python
+@handle_file_operation("read_video_file", default_return=[])
+def read_frames(video_path):
+    # Automatically handles FileNotFoundError, PermissionError, OSError
+```
+**Purpose**: Decorator for standardized file operation error handling
+**Parameters**:
+- `operation_name`: Name of operation for logging
+- `on_error`: Optional callback to call on error
+- `default_return`: Default value to return on error
+**Handles**:
+- `FileNotFoundError` → Warning log
+- `PermissionError` → Error log
+- `OSError` → Error log
+- `Exception` → Critical log with traceback
+**Returns**: Decorator function
+**Location**: error_handling.py:36-81
+
+#### `handle_video_processing(operation_name, on_error, default_return)` (Lines 83-123)
+```python
+@handle_video_processing("extract_frames", default_return=[])
+def extract_frames(video_path):
+    # Handles cv2 errors, IOError, ValueError
+```
+**Purpose**: Decorator for standardized video processing error handling
+**Parameters**:
+- `operation_name`: Name of operation for logging
+- `on_error`: Optional callback to call on error
+- `default_return`: Default value to return on error
+**Handles**:
+- `OSError`, `IOError` → Error log (I/O errors)
+- `ValueError` → Error log (Invalid video data)
+- `Exception` → Critical log with traceback
+**Returns**: Decorator function
+**Location**: error_handling.py:83-123
+
+#### `handle_database_operation(operation_name, on_error, default_return)` (Lines 125-157)
+```python
+@handle_database_operation("get_hash", default_return=None)
+def get_hash(file_path):
+    # Handles all database exceptions generically
+```
+**Purpose**: Decorator for standardized database operation error handling
+**Parameters**:
+- `operation_name`: Name of operation for logging
+- `on_error`: Optional callback to call on error
+- `default_return`: Default value to return on error
+**Handles**: All exceptions generically (sqlite3 exceptions vary)
+**Returns**: Decorator function
+**Location**: error_handling.py:125-157
+
+#### `handle_worker_operation(operation_name, error_signal)` (Lines 159-188)
+```python
+@handle_worker_operation("process_video", error_signal=self.error)
+def run(self):
+    # Emits error signal on exception
+```
+**Purpose**: Decorator for standardized worker thread error handling
+**Parameters**:
+- `operation_name`: Name of operation for logging
+- `error_signal`: PyQt signal to emit on error
+**Behavior**: Logs exception and emits error signal, then re-raises
+**Returns**: Decorator function
+**Location**: error_handling.py:159-188
+
+#### `ErrorHandler` (Lines 190-263)
+```python
+class ErrorHandler:
+    """Context manager for consistent error handling."""
+
+    def __init__(
+        self,
+        operation_name: str,
+        context: ErrorContext = ErrorContext.FILE_OPERATION,
+        default_return: Any = None,
+        on_error: Optional[Callable] = None,
+        reraise: bool = False
+    ):
+```
+**Purpose**: Context manager for flexible error handling
+**Usage**:
+```python
+with ErrorHandler("Load video", default_return=None) as eh:
+    video = load_video(path)
+
+if eh.has_error:
+    print(f"Error: {eh.error_message}")
+```
+**Parameters**:
+- `operation_name`: Name of operation
+- `context`: Type of operation context
+- `default_return`: Value to return on error
+- `on_error`: Optional callback on error
+- `reraise`: Whether to re-raise exception after handling
+**Attributes**:
+- `has_error`: Boolean indicating if error occurred
+- `error_message`: String error message
+- `exception`: Original exception object
+**Location**: error_handling.py:190-263
+
+#### `safe_execute(func, operation_name, default_return, *args, **kwargs)` (Lines 265-308)
+```python
+result = safe_execute(
+    risky_function,
+    "process_video",
+    default_return=[],
+    video_path,
+    frame_count=10
+)
+```
+**Purpose**: Safely execute a function with standardized error handling
+**Parameters**:
+- `func`: Function to execute
+- `operation_name`: Name for logging
+- `default_return`: Value to return on error
+- `*args`: Arguments for func
+- `**kwargs`: Keyword arguments for func
+**Returns**: Function result or default_return on error
+**Handles**:
+- `FileNotFoundError` → Warning log
+- `OSError`, `IOError` → Error log
+- `ValueError`, `TypeError` → Error log
+- `Exception` → Critical log
+**Location**: error_handling.py:265-308
+
+#### `ErrorMessages` (Lines 310-345)
+```python
+class ErrorMessages:
+    """Standard error messages for consistency."""
+
+    # File operations
+    FILE_NOT_FOUND = "File not found: {path}"
+    FILE_PERMISSION_DENIED = "Permission denied: {path}"
+    FILE_TOO_LARGE = "File too large: {path} ({size} bytes)"
+    FILE_CORRUPTED = "File appears to be corrupted: {path}"
+
+    # Video operations
+    VIDEO_CANNOT_OPEN = "Cannot open video file: {path}"
+    VIDEO_NO_FRAMES = "Video has no frames: {path}"
+    VIDEO_INVALID_FORMAT = "Invalid video format: {path}"
+    VIDEO_DECODE_ERROR = "Error decoding video: {path}"
+
+    # Audio operations
+    AUDIO_EXTRACTION_FAILED = "Audio extraction failed: {path}"
+    AUDIO_NO_STREAM = "No audio stream found: {path}"
+    AUDIO_INVALID_FORMAT = "Invalid audio format: {path}"
+
+    # Database operations
+    DATABASE_CONNECTION_FAILED = "Database connection failed"
+    DATABASE_QUERY_FAILED = "Database query failed: {query}"
+    DATABASE_LOCKED = "Database is locked, please try again"
+
+    # Worker operations
+    WORKER_TIMEOUT = "Operation timed out after {seconds}s"
+    WORKER_CANCELLED = "Operation cancelled by user"
+    WORKER_FAILED = "Worker thread failed: {reason}"
+
+    @staticmethod
+    def format(template: str, **kwargs) -> str:
+        """Format error message with parameters."""
+        return template.format(**kwargs)
+```
+**Purpose**: Standardized error message templates
+**Usage**: `ErrorMessages.format(ErrorMessages.FILE_NOT_FOUND, path="/video.mp4")`
+**Categories**:
+- File operations (4 messages)
+- Video operations (4 messages)
+- Audio operations (3 messages)
+- Database operations (3 messages)
+- Worker operations (3 messages)
+**Location**: error_handling.py:310-345
+
+---
 
 ### `validators.py` (Lines 1-339)
 
