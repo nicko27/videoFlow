@@ -1074,62 +1074,47 @@ class DuplicateFinderWindow(QMainWindow):
 
     def _start_scene_detection(self) -> None:
         """
-        Start scene detection analysis using audio fingerprinting.
-        Supports 3 algorithms: hash_index (fast), shazam (ultra-fast), sliding_window (classic).
+        Start scene detection using SubsequenceDetector with Strategy 3 (DCT + Scene Cuts).
+
+        Uses visual comparison (not audio fingerprinting) for accurate subsequence detection.
+        This is the same approach used in the test scripts for maximum effectiveness.
         """
         try:
-            from .workers.scene_worker import SceneDetectionWorker
+            from .workers.subsequence_worker import SubsequenceDetectionWorker
+            from .subsequence_detector import SubsequenceDetector
 
             config = self.get_analysis_config()
             scene_config = config.get('scene_detection', {})
 
-            # Get algorithm choice
-            algorithm = scene_config.get('algorithm', 'hash_index')
+            # Get Strategy 3 verification parameters
+            verification_enabled = config.get('enable_subseq_verification', True)
+            dct_threshold = config.get('subseq_dct_threshold', 75.0)
+            sequence_threshold = config.get('subseq_sequence_threshold', 95.0)
+            verification_workers = config.get('subseq_verification_workers', 2)
 
-            # Get precision mode (for Chromaprint-based methods)
-            precision_mode_name = scene_config.get('precision_mode', 'balanced')
-            if precision_mode_name == 'maximum':
-                precision_mode = PrecisionMode.MAXIMUM
-            elif precision_mode_name == 'fast':
-                precision_mode = PrecisionMode.FAST
-            else:
-                precision_mode = PrecisionMode.BALANCED
+            # Get scene detection parameters
+            min_match_ratio = scene_config.get('min_match_ratio', 0.70)
+            min_duration = scene_config.get('min_duration', 10.0)
 
-            # Create detector based on algorithm choice
-            if algorithm == 'shazam':
-                # Use Shazam algorithm (ultra-fast, experimental)
-                try:
-                    from .shazam_detector import ShazamSceneDetector
-                    self.scene_detector = ShazamSceneDetector(
-                        sample_rate=11025,
-                        min_match_ratio=scene_config.get('min_match_ratio', 0.85),
-                        min_cluster_size=10
-                    )
-                    algorithm_name = "Shazam (ultra-fast)"
-                    logger.info("Using Shazam algorithm for scene detection")
-                except ImportError as e:
-                    logger.warning(f"Shazam detector not available: {e}, falling back to hash index")
-                    algorithm = 'hash_index'
+            # Create SubsequenceDetector with Strategy 3 verification
+            self.subsequence_detector = SubsequenceDetector(
+                hasher=self.video_hasher,
+                max_cache_memory_mb=500,
+                sample_interval_seconds=0.75,
+                min_match_ratio=min_match_ratio,
+                enable_verification=verification_enabled,
+                verification_dct_threshold=dct_threshold,
+                verification_sequence_threshold=sequence_threshold,
+                verification_workers=verification_workers
+            )
 
-            if algorithm in ['hash_index', 'sliding_window']:
-                # Use Chromaprint-based detector (hash_index or sliding_window)
-                if self.scene_detector is None or not isinstance(self.scene_detector, AudioFingerprintDetector):
-                    self.scene_detector = AudioFingerprintDetector(
-                        precision_mode=precision_mode,
-                        min_match_ratio=scene_config.get('min_match_ratio', 0.85),
-                        max_cache_items=scene_config.get('cache_size', 500)
-                    )
-
-                if algorithm == 'hash_index':
-                    algorithm_name = "Hash Index (10-100x faster)"
-                    logger.info("Using Hash Index algorithm for scene detection")
-                else:
-                    algorithm_name = "Sliding Window (improved)"
-                    logger.info("Using improved Sliding Window algorithm for scene detection")
+            logger.info(f"SubsequenceDetector initialized: min_ratio={min_match_ratio*100:.1f}%, "
+                       f"verification={'enabled' if verification_enabled else 'disabled'}, "
+                       f"DCT={dct_threshold}%, sequence={sequence_threshold}%")
 
             # Update UI
             self.status_indicator.update_status(
-                "🎬", f"Detecting scenes ({algorithm_name})...",
+                "🎬", "Detecting scenes (Strategy 3: DCT + Scene Cuts)...",
                 "#17A2B8", "#D1ECF1", "#17A2B8"
             )
 
@@ -1142,16 +1127,12 @@ class DuplicateFinderWindow(QMainWindow):
                 self.scene_worker.stop()
                 self.scene_worker.wait()
 
-            # Create and configure worker with algorithm choice
-            logger.info(f"Starting scene detection on {len(files)} files using {algorithm_name}")
-            self.scene_worker = SceneDetectionWorker(
-                self.scene_detector,
-                files,
-                algorithm=algorithm  # Pass algorithm choice to worker
+            # Create and configure worker
+            logger.info(f"Starting subsequence detection on {len(files)} files")
+            self.scene_worker = SubsequenceDetectionWorker(
+                subsequence_detector=self.subsequence_detector,
+                files=files
             )
-
-            # Storage for scenes to verify
-            self._pending_scenes = []
 
             # Connect signals
             def on_progress(current: int, total: int, message: str):
@@ -1160,46 +1141,50 @@ class DuplicateFinderWindow(QMainWindow):
                     self.duplicate_progress.update_progress(current, total, message)
                 self.force_ui_update()
 
-            def on_scene_found(short_video: str, long_video: str, result: dict):
-                """Handle each found scene - collect for batch verification."""
-                # Store scene for batch verification
-                self._pending_scenes.append({
-                    'short_video': short_video,
-                    'long_video': long_video,
-                    'start_time': result.get('start_time_seconds', 0),
-                    'duration': result.get('duration', 0),
-                    'sequence_score': result['match_ratio'] * 100.0,
-                    'result': result
-                })
+            def on_subsequence_found(short_video: str, long_video: str, result: dict):
+                """Handle each found subsequence (already verified by Strategy 3)."""
+                # SubsequenceDetector with enable_verification=True already applies Strategy 3
+                # So these subsequences are already verified - just add them
+                match_ratio = result.get('match_ratio', 0.0)
+                start_frame_idx = result.get('start_frame_idx', 0)
+                confidence = result.get('confidence', 0.0)
+
+                logger.info(f"Subsequence verified: {os.path.basename(short_video)} in "
+                           f"{os.path.basename(long_video)} ({match_ratio*100:.1f}% match)")
+
+                # Store in database
+                self.video_hasher.db.store_subsequence_detection(
+                    short_video,
+                    long_video,
+                    match_ratio,
+                    start_frame_idx,
+                    confidence
+                )
+
+                # Add to duplicate handler
+                self.duplicate_handler.add_subsequence(
+                    short_video,
+                    long_video,
+                    result
+                )
+
+            def on_status_update(message: str):
+                """Handle status updates."""
+                logger.info(f"Subsequence detection: {message}")
 
             def on_finished(scenes: list):
-                """Handle completion of scene detection."""
-                logger.info(f"Scene detection complete: {len(scenes)} scenes found")
+                """Handle completion of subsequence detection."""
+                logger.info(f"Subsequence detection complete: {len(scenes)} scenes found")
 
-                # Check if verification is enabled
-                config = self.get_analysis_config()
-                verification_enabled = config.get('enable_subseq_verification', True)
+                # Clean up
+                self.scene_worker = None
 
-                if verification_enabled and len(self._pending_scenes) > 0:
-                    # Start verification process
-                    logger.info(f"Starting verification of {len(self._pending_scenes)} scenes")
-                    self._start_scene_verification(self._pending_scenes)
-                else:
-                    # No verification - add all scenes directly
-                    logger.info("Verification disabled, adding all scenes directly")
-                    for scene_data in self._pending_scenes:
-                        self._add_verified_scene(scene_data, accepted=True, from_cache=False)
-
-                    # Clean up
-                    self.scene_worker = None
-                    self._pending_scenes = []
-
-                    # Finish analysis
-                    self._finish_analysis()
+                # Finish analysis
+                self._finish_analysis()
 
             def on_error(error_msg: str):
-                """Handle error in scene detection."""
-                logger.error(f"Error during scene detection: {error_msg}")
+                """Handle error in subsequence detection."""
+                logger.error(f"Error during subsequence detection: {error_msg}")
                 QMessageBox.warning(
                     self,
                     "Erreur de détection de scènes",
@@ -1214,7 +1199,8 @@ class DuplicateFinderWindow(QMainWindow):
                 self._finish_analysis()
 
             self.scene_worker.progress.connect(on_progress)
-            self.scene_worker.scene_found.connect(on_scene_found)
+            self.scene_worker.subsequence_found.connect(on_subsequence_found)
+            self.scene_worker.status_update.connect(on_status_update)
             self.scene_worker.finished.connect(on_finished)
             self.scene_worker.error.connect(on_error)
 
