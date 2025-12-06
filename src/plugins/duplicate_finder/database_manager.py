@@ -165,7 +165,6 @@ class VideoDatabase:
         self.db_path = db_path
         self._initialized = False  # Flag to avoid repeated checks
         self._tables_exist = {}  # Cache for table existence
-        self._ignore_type_exists = False  # Flag for ignore_type column (set after migration)
 
         # Create connection pool with auto-detected optimal size
         self.connection_pool = ConnectionPool(db_path, pool_size=None)
@@ -426,9 +425,6 @@ class VideoDatabase:
                     cursor.execute("UPDATE ignored_pairs SET ignore_type = 'permanent' WHERE ignore_type IS NULL")
 
                     logger.info("Database migration completed")
-
-                # After migration, ignore_type column ALWAYS exists
-                self._ignore_type_exists = True
 
                 # STEP 4: Check and add audio_fingerprint column if necessary (migration)
                 cursor.execute("PRAGMA table_info(video_files)")

@@ -6,10 +6,49 @@ in the background using audio fingerprinting to avoid blocking the UI.
 """
 from typing import List, Dict, Any
 from PyQt6.QtCore import QThread, pyqtSignal
+import signal
+from contextlib import contextmanager
 
 from src.core.logger import Logger
 
 logger = Logger.get_logger('DuplicateFinder.SceneWorker')
+
+
+class TimeoutError(Exception):
+    """Exception raised when operation times out."""
+    pass
+
+
+@contextmanager
+def timeout(seconds):
+    """Context manager for timeout protection.
+
+    Args:
+        seconds: Timeout duration in seconds
+
+    Raises:
+        TimeoutError: If operation exceeds timeout
+
+    Note:
+        This uses SIGALRM which only works on Unix-like systems.
+        On Windows, this is a no-op (no timeout protection).
+    """
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"Operation timed out after {seconds} seconds")
+
+    # Check if signal.SIGALRM is available (Unix-like systems)
+    if hasattr(signal, 'SIGALRM'):
+        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(seconds)
+        try:
+            yield
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+    else:
+        # Windows or other systems - no timeout protection
+        logger.warning("Timeout protection not available on this platform")
+        yield
 
 
 class SceneDetectionWorker(QThread):
@@ -39,6 +78,7 @@ class SceneDetectionWorker(QThread):
         scene_detector,
         files: List[str],
         algorithm: str = 'hash_index',
+        detection_timeout: int = 300,
         parent=None
     ) -> None:
         """
@@ -48,12 +88,14 @@ class SceneDetectionWorker(QThread):
             scene_detector: AudioFingerprintDetector or ShazamSceneDetector instance.
             files: List of video file paths to analyze.
             algorithm: Algorithm to use ('hash_index', 'shazam', 'sliding_window').
+            detection_timeout: Timeout per detection in seconds (default 300 = 5 minutes).
             parent: Optional parent QObject.
         """
         super().__init__(parent)
         self.scene_detector = scene_detector
         self.files = files
         self.algorithm = algorithm
+        self.detection_timeout = detection_timeout
         self._stop = False
 
     def run(self) -> None:
@@ -173,26 +215,33 @@ class SceneDetectionWorker(QThread):
                     f"Checking {os.path.basename(short_video)} ({matches_found} found)"
                 )
 
-            # Call the appropriate detection method based on algorithm
+            # Call the appropriate detection method based on algorithm with timeout protection
             result = None
 
-            if self.algorithm == 'hash_index':
-                # Use hash index method
-                if hasattr(self.scene_detector, 'find_scene_with_index'):
-                    result = self.scene_detector.find_scene_with_index(short_video, long_video)
-                else:
-                    logger.warning("find_scene_with_index not available, falling back to find_scene")
-                    result = self.scene_detector.find_scene(short_video, long_video)
+            try:
+                with timeout(self.detection_timeout):
+                    if self.algorithm == 'hash_index':
+                        # Use hash index method
+                        if hasattr(self.scene_detector, 'find_scene_with_index'):
+                            result = self.scene_detector.find_scene_with_index(short_video, long_video)
+                        else:
+                            logger.warning("find_scene_with_index not available, falling back to find_scene")
+                            result = self.scene_detector.find_scene(short_video, long_video)
 
-            elif self.algorithm == 'sliding_window':
-                # Use standard sliding window method
-                if hasattr(self.scene_detector, 'find_scene'):
-                    result = self.scene_detector.find_scene(short_video, long_video)
+                    elif self.algorithm == 'sliding_window':
+                        # Use standard sliding window method
+                        if hasattr(self.scene_detector, 'find_scene'):
+                            result = self.scene_detector.find_scene(short_video, long_video)
 
-            elif self.algorithm == 'shazam':
-                # Use Shazam method
-                if hasattr(self.scene_detector, 'find_scene'):
-                    result = self.scene_detector.find_scene(short_video, long_video)
+                    elif self.algorithm == 'shazam':
+                        # Use Shazam method
+                        if hasattr(self.scene_detector, 'find_scene'):
+                            result = self.scene_detector.find_scene(short_video, long_video)
+
+            except TimeoutError as e:
+                logger.error(f"Scene detection timed out for {os.path.basename(short_video)}: {e}")
+                self.error.emit(f"Detection timeout: {os.path.basename(short_video)}")
+                continue  # Skip this pair and continue with next
 
             if result and result.get('is_scene'):
                 results.append((short_video, long_video, result))

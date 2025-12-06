@@ -327,7 +327,8 @@ class SubsequenceVerificationMethods:
         long_video: str,
         start_time: float,
         duration: float,
-        sequence_score: float
+        sequence_score: float,
+        stop_flag=None
     ) -> Dict:
         """
         Verify subsequence match using Strategy 3 (Scene Cuts Veto).
@@ -363,8 +364,28 @@ class SubsequenceVerificationMethods:
 
         logger.info(f"Verifying with Strategy 3: {short_video} @ {start_time:.1f}s (seq={sequence_score:.1f}%)")
 
+        # Check stop flag before starting
+        if stop_flag and stop_flag.is_set():
+            return {
+                'accepted': False,
+                'scene_cuts_score': 0.0,
+                'dct_score': 0.0,
+                'sequence_score': sequence_score,
+                'rejection_reason': 'Cancelled by user'
+            }
+
         # Step 1: Detect scene cuts in short video
         scene_score = self._detect_scene_cuts(short_video, 0.0, duration)
+
+        # Check stop flag after scene detection
+        if stop_flag and stop_flag.is_set():
+            return {
+                'accepted': False,
+                'scene_cuts_score': scene_score,
+                'dct_score': 0.0,
+                'sequence_score': sequence_score,
+                'rejection_reason': 'Cancelled by user'
+            }
 
         # Step 2: Scene cuts veto - reject if no scene cuts
         if scene_score == 0.0:
@@ -386,6 +407,16 @@ class SubsequenceVerificationMethods:
             duration=duration,
             num_samples=10
         )
+
+        # Check stop flag after DCT computation
+        if stop_flag and stop_flag.is_set():
+            return {
+                'accepted': False,
+                'scene_cuts_score': scene_score,
+                'dct_score': dct_score,
+                'sequence_score': sequence_score,
+                'rejection_reason': 'Cancelled by user'
+            }
 
         # Step 4: Apply thresholds
         accepted = (

@@ -27,9 +27,14 @@ class VideoPreviewWidget(QWidget):
         self.fps = 30.0
         self.duration = 0.0
         self.current_frame = 0
-        
-        self.setup_ui()
-        self.load_video_info()
+
+        try:
+            self.setup_ui()
+            self.load_video_info()
+        except Exception as e:
+            logger.error(f"Error initializing VideoPreviewWidget: {e}")
+            self.cleanup()  # Ensure cleanup on initialization failure
+            raise
         
     def setup_ui(self):
         """Configure the user interface"""
@@ -106,25 +111,27 @@ class VideoPreviewWidget(QWidget):
             cv2.setLogLevel(0)
             self.cap = cv2.VideoCapture(self.video_path)
 
-            if self.cap.isOpened():
-                self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
-                self.duration = self.total_frames / self.fps if self.fps > 0 else 0
-
-                # Info label supprimé - pas besoin de mettre à jour
-
-                # Show frame at 10% from the start
-                frame_at_10_percent = int(self.total_frames * 0.1) if self.total_frames > 0 else 0
-                self.show_frame(frame_at_10_percent)
-
-            else:
+            if not self.cap.isOpened():
                 self.preview_label.setText("❌ Impossible d'ouvrir")
+                self.cleanup()  # Release failed capture
+                return
+
+            self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.fps = self.cap.get(cv2.CAP_PROP_FPS) or 30.0
+            self.duration = self.total_frames / self.fps if self.fps > 0 else 0
+
+            # Info label supprimé - pas besoin de mettre à jour
+
+            # Show frame at 10% from the start
+            frame_at_10_percent = int(self.total_frames * 0.1) if self.total_frames > 0 else 0
+            self.show_frame(frame_at_10_percent)
 
             cv2.setLogLevel(1)
 
         except Exception as e:
             logger.error(f"Error loading {self.video_path}: {e}")
             self.preview_label.setText("❌ Erreur de chargement")
+            self.cleanup()  # Ensure cleanup on error
     
     def show_frame(self, frame_number):
         """Display a specific frame"""
@@ -151,9 +158,10 @@ class VideoPreviewWidget(QWidget):
             else:
                 self.preview_label.setText(f"Image {frame_number} non disponible")
 
-        except Exception as e:
+        except (OSError, cv2.error) as e:
             logger.error(f"Error displaying frame {frame_number}: {e}")
             self.preview_label.setText("Erreur d'affichage")
+            self.cleanup()  # Cleanup on error
     
     def seek_to_position(self, position):
         """Seek to a relative position (0.0 to 1.0)"""
@@ -224,14 +232,20 @@ class VideoPreviewWidget(QWidget):
         return 0
 
     def cleanup(self):
-        """Release resources"""
+        """Release resources explicitly"""
         try:
-            if self.cap:
+            if self.cap is not None:
                 self.cap.release()
                 self.cap = None
+                logger.debug(f"Released video capture for {self.video_path}")
         except Exception as e:
             logger.error(f"Error cleaning up {self.video_path}: {e}")
 
+    def closeEvent(self, event):
+        """Qt close event - ensure cleanup"""
+        self.cleanup()
+        super().closeEvent(event)
+
     def __del__(self):
-        """Destructor to ensure cleanup"""
+        """Destructor fallback - ensure cleanup"""
         self.cleanup()

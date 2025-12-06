@@ -20,6 +20,13 @@ python-magic==0.4.27
 bitstring==4.2.3
 click==8.1.8
 
+# Audio fingerprinting
+librosa>=0.10.0
+soundfile>=0.12.1
+
+# LSH for fast audio similarity search (Level 1 of advanced pipeline)
+datasketch>=1.6.0
+
 # Audio fingerprinting (OPTIONAL - for scene detection)
 # Uncomment to enable accurate scene detection anywhere in videos
 # pyacoustid>=1.2.0

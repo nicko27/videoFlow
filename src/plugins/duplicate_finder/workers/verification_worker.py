@@ -6,6 +6,7 @@ with intelligent caching to avoid re-verification of unchanged files.
 """
 
 import os
+import threading
 from typing import List, Dict
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -59,6 +60,7 @@ class VerificationWorker(QThread):
         self.matches = matches
         self.db = db
         self._stop_requested = False
+        self._stop_flag = threading.Event()
         self.results = []
 
         logger.info(f"VerificationWorker initialized with {len(matches)} matches")
@@ -66,6 +68,7 @@ class VerificationWorker(QThread):
     def stop(self):
         """Request worker to stop gracefully."""
         self._stop_requested = True
+        self._stop_flag.set()
         logger.info("Verification stop requested")
 
     def run(self):
@@ -120,13 +123,14 @@ class VerificationWorker(QThread):
 
                     logger.info(f"Verifying {short_name} @ {match['start_time']:.1f}s")
 
-                    # Run verification
+                    # Run verification with stop flag
                     verification_result = self.verifier.verify_with_strategy3(
                         short_video=match['short_video'],
                         long_video=match['long_video'],
                         start_time=match['start_time'],
                         duration=match['duration'],
-                        sequence_score=match['sequence_score']
+                        sequence_score=match['sequence_score'],
+                        stop_flag=self._stop_flag
                     )
 
                     # Store in cache for future runs
