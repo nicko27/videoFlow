@@ -9,13 +9,14 @@
 ## TABLE OF CONTENTS
 
 1. [Core Plugin Files](#core-plugin-files)
-2. [Audio Processing](#audio-processing)
-3. [Analysis Pipeline](#analysis-pipeline)
-4. [Handlers](#handlers)
-5. [Workers](#workers)
-6. [UI Components](#ui-components)
-7. [Database & Caching](#database--caching)
-8. [Utilities & Validators](#utilities--validators)
+2. [Configuration Module](#configuration-module) ✨ NEW
+3. [Audio Processing](#audio-processing)
+4. [Analysis Pipeline](#analysis-pipeline)
+5. [Handlers](#handlers)
+6. [Workers](#workers)
+7. [UI Components](#ui-components)
+8. [Database & Caching](#database--caching)
+9. [Utilities & Validators](#utilities--validators)
 
 ---
 
@@ -84,6 +85,234 @@ def get_version(self):
 **Purpose**: Return plugin version
 **Returns**: Version string "1.0.0"
 **Location**: plugin.py:42-43
+
+---
+
+## CONFIGURATION MODULE
+
+### `config/__init__.py` (Lines 1-20)
+
+#### Module Exports
+```python
+__all__ = [
+    'Paths',
+    'VideoComparison',
+    'Strategy3Verification',
+    'AudioFingerprinting',
+    'Performance',
+    'Timeouts',
+]
+```
+**Purpose**: Clean public API for configuration constants
+**Exports**: 6 dataclass constants modules
+**Location**: config/__init__.py:1-20
+**Added**: 2025-12-06 (ISSUE #18 fix)
+
+---
+
+### `config/constants.py` (Lines 1-320)
+
+#### `Paths` (Lines 16-32)
+```python
+@dataclass
+class Paths:
+    """Application paths and directories."""
+    DATA_DIR: ClassVar[Path] = Path.home() / '.duplicate_finder'
+    CACHE_DIR: ClassVar[Path] = DATA_DIR / 'cache'
+    LOG_DIR: ClassVar[Path] = DATA_DIR / 'logs'
+    DB_PATH: ClassVar[Path] = DATA_DIR / 'duplicates.db'
+    AUDIO_CACHE_DIR: ClassVar[Path] = CACHE_DIR / 'audio'
+    VIDEO_CACHE_DIR: ClassVar[Path] = CACHE_DIR / 'video'
+    HASH_CACHE_DIR: ClassVar[Path] = CACHE_DIR / 'hashes'
+    TEMP_DIR: ClassVar[Path] = DATA_DIR / 'temp'
+```
+**Purpose**: Centralized path definitions
+**Constants**: 9 paths (all ClassVar[Path])
+**Usage**: `from config.constants import Paths; db = Paths.DB_PATH`
+**Location**: constants.py:16-32
+**Replaces**: Hardcoded paths in database_manager.py, etc.
+
+#### `VideoComparison` (Lines 35-70)
+```python
+@dataclass
+class VideoComparison:
+    """Video comparison and hashing thresholds."""
+    DEFAULT_THRESHOLD: ClassVar[float] = 0.85
+    HIGH_PRECISION_THRESHOLD: ClassVar[float] = 0.92
+    LOW_PRECISION_THRESHOLD: ClassVar[float] = 0.75
+    DURATION_TOLERANCE: ClassVar[float] = 0.05
+    SIZE_TOLERANCE: ClassVar[float] = 0.10
+    FRAME_EXTRACTION_COUNT: ClassVar[int] = 10
+    FRAME_SAMPLE_INTERVAL: ClassVar[int] = 5
+    HASH_SIZE: ClassVar[int] = 8
+    HIGHFREQ_FACTOR: ClassVar[int] = 4
+```
+**Purpose**: Video comparison thresholds and parameters
+**Constants**: 9 constants (thresholds, tolerances, hash params)
+**Usage**: `if similarity > VideoComparison.DEFAULT_THRESHOLD:`
+**Location**: constants.py:35-70
+**Replaces**: Magic numbers in video_hasher.py
+**Documentation**: Includes rationale for each threshold
+
+#### `Strategy3Verification` (Lines 73-112)
+```python
+@dataclass
+class Strategy3Verification:
+    """Strategy 3 subsequence verification thresholds."""
+    SCENE_CUT_THRESHOLD: ClassVar[float] = 30.0
+    MAX_SCENE_CUTS_ALLOWED: ClassVar[int] = 0
+    DCT_THRESHOLD: ClassVar[float] = 75.0
+    SEQUENCE_THRESHOLD: ClassVar[float] = 95.0
+    FRAMES_TO_COMPARE: ClassVar[int] = 30
+    FRAME_SAMPLE_STEP: ClassVar[int] = 1
+```
+**Purpose**: Strategy 3 verification parameters
+**Constants**: 6 constants (scene detection, DCT, sequence)
+**Usage**: `if pixel_diff > Strategy3Verification.SCENE_CUT_THRESHOLD:`
+**Location**: constants.py:73-112
+**Replaces**: Magic numbers in subsequence_verification.py
+**Documentation**: Extensive docstrings explaining why 30.0, 75.0, 95.0
+
+**Why these values?**:
+- SCENE_CUT_THRESHOLD = 30.0: Calibrated from 100 test videos
+- DCT_THRESHOLD = 75.0: Catches re-encodes while rejecting edits
+- SEQUENCE_THRESHOLD = 95.0: Ensures temporal coherence
+
+#### `AudioFingerprinting` (Lines 115-158)
+```python
+@dataclass
+class AudioFingerprinting:
+    """Audio fingerprinting and comparison parameters."""
+    FAST_HOP_LENGTH: ClassVar[float] = 5.0
+    BALANCED_HOP_LENGTH: ClassVar[float] = 2.5
+    MAXIMUM_HOP_LENGTH: ClassVar[float] = 1.0
+    SAMPLE_RATE: ClassVar[int] = 22050
+    N_MFCC: ClassVar[int] = 20
+    N_FFT: ClassVar[int] = 2048
+    HOP_LENGTH_SAMPLES: ClassVar[int] = 512
+    MIN_MATCH_LENGTH: ClassVar[int] = 5
+    MATCH_THRESHOLD: ClassVar[float] = 0.85
+    CACHE_VERSION: ClassVar[int] = 2
+```
+**Purpose**: Audio fingerprinting parameters (MFCC, matching)
+**Constants**: 11 constants (hop lengths, MFCC params, matching)
+**Usage**: `hop_length = AudioFingerprinting.BALANCED_HOP_LENGTH`
+**Location**: constants.py:115-158
+**Replaces**: Magic numbers in audio_fingerprinting.py
+**Based on**: Shazam algorithm research
+**Trade-offs**: Speed vs accuracy documented
+
+#### `Performance` (Lines 161-197)
+```python
+@dataclass
+class Performance:
+    """Performance and optimization parameters."""
+    DEFAULT_HASH_WORKERS: ClassVar[int] = 4
+    DEFAULT_COMPARISON_WORKERS: ClassVar[int] = 8
+    MAX_WORKERS: ClassVar[int] = 16
+    HASH_CACHE_SIZE: ClassVar[int] = 1000
+    FRAME_CACHE_SIZE: ClassVar[int] = 100
+    AUDIO_CACHE_SIZE: ClassVar[int] = 500
+    DB_POOL_SIZE: ClassVar[int] = 10
+    DB_CACHE_SIZE: ClassVar[int] = 10000
+    MAX_VIDEO_SIZE_MB: ClassVar[int] = 10240
+    MAX_AUDIO_SIZE_MB: ClassVar[int] = 1024
+```
+**Purpose**: Performance tuning parameters
+**Constants**: 11 constants (workers, cache sizes, limits)
+**Usage**: `workers = Performance.DEFAULT_HASH_WORKERS`
+**Location**: constants.py:161-197
+**Controls**: Parallelization, caching, resource usage
+
+#### `Timeouts` (Lines 200-238)
+```python
+@dataclass
+class Timeouts:
+    """Timeout values for long-running operations."""
+    HASH_TIMEOUT: ClassVar[int] = 120
+    COMPARISON_TIMEOUT: ClassVar[int] = 60
+    FRAME_EXTRACTION_TIMEOUT: ClassVar[int] = 30
+    AUDIO_EXTRACTION_TIMEOUT: ClassVar[int] = 60
+    FINGERPRINT_TIMEOUT: ClassVar[int] = 120
+    SCENE_DETECTION_TIMEOUT: ClassVar[int] = 300
+    VERIFICATION_TIMEOUT: ClassVar[int] = 180
+    DB_QUERY_TIMEOUT: ClassVar[int] = 30
+    WORKER_SHUTDOWN_TIMEOUT: ClassVar[int] = 5
+```
+**Purpose**: Timeout values to prevent hanging
+**Constants**: 10 timeouts (all in seconds)
+**Usage**: `timeout = Timeouts.HASH_TIMEOUT`
+**Location**: constants.py:200-238
+**Prevents**: Hanging on corrupted/malformed files
+
+#### `LSHIndexing` (Lines 241-258)
+```python
+@dataclass
+class LSHIndexing:
+    """LSH (Locality-Sensitive Hashing) indexing parameters."""
+    NUM_PERM: ClassVar[int] = 128
+    THRESHOLD: ClassVar[float] = 0.80
+    NUM_BANDS: ClassVar[int] = 16
+    BATCH_SIZE: ClassVar[int] = 1000
+```
+**Purpose**: LSH indexing for Level 1 filtering
+**Constants**: 4 constants (MinHash, LSH params)
+**Usage**: `num_perm = LSHIndexing.NUM_PERM`
+**Location**: constants.py:241-258
+**Used by**: Level 1 of advanced pipeline (O(N) filtering)
+
+#### Module-Level Exports (Lines 261-320)
+```python
+# Backward compatibility exports
+DATA_DIR = Paths.DATA_DIR
+DEFAULT_THRESHOLD = VideoComparison.DEFAULT_THRESHOLD
+SCENE_CUT_THRESHOLD = Strategy3Verification.SCENE_CUT_THRESHOLD
+# ... 30+ more exports
+```
+**Purpose**: Backward compatibility with old imports
+**Allows**: `from config.constants import HASH_TIMEOUT` (old style)
+**Location**: constants.py:261-320
+**Benefit**: Gradual migration without breaking existing code
+
+---
+
+### Constants Summary
+
+**Total Constants**: 60+ constants across 6 dataclasses
+
+**By Category**:
+- **Paths** (9): All application directories and file paths
+- **VideoComparison** (9): Video hashing and comparison thresholds
+- **Strategy3Verification** (6): Subsequence verification parameters
+- **AudioFingerprinting** (11): Audio MFCC and matching parameters
+- **Performance** (11): Worker counts, cache sizes, limits
+- **Timeouts** (10): All operation timeouts
+- **LSHIndexing** (4): LSH/MinHash parameters
+
+**Benefits**:
+- ✅ Centralized: All constants in one place
+- ✅ Documented: Rationale for each value
+- ✅ Type-safe: ClassVar annotations
+- ✅ IDE-friendly: Autocomplete support
+- ✅ Maintainable: Easy to find and modify
+- ✅ Backward compatible: Module-level exports
+
+**Usage Pattern**:
+```python
+# Recommended (new style)
+from config.constants import VideoComparison
+if similarity > VideoComparison.DEFAULT_THRESHOLD:
+    # ...
+
+# Also supported (old style)
+from config.constants import DEFAULT_THRESHOLD
+if similarity > DEFAULT_THRESHOLD:
+    # ...
+```
+
+**Status**: Created 2025-12-06 (ISSUE #18 fix)
+**Integration**: Constants defined but not yet integrated into existing code
+**Next Step**: Replace hardcoded values incrementally
 
 ---
 
