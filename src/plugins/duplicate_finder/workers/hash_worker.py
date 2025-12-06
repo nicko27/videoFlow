@@ -13,9 +13,9 @@ from PyQt6.QtCore import QThread, pyqtSignal, QMutex
 from src.core.logger import Logger
 
 try:
-    from ..validators import ConfigValidator, FileValidator
+    from ..validators import FileValidator
 except ImportError:
-    from validators import ConfigValidator, FileValidator
+    from validators import FileValidator
 
 logger = Logger.get_logger('DuplicateFinder.HashWorker')
 
@@ -76,8 +76,8 @@ class ParallelHashWorker(QThread):
         self.video_hasher = video_hasher
         self.subsequence_detector = subsequence_detector
 
-        # Validate max_workers
-        validated_workers = ConfigValidator.validate_workers(max_workers, 'max_workers')
+        # Validate max_workers (simple validation)
+        validated_workers = max(1, min(max_workers or 4, 16))  # Between 1 and 16
         # Don't exceed number of files to process
         self.max_workers = min(validated_workers, max(1, len(files)))
         logger.info(f"Hash worker using {self.max_workers} workers for {len(files)} files")
@@ -86,8 +86,8 @@ class ParallelHashWorker(QThread):
         if self.subsequence_detector:
             logger.info("Dense hash pre-computation ENABLED - will compute during hashing phase")
 
-        # Validate timeout
-        self.timeout = ConfigValidator.validate_timeout(timeout, 'hash_timeout')
+        # Validate timeout (simple validation)
+        self.timeout = max(30, min(timeout or 600, 3600))  # Between 30s and 1 hour
 
         self._stop = False
         self._mutex = QMutex()

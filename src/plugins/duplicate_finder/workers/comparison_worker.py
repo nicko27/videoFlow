@@ -12,12 +12,10 @@ from PyQt6.QtCore import QThread, pyqtSignal, QMutex
 
 from src.core.logger import Logger
 
-try:
-    from ..validators import ConfigValidator
-except ImportError:
-    from validators import ConfigValidator
-
 logger = Logger.get_logger('DuplicateFinder.ComparisonWorker')
+
+# Default config values (replaces ConfigValidator)
+DEFAULT_BATCH_SIZE = 10
 
 
 class OptimizedComparisonWorker(QThread):
@@ -85,11 +83,11 @@ class OptimizedComparisonWorker(QThread):
         self.specific_pairs = specific_pairs
 
         # Validate and sanitize configuration
-        self.config = ConfigValidator.validate_config(config)
-        logger.info(f"Validated config: {self.config}")
+        self.config = config if config else {}
+        logger.info(f"Config: {self.config}")
 
-        # Validate threshold
-        self.threshold = ConfigValidator.validate_threshold(threshold)
+        # Validate threshold (simple validation)
+        self.threshold = max(0.0, min(threshold or 0.85, 1.0))  # Between 0.0 and 1.0
 
         self._stop = False
         self._mutex = QMutex()
@@ -317,7 +315,7 @@ class OptimizedComparisonWorker(QThread):
             # Additional runtime validation
             if batch_size <= 0:
                 logger.error(f"Invalid batch_size: {batch_size}. Using default.")
-                batch_size = ConfigValidator.DEFAULT_BATCH_SIZE
+                batch_size = DEFAULT_BATCH_SIZE
 
             if batch_size > len(pairs):
                 batch_size = len(pairs)
