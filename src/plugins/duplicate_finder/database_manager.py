@@ -1590,20 +1590,20 @@ class VideoDatabase:
                         logger.error("Must provide either subseq_id or both video paths")
                         return False
 
-                    # Get file IDs
-                    cursor.execute('SELECT id FROM video_files WHERE file_path = ?', (short_video_path,))
+                    # OPTIMIZED: Get both file IDs in a single query (ISSUE #26 fix)
+                    cursor.execute('''
+                        SELECT
+                            (SELECT id FROM video_files WHERE file_path = ?) as short_id,
+                            (SELECT id FROM video_files WHERE file_path = ?) as long_id
+                    ''', (short_video_path, long_video_path))
                     result = cursor.fetchone()
-                    if not result:
-                        logger.error(f"Short video not found in database: {short_video_path}")
+                    if not result or not result[0] or not result[1]:
+                        if not result or not result[0]:
+                            logger.error(f"Short video not found in database: {short_video_path}")
+                        if not result or not result[1]:
+                            logger.error(f"Long video not found in database: {long_video_path}")
                         return False
-                    short_id = result[0]
-
-                    cursor.execute('SELECT id FROM video_files WHERE file_path = ?', (long_video_path,))
-                    result = cursor.fetchone()
-                    if not result:
-                        logger.error(f"Long video not found in database: {long_video_path}")
-                        return False
-                    long_id = result[0]
+                    short_id, long_id = result
 
                     # Find subsequence ID
                     cursor.execute('''
@@ -1752,18 +1752,16 @@ class VideoDatabase:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # Get video IDs
-                cursor.execute('SELECT id FROM video_files WHERE file_path = ?', (short_video_path,))
-                short_row = cursor.fetchone()
-                if not short_row:
+                # OPTIMIZED: Get both video IDs in a single query (ISSUE #26 fix)
+                cursor.execute('''
+                    SELECT
+                        (SELECT id FROM video_files WHERE file_path = ?) as short_id,
+                        (SELECT id FROM video_files WHERE file_path = ?) as long_id
+                ''', (short_video_path, long_video_path))
+                result = cursor.fetchone()
+                if not result or not result[0] or not result[1]:
                     return None
-                short_id = short_row[0]
-
-                cursor.execute('SELECT id FROM video_files WHERE file_path = ?', (long_video_path,))
-                long_row = cursor.fetchone()
-                if not long_row:
-                    return None
-                long_id = long_row[0]
+                short_id, long_id = result
 
                 # Get cached result with time tolerance
                 cursor.execute('''
