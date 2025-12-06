@@ -2419,88 +2419,129 @@ cursor.execute(f'''
 
 ---
 
-### ⚠️ ISSUE #28: Unvalidated File Paths
+### ✅ ISSUE #28: Unvalidated File Paths [FIXED 2025-12-06]
 
 **Severity**: MEDIUM (Security)
-**Files**: Multiple
+**Status**: ✅ FIXED
+**Files**: `validators/file_validator.py` (new), `handlers/file_handler.py` (modified)
 
-#### Problem Description:
-File paths from user input are not validated for:
+#### Problem Description (Original):
+File paths from user input were not validated for security:
 - Path traversal attacks (`../../etc/passwd`)
 - Symbolic link attacks
 - Special file paths (`/dev/null`, named pipes)
+- Invalid/corrupt video files
+- Oversized files (DoS risk)
 
-**Example**:
+#### Fix Applied:
+
+**1. Created FileValidator class** (`validators/file_validator.py` - 300 lines):
+
 ```python
-# main_window.py - Add files dialog
-files = QFileDialog.getOpenFileNames(...)
-self.file_handler.add_files(files)  # No validation!
+class FileValidator:
+    """Validates file paths for security and integrity.
 
-# User could add:
-# - /etc/passwd (not a video but tries to process)
-# - ../../../../../sensitive_data.mp4
-# - Symlink to system files
+    Security checks:
+    - Path resolution and traversal detection
+    - Symbolic link prevention
+    - File type/extension whitelist
+    - File size limits (1 KB - 50 GB)
+    - Video format verification (optional)
+    """
+
+    ALLOWED_EXTENSIONS = {
+        '.mp4', '.avi', '.mov', '.mkv', '.flv',
+        '.wmv', '.webm', '.m4v', '.mpg', '.mpeg', ...
+    }
+
+    def validate_path(self, file_path: str) -> Tuple[bool, Optional[str]]:
+        """Comprehensive file validation with 8 security checks."""
+        # 1. Resolve to canonical path
+        # 2. Check path traversal
+        # 3. Check symbolic links
+        # 4. Verify file exists
+        # 5. Verify regular file
+        # 6. Check extension whitelist
+        # 7. Check file size limits
+        # 8. Verify video format (optional)
+
+    def validate_paths_batch(self, file_paths) -> Tuple[List, List]:
+        """Batch validation for multiple files."""
 ```
+
+**2. Integrated into FileHandler** (`handlers/file_handler.py`):
+
+```python
+class FileHandler:
+    def __init__(self, file_list_widget):
+        # SECURITY: File validator (ISSUE #28 fix)
+        self.file_validator = FileValidator(
+            verify_video_format=False  # Performance optimization
+        )
+
+    def add_files(self, file_paths):
+        # SECURITY: Validate all file paths
+        valid_files, invalid_files = self.file_validator.validate_paths_batch(
+            file_paths,
+            continue_on_error=True
+        )
+
+        # Log validation failures
+        if invalid_files:
+            logger.warning(f"Rejected {len(invalid_files)} invalid files")
+            for file_path, error in invalid_files[:5]:
+                logger.warning(f"  - {file_path}: {error}")
+
+        # Add only valid files
+        return self.file_list_widget.add_files(valid_files)
+
+    def add_folder(self, folder_path):
+        # Also validates all files from folder scan
+        valid_files, invalid_files = self.file_validator.validate_paths_batch(...)
+```
+
+#### Security Features Implemented:
+
+**1. Path Traversal Protection**:
+- Resolves paths to canonical form
+- Detects `..` in path components
+- Prevents access outside intended directories
+
+**2. Symbolic Link Prevention**:
+- Blocks symlink attacks by default
+- Configurable via `allow_symlinks` parameter
+
+**3. File Type Validation**:
+- Extension whitelist (15+ video formats)
+- Regular file check (blocks devices, pipes, etc.)
+
+**4. Size Limits**:
+- Minimum: 1 KB (filters empty/corrupt files)
+- Maximum: 50 GB (prevents DoS from huge files)
+- Configurable limits
+
+**5. Video Format Verification** (optional):
+- OpenCV validation (can open as video)
+- Frame readability check
+- Skipped by default for performance
+
+**6. Batch Validation**:
+- Validates multiple files efficiently
+- `continue_on_error` mode for UX
+- Detailed error reporting
+
+**7. Safe Filename Check**:
+- Static method for filename validation
+- Blocks shell metacharacters
+- Prevents command injection
 
 #### Impact:
-- Information disclosure
-- Denial of service (process infinite file)
-- Potential privilege escalation
-
-#### Fix Required:
-**Validate file paths**:
-
-```python
-import os
-from pathlib import Path
-
-class FileValidator:
-    ALLOWED_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm'}
-    MAX_FILE_SIZE = 10 * 1024 * 1024 * 1024  # 10 GB
-
-    @staticmethod
-    def validate_path(file_path: str) -> Tuple[bool, Optional[str]]:
-        """
-        Validate file path for security.
-
-        Returns:
-            (is_valid, error_message)
-        """
-        try:
-            # Resolve to absolute path
-            path = Path(file_path).resolve()
-
-            # Check path traversal
-            if '..' in path.parts:
-                return False, "Path traversal detected"
-
-            # Check symbolic link
-            if path.is_symlink():
-                return False, "Symbolic links not allowed"
-
-            # Check is regular file
-            if not path.is_file():
-                return False, "Not a regular file"
-
-            # Check extension
-            if path.suffix.lower() not in FileValidator.ALLOWED_EXTENSIONS:
-                return False, f"Invalid extension: {path.suffix}"
-
-            # Check file size
-            if path.stat().st_size > FileValidator.MAX_FILE_SIZE:
-                return False, "File too large"
-
-            # Check is video file (try to open with OpenCV)
-            cap = cv2.VideoCapture(str(path))
-            if not cap.isOpened():
-                return False, "Not a valid video file"
-            cap.release()
-
-            return True, None
-
-        except Exception as e:
-            return False, f"Validation error: {e}"
-```
+- ✅ **Security**: Prevents path traversal, symlink attacks, invalid files
+- ✅ **Robustness**: Filters out corrupt/invalid files early
+- ✅ **DoS Prevention**: Size limits prevent resource exhaustion
+- ✅ **Logging**: Detailed validation failure reporting
+- ✅ **Performance**: Batch validation, optional format checks
+- ✅ **UX**: Continues processing valid files despite some failures
 
 ---
 
@@ -2733,13 +2774,14 @@ Users must figure out features by trial and error.
   - ⚠️  ISSUE #11: Incomplete i18n (95% français hardcodé)
 
 **Medium Priority Issues**: 6 total
-- ✅ Fixed: 5/6 (83%)
+- ✅ Fixed: 6/6 (100%) ✅ **ALL MEDIUM PRIORITY ISSUES RESOLVED!**
   - ✅ ISSUE #12: Dead code removed (database_manager, themes deprecated) (2025-12-06)
   - ✅ ISSUE #13: Standardized error handling (error_handling.py module) (2025-12-06)
   - ✅ ISSUE #14: Audio extraction cancellation (timeout + stop checks) (2025-12-06)
   - ✅ ISSUE #15: Cache invalidation improved (mtime + size validation) (2025-12-06)
   - ✅ ISSUE #25: Frame extraction caching (10-100x speedup for N² comparisons) (2025-12-06)
-- ⚠️  Remaining: 1/6 (17%)
+  - ✅ ISSUE #28: File path validation (security + integrity checks) (2025-12-06)
+- ⚠️  Remaining: 0/6 (0%)
 
 **Low Priority Issues**: 8 total
 - ✅ Fixed/Verified: 5/8 (62.5%)

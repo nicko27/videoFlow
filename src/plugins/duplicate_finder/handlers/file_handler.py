@@ -3,12 +3,15 @@ File operations handler for the duplicate finder.
 
 This module handles all file-related operations including adding files,
 managing file lists, and validating file paths.
+
+Updated: 2025-12-06 (Phase 10 - Added file validation for ISSUE #28)
 """
 import os
 from typing import List, Tuple
 from PyQt6.QtWidgets import QFileDialog
 
 from src.core.logger import Logger
+from ..validators import FileValidator, ValidationError
 
 logger = Logger.get_logger('DuplicateFinder.FileHandler')
 
@@ -40,7 +43,17 @@ class FileHandler:
             file_list_widget: FileListWidget instance for managing the file list UI.
         """
         self.file_list_widget = file_list_widget
-        logger.info("File handler initialized")
+
+        # SECURITY: File validator for path validation (ISSUE #28 fix)
+        # Validates file paths to prevent security issues:
+        # - Path traversal attacks
+        # - Symbolic link exploits
+        # - Invalid/corrupt files
+        self.file_validator = FileValidator(
+            verify_video_format=False  # Skip OpenCV check for performance (done later)
+        )
+
+        logger.info("File handler initialized with security validation")
 
     def add_files_dialog(self, parent=None) -> int:
         """
@@ -86,36 +99,57 @@ class FileHandler:
 
     def add_files(self, file_paths: List[str]) -> int:
         """
-        Add files to the file list.
+        Add files to the file list with security validation.
 
-        This method filters out duplicate files that are already in the list.
+        This method filters out duplicate files that are already in the list
+        and validates all file paths for security (ISSUE #28 fix).
 
         Args:
             file_paths: List of file paths to add.
 
         Returns:
-            Number of new files added (excluding duplicates).
+            Number of new files added (excluding duplicates and invalid files).
         """
+        # SECURITY: Validate all file paths (ISSUE #28 fix)
+        # This prevents path traversal, symlink attacks, and invalid files
+        valid_files, invalid_files = self.file_validator.validate_paths_batch(
+            file_paths,
+            continue_on_error=True  # Validate all files, don't stop on first error
+        )
+
+        # Log any validation failures
+        if invalid_files:
+            logger.warning(f"Rejected {len(invalid_files)} invalid files during validation:")
+            for file_path, error in invalid_files[:5]:  # Show first 5
+                logger.warning(f"  - {os.path.basename(file_path)}: {error}")
+            if len(invalid_files) > 5:
+                logger.warning(f"  ... and {len(invalid_files) - 5} more")
+
         # Optimisation O(N) : conversion en set pour lookup rapide
         existing_files = set(self.file_list_widget.get_files())
-        new_files = [f for f in file_paths if f not in existing_files]
+        new_files = [f for f in valid_files if f not in existing_files]
 
         if new_files:
             count = self.file_list_widget.add_files(new_files)
-            logger.info(f"Added {count} new files")
+            logger.info(
+                f"Added {count} new files "
+                f"(rejected {len(invalid_files)} invalid, "
+                f"skipped {len(valid_files) - len(new_files)} duplicates)"
+            )
             return count
 
+        logger.info(f"No new files to add (rejected {len(invalid_files)} invalid)")
         return 0
 
     def add_folder(self, folder_path: str) -> int:
         """
-        Add all video files from a folder and its subfolders.
+        Add all video files from a folder and its subfolders with validation.
 
         Args:
             folder_path: Path to the folder to scan.
 
         Returns:
-            Number of files added.
+            Number of files added (after validation).
         """
         if not os.path.isdir(folder_path):
             logger.warning(f"Invalid folder path: {folder_path}")
@@ -133,9 +167,28 @@ class FileHandler:
                     if file_path not in existing_files:
                         found_files.append(file_path)
 
-        if found_files:
-            count = self.file_list_widget.add_files(found_files)
-            logger.info(f"Added {count} files from folder: {folder_path}")
+        if not found_files:
+            logger.info(f"No new video files found in folder: {folder_path}")
+            return 0
+
+        # SECURITY: Validate all found files (ISSUE #28 fix)
+        valid_files, invalid_files = self.file_validator.validate_paths_batch(
+            found_files,
+            continue_on_error=True
+        )
+
+        if invalid_files:
+            logger.warning(
+                f"Rejected {len(invalid_files)} invalid files from folder scan "
+                f"(total found: {len(found_files)})"
+            )
+
+        if valid_files:
+            count = self.file_list_widget.add_files(valid_files)
+            logger.info(
+                f"Added {count} files from folder: {folder_path} "
+                f"(rejected {len(invalid_files)} invalid)"
+            )
             return count
 
         return 0
