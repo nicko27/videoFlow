@@ -175,7 +175,8 @@ class SceneDetectionWorker(QThread):
                     # Estimate duration from last timestamp
                     video_durations[video_path] = max([t for _, t in hashes]) if hashes else 0
 
-        # Generate pairs where one video is significantly shorter
+        # Generate pairs where one video is shorter than the other
+        # The audio fingerprinting algorithm will handle the actual duration checks
         pairs = []
         for i, video1 in enumerate(self.files):
             if video1 not in video_durations:
@@ -188,14 +189,13 @@ class SceneDetectionWorker(QThread):
                 dur1 = video_durations[video1]
                 dur2 = video_durations[video2]
 
-                # One must be at least 20% shorter
-                if dur1 > 0 and dur2 > 0:
-                    ratio = min(dur1, dur2) / max(dur1, dur2)
-                    if ratio < 0.80:  # At least 20% difference
-                        if dur1 < dur2:
-                            pairs.append((video1, video2))
-                        else:
-                            pairs.append((video2, video1))
+                # Only require that one video is shorter (let audio fingerprinting check duration requirements)
+                if dur1 > 0 and dur2 > 0 and dur1 != dur2:
+                    # Always put shorter video first (short_video, long_video)
+                    if dur1 < dur2:
+                        pairs.append((video1, video2))
+                    else:
+                        pairs.append((video2, video1))
 
         logger.info(f"Checking {len(pairs)} potential scene pairs")
 
