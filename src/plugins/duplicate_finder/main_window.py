@@ -34,7 +34,7 @@ try:
     from .handlers.duplicate_handler import DuplicateHandler
     from .handlers.audio_first_handler import AudioFirstHandler
     from .audio_config import AudioFirstConfig
-    from .themes import get_current_theme
+    from .design_system import get_current_theme
     from .layouts import LayoutManager, LayoutType
     from .audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
     from .advanced_progress_dialog import AdvancedProgressDialog
@@ -52,7 +52,7 @@ except ImportError:
     from handlers.duplicate_handler import DuplicateHandler
     from handlers.audio_first_handler import AudioFirstHandler
     from audio_config import AudioFirstConfig
-    from themes import get_current_theme
+    from design_system import get_current_theme
     from layouts import LayoutManager, LayoutType
     from audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
     from advanced_progress_dialog import AdvancedProgressDialog

@@ -11,11 +11,9 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QPalette, QColor, QPixmap, QImage
 
 try:
-    from .design_system import Colors, Spacing, Typography, Styles, get_status_colors
-    from .themes import get_current_theme
+    from .design_system import Colors, Spacing, Typography, Styles, get_status_colors, get_current_theme
 except ImportError:
-    from design_system import Colors, Spacing, Typography, Styles, get_status_colors
-    from themes import get_current_theme
+    from design_system import Colors, Spacing, Typography, Styles, get_status_colors, get_current_theme
 
 from src.core.logger import Logger
 

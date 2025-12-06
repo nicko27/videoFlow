@@ -472,3 +472,32 @@ def get_status_colors(status_type: str) -> Dict[str, str]:
     }
 
     return status_map.get(status_type.lower(), StatusColors.INFO)
+
+
+class SimpleTheme:
+    """Simple theme object for backward compatibility."""
+
+    def get_spacing(self) -> Dict[str, int]:
+        """Get theme-specific spacing values.
+
+        Returns:
+            Dictionary with spacing values for the theme
+        """
+        return {
+            'padding': Spacing.MD,
+            'gap': Spacing.SM,
+            'margin': Spacing.MD
+        }
+
+
+# Global simple theme instance
+_simple_theme = SimpleTheme()
+
+
+def get_current_theme() -> SimpleTheme:
+    """Get the current theme.
+
+    Returns:
+        SimpleTheme instance with get_spacing() method
+    """
+    return _simple_theme

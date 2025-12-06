@@ -14,7 +14,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 from ..progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator, HashDebuggerV2
-from ..themes import get_current_theme
+from ..design_system import get_current_theme
 from ..i18n import get_translator
 
 
