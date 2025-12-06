@@ -529,49 +529,60 @@ if stop_flag and stop_flag.is_set():
 
 ---
 
-### ⚠️ ISSUE #10: No Progress Indication for Long Operations
+### ✅ ISSUE #10: No Progress Indication for Long Operations [ALREADY RESOLVED]
 
 **Severity**: MEDIUM (UX)
+**Status**: ✅ ALREADY IMPLEMENTED
 **Files**: Multiple
 
-#### Problem Description:
-Several long-running operations provide no progress feedback:
+#### Original Problem Description:
+Several long-running operations were reported to provide no progress feedback.
 
-**1. Audio Extraction** (`audio_worker.py`):
-- Extracts audio from 100+ videos
-- Each video takes 5-30 seconds
-- Progress bar exists but not connected for audio extraction phase
+#### Investigation Results (2025-12-06):
+Upon detailed code analysis, **all three operations already have progress callbacks implemented**:
 
-**2. LSH Index Building** (`analysis/lsh_audio.py:49-138`):
-- Extracts MFCC features from all files
-- Can take 5-10 minutes for 200 videos
-- No progress indication
+**1. Audio Extraction** (`workers/audio_worker.py`):
+- ✅ **HAS progress signals**: `self.progress.emit(processed, total, display_path)` (line 106)
+- ✅ Shows status: "✓ Cached", "✓ Extrait", "Timeout", "Erreur"
+- ✅ Connected to UI via PyQt signals
+- **Status**: Fully functional
 
-**3. Dense Hash Pre-computation** (`subsequence_detector.py:350-435`):
-- Computes frame-level hashes
-- Can take 10+ minutes
-- No progress bar
+**2. LSH Index Building** (`analysis/lsh_audio.py:406-508`):
+- ✅ **HAS progress_callback parameter**: `def find_candidates(..., progress_callback: Optional[Callable] = None)` (line 410)
+- ✅ **Connected in advanced_pipeline.py** (lines 189-191):
+  ```python
+  candidates_l1 = self.lsh_analyzer.find_candidates(
+      video_paths,
+      self.db,
+      progress_callback=lambda cur, tot, msg: self._update_progress(
+          "Level 1", cur, tot, msg
+      )
+  )
+  ```
+- ✅ Phase 1 progress (lines 433-438): Processing each video
+- ✅ Phase 2 progress (lines 464-469): Finding candidates
+- **Status**: Fully functional
 
-#### Impact:
-- User thinks application is frozen
-- No way to estimate completion time
-- Frustrating UX
+**3. Dense Hash Pre-computation** (`subsequence_detector.py:167-186`):
+- ✅ **HAS progress_callback parameter**: `def compute_dense_hash(self, video_path: str, progress_callback=None)` (line 167)
+- ✅ Callback for cache hits (lines 183-184): `progress_callback(1, 1, "Loaded from cache")`
+- ✅ Called during processing with progress updates
+- **Status**: Fully functional
 
-#### Fix Required:
-Add progress callbacks to all long operations:
+#### Conclusion:
+This issue was based on outdated analysis. All long-running operations **already have** progress indication:
+- Audio extraction: PyQt signals with status
+- LSH indexing: Callback connected to UI
+- Dense hash: Callback parameter
 
-```python
-# Example for LSH index building:
-def build_index(self, files: List[str], progress_callback: Optional[Callable] = None) -> bool:
-    total = len(files)
+**No fix needed** - functionality already exists and is properly connected to UI.
 
-    for i, file_path in enumerate(files):
-        if progress_callback:
-            progress_callback(i, total, f"Processing {os.path.basename(file_path)}")
-
-        features = self._extract_audio_features(file_path)
-        # ... rest of processing
-```
+#### Evidence:
+- `analysis/lsh_audio.py:410` - progress_callback parameter
+- `analysis/lsh_audio.py:433-438, 464-469` - progress_callback invocations
+- `analysis/advanced_pipeline.py:189-191` - callback connection
+- `workers/audio_worker.py:106` - progress.emit()
+- `subsequence_detector.py:167, 183-184` - progress_callback
 
 ---
 
@@ -953,90 +964,132 @@ def get_hash(self, file_path: str, hash_type: str) -> Optional[str]:
 
 ## LOW PRIORITY ISSUES
 
-### ⚠️ ISSUE #16: No Logging Configuration
+### ✅ ISSUE #16: No Logging Configuration [FIXED 2025-12-06]
 
 **Severity**: LOW (Debugging)
-**Files**: All files use logger
+**Status**: ✅ FIXED
+**Files**: `src/core/logger.py`
 
-#### Problem Description:
-All files use `Logger.get_logger()` but there's no global logging configuration. Users cannot:
+#### Original Problem Description:
+All files use `Logger.get_logger()` but there was no way to configure logging levels dynamically. Users could not:
 - Set log level (DEBUG, INFO, WARNING, ERROR)
-- Configure log output (file, console, both)
-- Rotate log files
-- Filter logs by module
+- Change levels without restart
+- View current configuration
 
-#### Impact:
-- Difficult to debug user issues
-- No persistent logs for error reporting
-- Cannot enable verbose logging when needed
+#### Investigation Results:
+The logger already had:
+- ✅ File rotation (100MB, 5 backups)
+- ✅ Console and file handlers
+- ✅ Proper formatting
 
-#### Fix Required:
-**Add logging configuration**:
+But was missing:
+- ❌ User-configurable levels
+- ❌ Dynamic level changes
+- ❌ Configuration API
+
+#### Fix Applied ✅:
+
+**Added configuration methods** to `src/core/logger.py`:
+
+**1. Configure before initialization** (lines 138-160):
 ```python
-# src/core/logger.py
-import logging
-from logging.handlers import RotatingFileHandler
-from pathlib import Path
-
-class Logger:
-    _configured = False
-
-    @classmethod
-    def configure(cls, level=logging.INFO, log_file=None):
-        if cls._configured:
-            return
-
-        # Create logs directory
-        if log_file is None:
-            log_dir = Path.home() / '.duplicate_finder' / 'logs'
-            log_dir.mkdir(parents=True, exist_ok=True)
-            log_file = log_dir / 'duplicate_finder.log'
-
-        # Configure root logger
-        root_logger = logging.getLogger('DuplicateFinder')
-        root_logger.setLevel(level)
-
-        # Console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(level)
-        console_formatter = logging.Formatter(
-            '%(levelname)s - %(name)s - %(message)s'
-        )
-        console_handler.setFormatter(console_formatter)
-        root_logger.addHandler(console_handler)
-
-        # File handler with rotation
-        file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=10*1024*1024,  # 10 MB
-            backupCount=5
-        )
-        file_handler.setLevel(logging.DEBUG)  # Always log DEBUG to file
-        file_formatter = logging.Formatter(
-            '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
-        )
-        file_handler.setFormatter(file_formatter)
-        root_logger.addHandler(file_handler)
-
-        cls._configured = True
-
-    @classmethod
-    def get_logger(cls, name):
-        cls.configure()  # Ensure configured
-        return logging.getLogger(f'DuplicateFinder.{name}')
+@classmethod
+def configure(cls, console_level=logging.INFO, file_level=logging.DEBUG):
+    """Configure logging levels before first use."""
+    if not cls._initialized:
+        instance = cls()
+        instance._setup_logger(console_level, file_level)
+    else:
+        cls.set_console_level(console_level)
+        cls.set_file_level(file_level)
 ```
 
-**Add settings for log level**:
+**2. Dynamic level changes** (lines 162-202):
 ```python
-# In settings UI
+@classmethod
+def set_console_level(cls, level):
+    """Dynamically change console logging level."""
+    if cls._console_handler:
+        cls._console_handler.setLevel(level)
+        logger = logging.getLogger('VideoFlow')
+        logger.info(f"Console log level changed to {logging.getLevelName(level)}")
+
+@classmethod
+def set_file_level(cls, level):
+    """Dynamically change file logging level."""
+    if cls._file_handler:
+        cls._file_handler.setLevel(level)
+        logger = logging.getLogger('VideoFlow')
+        logger.info(f"File log level changed to {logging.getLevelName(level)}")
+```
+
+**3. Get current configuration** (lines 204-220):
+```python
+@classmethod
+def get_current_levels(cls):
+    """Get current logging levels for console and file."""
+    if cls._console_handler and cls._file_handler:
+        return {
+            'console': logging.getLevelName(cls._console_handler.level),
+            'file': logging.getLevelName(cls._file_handler.level)
+        }
+    return {'console': 'NOT_INITIALIZED', 'file': 'NOT_INITIALIZED'}
+```
+
+#### Usage Examples:
+
+**Configure at startup**:
+```python
+from src.core.logger import Logger
+import logging
+
+# Set console to INFO, file to DEBUG (default)
+Logger.configure(console_level=logging.INFO, file_level=logging.DEBUG)
+
+# Get logger
+logger = Logger.get_logger('MyModule')
+logger.debug("This goes to file only")
+logger.info("This goes to both console and file")
+```
+
+**Dynamic level changes**:
+```python
+# Enable debug on console for troubleshooting
+Logger.set_console_level(logging.DEBUG)
+
+# Reduce file logging to save space
+Logger.set_file_level(logging.WARNING)
+
+# Check current configuration
+levels = Logger.get_current_levels()
+print(f"Console: {levels['console']}, File: {levels['file']}")
+```
+
+**UI Integration**:
+```python
+# In settings dialog
+from PyQt6.QtWidgets import QComboBox
+
 log_level_combo = QComboBox()
 log_level_combo.addItems(['DEBUG', 'INFO', 'WARNING', 'ERROR'])
-log_level_combo.currentTextChanged.connect(self.on_log_level_changed)
-
-def on_log_level_changed(self, level_text):
-    level = getattr(logging, level_text)
-    Logger.configure(level=level)
+log_level_combo.currentTextChanged.connect(lambda text:
+    Logger.set_console_level(getattr(logging, text))
+)
 ```
+
+#### Benefits:
+- ✅ Configure logging levels independently for console and file
+- ✅ Change levels dynamically without restart
+- ✅ Query current configuration
+- ✅ Console uses concise format, file uses detailed format
+- ✅ Backward compatible (works without configuration)
+- ✅ Default: INFO for console, DEBUG for file
+
+#### Impact:
+- Better debugging capability
+- User can reduce console verbosity
+- File always has DEBUG for troubleshooting
+- Easy integration with settings UI
 
 ---
 
@@ -2184,12 +2237,12 @@ Users must figure out features by trial and error.
   - ✅ ERROR #6: Scene detection timeout (2025-12-06)
 
 **High Priority Issues**: 5 total
-- ✅ Fixed: 3/5 (60%)
+- ✅ Fixed/Verified: 4/5 (80%)
   - ✅ ISSUE #7: OpenCV resource leak (2025-12-06)
   - ✅ ISSUE #8: Database thread safety verified (already correct)
   - ✅ ISSUE #9: Verification worker graceful stop (2025-12-06)
-- ⚠️  Remaining: 2/5 (40%)
-  - ⚠️  ISSUE #10: No progress for long operations
+  - ✅ ISSUE #10: Progress indication (already implemented - verified 2025-12-06)
+- ⚠️  Remaining: 1/5 (20%)
   - ⚠️  ISSUE #11: Incomplete i18n (95% français hardcodé)
 
 **Medium Priority Issues**: 6 total
@@ -2200,13 +2253,16 @@ Users must figure out features by trial and error.
 - ⚠️  Remaining: 3/6 (50%)
   - ⚠️  ISSUE #15: Cache invalidation edge case
 
-**Low Priority Issues**: 8
-- No logging configuration
-- No unit tests
-- Hardcoded paths and magic numbers
-- Inconsistent naming
-- Insufficient docstrings
-- Long functions
+**Low Priority Issues**: 8 total
+- ✅ Fixed: 1/8 (12.5%)
+  - ✅ ISSUE #16: Logging configuration (added configure(), set_console_level(), set_file_level()) (2025-12-06)
+- ⚠️  Remaining: 7/8 (87.5%)
+  - ⚠️  ISSUE #17: No unit tests
+  - ⚠️  Hardcoded paths and magic numbers
+  - ⚠️  Inconsistent naming
+  - ⚠️  Insufficient docstrings
+  - ⚠️  Long functions
+  - ⚠️  (Other low priority issues)
 
 **Code Quality**: 3 major issues
 - Inconsistent naming conventions

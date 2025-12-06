@@ -25,24 +25,37 @@ class Logger:
         - File output with rotation (100MB max, 5 backups)
         - Timestamped log files in the logs/ directory
         - UTF-8 encoding support
-        - DEBUG level logging by default
+        - Configurable log levels (DEBUG, INFO, WARNING, ERROR)
+        - Dynamic level changes without restart
 
     Attributes:
         _instance (Logger): Singleton instance of the Logger class.
         _initialized (bool): Whether the logger has been initialized.
         logger (logging.Logger): The main VideoFlow logger instance.
+        _console_handler (logging.Handler): Console handler for level control.
+        _file_handler (logging.Handler): File handler for level control.
 
     Example:
         Get a logger for a specific module::
 
             from src.core.logger import Logger
 
+            # Configure logging level (before first use)
+            Logger.configure(console_level=logging.INFO, file_level=logging.DEBUG)
+
+            # Get logger instance
             logger = Logger.get_logger('MyModule')
             logger.info('Application started')
             logger.error('An error occurred', exc_info=True)
+
+            # Change logging level dynamically
+            Logger.set_console_level(logging.DEBUG)
+            Logger.set_file_level(logging.WARNING)
     """
     _instance = None
     _initialized = False
+    _console_handler = None
+    _file_handler = None
 
     def __new__(cls):
         """Create or return the singleton Logger instance.
@@ -60,33 +73,37 @@ class Logger:
             Logger._initialized = True
             self._setup_logger()
 
-    def _setup_logger(self):
+    def _setup_logger(self, console_level=logging.INFO, file_level=logging.DEBUG):
         """Configure the logging system.
 
         Sets up both console and file handlers with appropriate formatting.
-        Console handler outputs to stdout with DEBUG level, while file handler
-        writes to rotating log files in the logs/ directory.
+        Console handler outputs to stdout, while file handler writes to
+        rotating log files in the logs/ directory.
 
         The log file naming includes a timestamp to differentiate between
         application runs. Files are rotated when they reach 100MB, keeping
         up to 5 backup files.
+
+        Args:
+            console_level: Logging level for console (default: INFO)
+            file_level: Logging level for file (default: DEBUG)
         """
         # Main logger configuration
         self.logger = logging.getLogger('VideoFlow')
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.DEBUG)  # Allow all levels, handlers filter
 
-        # Console handler with more details
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.DEBUG)  # Changed to DEBUG to see all messages
+        # Console handler
+        Logger._console_handler = logging.StreamHandler(sys.stdout)
+        Logger._console_handler.setLevel(console_level)
 
-        # Console message format
+        # Console message format (more concise for console)
         console_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
+            '%(levelname)s - %(name)s - %(message)s'
         )
-        console_handler.setFormatter(console_formatter)
+        Logger._console_handler.setFormatter(console_formatter)
 
         # Add console handler
-        self.logger.addHandler(console_handler)
+        self.logger.addHandler(Logger._console_handler)
 
         try:
             # Create logs directory if it doesn't exist
@@ -97,26 +114,110 @@ class Logger:
             log_file = os.path.join(logs_dir, f'videoflow_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
 
             # File handler with rotation
-            file_handler = RotatingFileHandler(
+            Logger._file_handler = RotatingFileHandler(
                 log_file,
                 maxBytes=100*1024*1024,  # 100MB
                 backupCount=5,
                 encoding='utf-8'
             )
-            file_handler.setLevel(logging.DEBUG)
+            Logger._file_handler.setLevel(file_level)
 
-            # File message format
+            # File message format (detailed for file)
             file_formatter = logging.Formatter(
                 '%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s'
             )
-            file_handler.setFormatter(file_formatter)
+            Logger._file_handler.setFormatter(file_formatter)
 
             # Add file handler
-            self.logger.addHandler(file_handler)
+            self.logger.addHandler(Logger._file_handler)
         except Exception as e:
             self.logger.error(f"Error during log file configuration: {str(e)}", exc_info=True)
 
-        self.logger.info("Logger initialized")
+        self.logger.info(f"Logger initialized (console={logging.getLevelName(console_level)}, file={logging.getLevelName(file_level)})")
+
+    @classmethod
+    def configure(cls, console_level=logging.INFO, file_level=logging.DEBUG):
+        """Configure logging levels before first use.
+
+        This method allows setting log levels before the logger is initialized.
+        If the logger is already initialized, use set_console_level() and
+        set_file_level() instead.
+
+        Args:
+            console_level: Logging level for console output (default: INFO)
+            file_level: Logging level for file output (default: DEBUG)
+
+        Example:
+            # Configure before first logger creation
+            Logger.configure(console_level=logging.WARNING, file_level=logging.DEBUG)
+        """
+        if not cls._initialized:
+            instance = cls()
+            instance._setup_logger(console_level, file_level)
+        else:
+            # If already initialized, update levels
+            cls.set_console_level(console_level)
+            cls.set_file_level(file_level)
+
+    @classmethod
+    def set_console_level(cls, level):
+        """Dynamically change console logging level.
+
+        Args:
+            level: New logging level (logging.DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+        Example:
+            # Enable debug logging on console
+            Logger.set_console_level(logging.DEBUG)
+
+            # Reduce console verbosity
+            Logger.set_console_level(logging.WARNING)
+        """
+        if cls._console_handler:
+            cls._console_handler.setLevel(level)
+            logger = logging.getLogger('VideoFlow')
+            logger.info(f"Console log level changed to {logging.getLevelName(level)}")
+        else:
+            raise RuntimeError("Logger not initialized. Call Logger.get_logger() first.")
+
+    @classmethod
+    def set_file_level(cls, level):
+        """Dynamically change file logging level.
+
+        Args:
+            level: New logging level (logging.DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+        Example:
+            # Log only errors to file
+            Logger.set_file_level(logging.ERROR)
+
+            # Log everything to file
+            Logger.set_file_level(logging.DEBUG)
+        """
+        if cls._file_handler:
+            cls._file_handler.setLevel(level)
+            logger = logging.getLogger('VideoFlow')
+            logger.info(f"File log level changed to {logging.getLevelName(level)}")
+        else:
+            raise RuntimeError("Logger not initialized. Call Logger.get_logger() first.")
+
+    @classmethod
+    def get_current_levels(cls):
+        """Get current logging levels for console and file.
+
+        Returns:
+            dict: {'console': level_name, 'file': level_name}
+
+        Example:
+            levels = Logger.get_current_levels()
+            print(f"Console: {levels['console']}, File: {levels['file']}")
+        """
+        if cls._console_handler and cls._file_handler:
+            return {
+                'console': logging.getLevelName(cls._console_handler.level),
+                'file': logging.getLevelName(cls._file_handler.level)
+            }
+        return {'console': 'NOT_INITIALIZED', 'file': 'NOT_INITIALIZED'}
 
     @classmethod
     def get_logger(cls, name: str = None) -> logging.Logger:
@@ -133,8 +234,12 @@ class Logger:
             logging.Logger: Configured logger instance ready for use.
 
         Example:
+            # Get logger with default levels (INFO console, DEBUG file)
             logger = Logger.get_logger('PluginManager')
-            # Creates logger 'VideoFlow.PluginManager'
+
+            # Or configure first
+            Logger.configure(console_level=logging.WARNING)
+            logger = Logger.get_logger('PluginManager')
         """
         instance = cls()
         if name:
