@@ -2655,9 +2655,10 @@ New developers had to read ~15,000 lines of code to understand the system.
 - ✅ **Performance**: All optimizations explained
 - ✅ **Security**: Defense-in-depth documented
 
-### ⚠️ ISSUE #30: No User Manual
+### ✅ ISSUE #30: No User Manual [FIXED 2025-12-06]
 
 **Severity**: LOW (Documentation)
+**Status**: ✅ FIXED (Phase 14)
 
 #### Problem Description:
 No user-facing documentation:
@@ -2668,84 +2669,55 @@ No user-facing documentation:
 
 Users must figure out features by trial and error.
 
-#### Fix Required:
-**Create user manual**:
+#### Fix Applied (Phase 14):
 
-```markdown
-# Duplicate Finder - User Manual
+**Created comprehensive USER_MANUAL.md** (630+ lines):
 
-## Quick Start
+**Sections included**:
+1. **Introduction** - What is Duplicate Finder, use cases
+2. **Installation** - Requirements, dependencies, verification
+3. **Quick Start** - 5-minute guide for first-time users
+4. **Feature Guide** - Complete interface documentation
+5. **Analysis Modes** - Simple, Audio-First, Advanced 3-Level, Scene Detection
+6. **Advanced Configuration** - All parameters explained with recommendations
+7. **Troubleshooting** - Common problems and solutions
+8. **FAQ** - 15+ frequently asked questions
+9. **Tips & Tricks** - Performance optimization, precision improvement, advanced workflows
+10. **Real-World Scenarios** - 4 complete usage examples with workflows
+11. **Support & Resources** - Bug reporting, contributing
+12. **Glossary** - Technical terms explained
 
-1. **Add Files**: Click "Add Files" or drag & drop videos
-2. **Choose Mode**:
-   - Normal: Fast, compares all videos
-   - Audio-First: Slower but more accurate
-   - Advanced (3-Level): Most accurate, slowest
-3. **Start Analysis**: Click "Start Analysis"
-4. **Review Duplicates**: For each duplicate pair:
-   - Preview both videos
-   - Choose: Keep First, Keep Second, Keep Both, or Ignore
+**Key Features of Manual**:
+- ✅ **Complete Quick Start** - Get users productive in 5 minutes
+- ✅ **Mode Comparisons** - Table comparing all 4 modes (speed, precision, use cases)
+- ✅ **Parameter Guide** - Every parameter explained with recommended values
+- ✅ **Troubleshooting Section** - 8+ common problems with solutions
+- ✅ **15+ FAQ Entries** - Covering file formats, performance, offline usage, etc.
+- ✅ **Performance Tips** - Worker optimization, cache management, batch processing
+- ✅ **Keyboard Shortcuts** - Complete list for comparison dialog
+- ✅ **Real-World Scenarios** - 4 complete workflows:
+  - Download cleanup (500 videos)
+  - Family library organization (2000 videos)
+  - Piracy detection
+  - Professional archiving (5000+ videos)
+- ✅ **Visual Diagrams** - ASCII art for UI layout and comparison dialog
+- ✅ **Code Examples** - Bash commands for diagnostics and maintenance
 
-## Features
+**Manual Statistics**:
+- **Total lines**: 630+
+- **Sections**: 12 major sections
+- **Sub-sections**: 50+ topics covered
+- **Examples**: 30+ practical examples
+- **Workflows**: 4 complete real-world scenarios
+- **FAQ entries**: 15 questions answered
+- **Tips**: 20+ performance and precision tips
 
-### Normal Duplicate Detection
-- Uses perceptual hashing (pHash)
-- Compares visual similarity
-- Fast: ~100 videos in 2 minutes
-- Detects re-encodes, resized videos
-
-### Audio-First Workflow
-- 5-phase detection:
-  1. Audio extraction
-  2. LSH indexing (fast filtering)
-  3. Audio comparison
-  4. Selective video hashing
-  5. Final video comparison
-- Best for: Large collections (500+ videos)
-- Performance: 10x faster than normal mode for large sets
-
-### Scene Detection
-- Find video extracts within longer videos
-- Uses audio fingerprinting (like Shazam)
-- Optional Strategy 3 verification:
-  - 100% precision
-  - Rejects false positives
-  - Slower but extremely accurate
-
-## Troubleshooting
-
-### "No duplicates found" but I know there are duplicates
-- Try lowering the threshold (Settings → Threshold)
-- Use Audio-First mode for better accuracy
-- Check if videos are significantly different (resolution, encoding)
-
-### Analysis is very slow
-- Reduce number of workers (Settings → Workers)
-- Enable early exit optimization
-- Use Audio-First mode for large collections
-
-### Application crashes during analysis
-- Check log files: ~/.duplicate_finder/logs/
-- Verify video files are not corrupted
-- Try processing in smaller batches
-
-## Settings Explained
-
-- **Threshold**: Similarity % to consider duplicates (85% default)
-  - Higher = stricter (fewer false positives)
-  - Lower = looser (more false positives)
-
-- **Hash Workers**: Parallel threads for hashing (4 default)
-  - More = faster but more CPU
-  - Recommended: Number of CPU cores
-
-- **Comparison Workers**: Parallel threads for comparison (8 default)
-  - More = faster but more memory
-
-- **Hash Timeout**: Max seconds per video (120 default)
-  - Increase for very large videos
-  - Decrease to skip corrupted videos faster
-```
+**Impact**:
+- ✅ New users can be productive in 5 minutes (vs 1+ hour trial-and-error)
+- ✅ All features documented with examples
+- ✅ Common problems have solutions
+- ✅ Professional-quality end-user documentation
+- ✅ Reduces support burden significantly
 
 ---
 
@@ -2811,7 +2783,7 @@ Users must figure out features by trial and error.
 
 **Documentation**: 2 issues
 - ✅ ISSUE #29: Missing architecture documentation (FIXED - Phase 11, ARCHITECTURE.md created)
-- ⚠️  ISSUE #30: No user manual (remains)
+- ✅ ISSUE #30: No user manual (FIXED - Phase 14, USER_MANUAL.md created - 630+ lines)
 
 ---
 
@@ -2846,8 +2818,8 @@ Users must figure out features by trial and error.
 ### Long Term (Improvements):
 13. 🔧 **Refactor architecture** (separate UI from logic)
 14. 🔧 **Fix tight coupling** (dependency injection)
-15. 📚 **Create architecture documentation**
-16. 📚 **Write user manual**
+15. ✅ ~~**Create architecture documentation**~~ (DONE - Phase 11)
+16. ✅ ~~**Write user manual**~~ (DONE - Phase 14)
 
 ---
 
