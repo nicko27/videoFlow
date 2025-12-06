@@ -139,16 +139,9 @@ class DuplicateFinderWindow(QMainWindow):
         self.verification_worker = None  # Worker for subsequence verification
         self._pending_scenes = []  # Scenes waiting for verification
 
-        # Layout manager
+        # Layout manager (Dashboard View only)
         self.layout_manager = LayoutManager()
-        # Load saved layout preference (defaults to classic)
-        saved_layout = self.settings_manager.get_layout_preference()
-        try:
-            self.current_layout = LayoutType(saved_layout)
-        except ValueError:
-            logger.warning(f"Invalid saved layout '{saved_layout}', using classic")
-            self.current_layout = LayoutType.CLASSIC
-        self.layout_selector = None
+        self.current_layout = LayoutType.DASHBOARD
 
         # UI update timer
         self.status_update_timer = QTimer()
@@ -230,15 +223,12 @@ class DuplicateFinderWindow(QMainWindow):
         self.audio_progress = right_widgets.get('audio_progress')  # New audio hash progress
         self.verification_progress = right_widgets.get('verification_progress')  # Subsequence verification progress
 
-        # Create layout selector widget (no longer in header)
-        layout_selector_widget = self._create_layout_selector()
-
-        # Use LayoutManager to create the layout (without header)
+        # Use LayoutManager to create the Dashboard layout
         layout_container = self.layout_manager.create_layout(
             self.current_layout,
             left_panel,
             right_panel,
-            layout_selector_widget
+            None  # No header widget needed
         )
 
         main_layout.addWidget(layout_container)
@@ -279,71 +269,6 @@ class DuplicateFinderWindow(QMainWindow):
 
         return title_widget
 
-    def _create_layout_selector(self) -> QWidget:
-        """
-        Create layout selector widget (separate from title).
-
-        Returns:
-            QWidget containing the layout selector.
-        """
-        from PyQt6.QtWidgets import QHBoxLayout, QComboBox
-        from .design_system import Colors, Spacing, Typography
-
-        selector_widget = QWidget()
-        selector_layout = QHBoxLayout(selector_widget)
-        selector_layout.setContentsMargins(5, 5, 5, 5)
-        selector_layout.setSpacing(10)
-
-        # Layout selector label
-        layout_label = QLabel("📐 Disposition:")
-        layout_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
-        layout_label.setStyleSheet(f"color: {Colors.GRAY_700};")
-        selector_layout.addWidget(layout_label)
-
-        # Layout selector combo
-        self.layout_selector = QComboBox()
-        self.layout_selector.setMinimumWidth(180)
-        self.layout_selector.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
-        self.layout_selector.setStyleSheet(f"""
-            QComboBox {{
-                border: 1px solid {Colors.BORDER_DEFAULT};
-                border-radius: {Spacing.RADIUS_SM}px;
-                padding: {Spacing.XS}px {Spacing.SM}px;
-                background-color: {Colors.WHITE};
-                color: {Colors.BLACK};
-            }}
-            QComboBox:hover {{
-                border-color: {Colors.PRIMARY};
-            }}
-            QComboBox::drop-down {{
-                border: none;
-                padding-right: {Spacing.XS}px;
-            }}
-            QComboBox QAbstractItemView {{
-                border: 1px solid {Colors.BORDER_DEFAULT};
-                background-color: {Colors.WHITE};
-                selection-background-color: {Colors.PRIMARY_LIGHT};
-                selection-color: {Colors.BLACK};
-            }}
-        """)
-
-        # Populate layouts
-        layout_names = self.layout_manager.get_layout_names()
-        for key, name in layout_names.items():
-            self.layout_selector.addItem(name, key)
-
-        # Set current layout in selector
-        for i in range(self.layout_selector.count()):
-            if self.layout_selector.itemData(i) == self.current_layout.value:
-                self.layout_selector.setCurrentIndex(i)
-                break
-
-        self.layout_selector.currentIndexChanged.connect(self.on_layout_changed)
-        selector_layout.addWidget(self.layout_selector)
-        selector_layout.addStretch()
-
-        return selector_widget
-
     def apply_theme(self) -> None:
         """
         Apply current theme to all UI components.
@@ -380,69 +305,6 @@ class DuplicateFinderWindow(QMainWindow):
         """
         logger.info(f"Theme changed to: {theme_key}")
         self.apply_theme()
-
-        # Recreate UI with new theme
-        # Store current state
-        files = []
-        if self.file_list_widget:
-            files = self.file_list_widget.get_files()
-
-        # Recreate UI
-        self.setup_ui()
-
-        # ALWAYS recreate file_handler with new widget reference
-        if self.file_list_widget:
-            self.file_handler = FileHandler(self.file_list_widget)
-
-        # Restore files if any
-        if files and self.file_handler:
-            self.file_handler.add_files(files)
-
-    def on_layout_changed(self, index: int) -> None:
-        """
-        Handle layout change event.
-
-        Args:
-            index: Index of the selected layout in the combo box.
-        """
-        if not self.layout_selector:
-            return
-
-        layout_key = self.layout_selector.currentData()
-        if not layout_key:
-            return
-
-        # Convert string key to LayoutType enum
-        try:
-            new_layout = LayoutType(layout_key)
-        except ValueError:
-            logger.error(f"Invalid layout key: {layout_key}")
-            return
-
-        if new_layout == self.current_layout:
-            return  # No change
-
-        logger.info(f"Layout changed to: {layout_key}")
-        self.current_layout = new_layout
-
-        # Store current state
-        files = []
-        if self.file_list_widget:
-            files = self.file_list_widget.get_files()
-
-        # Recreate UI with new layout
-        self.setup_ui()
-
-        # ALWAYS recreate file_handler with new widget reference
-        if self.file_list_widget:
-            self.file_handler = FileHandler(self.file_list_widget)
-
-        # Restore files if any
-        if files and self.file_handler:
-            self.file_handler.add_files(files)
-
-        # Save layout preference
-        self.settings_manager.save_layout_preference(layout_key)
 
     def _create_left_panel(self):
         """
