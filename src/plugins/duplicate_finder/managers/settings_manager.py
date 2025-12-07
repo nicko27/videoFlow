@@ -154,41 +154,6 @@ class SettingsManager(QObject):
 
             self.settings.endGroup()
 
-            # Load advanced 3-level mode settings
-            self.settings.beginGroup("advanced_mode")
-
-            # Enable checkbox
-            if 'enable_advanced_mode' in widgets and widgets['enable_advanced_mode'] is not None:
-                enabled = self.settings.value('enabled', False, type=bool)
-                widgets['enable_advanced_mode'].setChecked(enabled)
-
-            # Level 1: LSH loose threshold
-            self._load_widget_value(
-                widgets, 'level1_threshold_spin', 'level1_threshold', 0.7, float
-            )
-
-            # Level 2: Long period duration
-            self._load_widget_value(
-                widgets, 'level2_duration_spin', 'level2_duration', 120, int
-            )
-
-            # Level 2: Refined threshold
-            self._load_widget_value(
-                widgets, 'level2_threshold_spin', 'level2_threshold', 0.8, float
-            )
-
-            # Level 3: pHash threshold
-            self._load_widget_value(
-                widgets, 'level3_phash_threshold_spin', 'level3_phash_threshold', 10, int
-            )
-
-            # Level 3: Frame rate
-            self._load_widget_value(
-                widgets, 'level3_frame_rate_spin', 'level3_frame_rate', 0.8, float
-            )
-
-            self.settings.endGroup()
-
             # Load subsequence verification settings
             self.settings.beginGroup("subsequence_verification")
 
@@ -283,22 +248,6 @@ class SettingsManager(QObject):
             # Save checkbox state
             if 'enable_scene_check' in widgets and widgets['enable_scene_check'] is not None:
                 self.settings.setValue('enabled', widgets['enable_scene_check'].isChecked())
-
-            self.settings.endGroup()
-
-            # Advanced 3-level mode settings
-            self.settings.beginGroup("advanced_mode")
-
-            # Enable checkbox
-            if 'enable_advanced_mode' in widgets and widgets['enable_advanced_mode'] is not None:
-                self.settings.setValue('enabled', widgets['enable_advanced_mode'].isChecked())
-
-            # Save all advanced mode parameters
-            self._save_widget_value(widgets, 'level1_threshold_spin', 'level1_threshold')
-            self._save_widget_value(widgets, 'level2_duration_spin', 'level2_duration')
-            self._save_widget_value(widgets, 'level2_threshold_spin', 'level2_threshold')
-            self._save_widget_value(widgets, 'level3_phash_threshold_spin', 'level3_phash_threshold')
-            self._save_widget_value(widgets, 'level3_frame_rate_spin', 'level3_frame_rate')
 
             self.settings.endGroup()
 
@@ -413,8 +362,6 @@ class SettingsManager(QObject):
             'batch_size_spin', 'hash_timeout_spin', 'comparison_timeout_spin',
             'scene_min_match_spin', 'scene_min_duration_spin',
             'scene_cache_size_spin', 'scene_precision_combo', 'enable_scene_check',
-            'enable_advanced_mode', 'level1_threshold_spin', 'level2_duration_spin',
-            'level2_threshold_spin', 'level3_phash_threshold_spin', 'level3_frame_rate_spin',
             'enable_subseq_verification', 'subseq_dct_threshold_spin',
             'subseq_sequence_threshold_spin', 'subseq_verification_workers_spin'
         ]
@@ -563,42 +510,6 @@ class SettingsManager(QObject):
                 'min_match_ratio': min_match_ratio,
                 'min_duration': min_duration,
                 'cache_size': cache_size
-            }
-
-        # Add advanced 3-level mode config if widgets exist
-        if 'enable_advanced_mode' in widgets and widgets['enable_advanced_mode'] is not None:
-            enabled = widgets['enable_advanced_mode'].isChecked()
-
-            # Get widget values with defaults
-            level1_threshold = 0.7
-            level2_duration = 120
-            level2_threshold = 0.8
-            level3_phash_threshold = 10
-            level3_frame_rate = 0.8
-
-            # Override with actual widget values if available
-            if 'level1_threshold_spin' in widgets and widgets['level1_threshold_spin'] is not None:
-                level1_threshold = widgets['level1_threshold_spin'].value()
-
-            if 'level2_duration_spin' in widgets and widgets['level2_duration_spin'] is not None:
-                level2_duration = widgets['level2_duration_spin'].value()
-
-            if 'level2_threshold_spin' in widgets and widgets['level2_threshold_spin'] is not None:
-                level2_threshold = widgets['level2_threshold_spin'].value()
-
-            if 'level3_phash_threshold_spin' in widgets and widgets['level3_phash_threshold_spin'] is not None:
-                level3_phash_threshold = widgets['level3_phash_threshold_spin'].value()
-
-            if 'level3_frame_rate_spin' in widgets and widgets['level3_frame_rate_spin'] is not None:
-                level3_frame_rate = widgets['level3_frame_rate_spin'].value()
-
-            config['advanced_mode'] = {
-                'enabled': enabled,
-                'level1_threshold': level1_threshold,
-                'level2_duration': level2_duration,
-                'level2_threshold': level2_threshold,
-                'level3_phash_threshold': level3_phash_threshold,
-                'level3_frame_rate': level3_frame_rate
             }
 
         return config
