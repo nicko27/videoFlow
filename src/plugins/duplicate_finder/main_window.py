@@ -39,6 +39,7 @@ try:
     from .audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
     from .advanced_progress_dialog import AdvancedProgressDialog
     from .analysis import AdvancedDuplicatePipeline
+    from .i18n import get_translator
 except ImportError:
     # Fallback for direct imports
     from video_hasher import VideoHasher
@@ -57,6 +58,7 @@ except ImportError:
     from audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
     from advanced_progress_dialog import AdvancedProgressDialog
     from analysis import AdvancedDuplicatePipeline
+    from i18n import get_translator
 
 from src.core.logger import Logger
 
@@ -131,6 +133,8 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Initialize managers and handlers
         self.settings_manager = SettingsManager()
+        self.translator = get_translator()
+        self.translator.set_language('fr')  # Set to French by default
         self.file_handler: Optional[FileHandler] = None
         self.analysis_handler: Optional[AnalysisHandler] = None
         self.duplicate_handler: Optional[DuplicateHandler] = None
@@ -1054,20 +1058,30 @@ class DuplicateFinderWindow(QMainWindow):
         """
         Handle comparison analysis completion.
         """
-        self.duplicate_progress.set_status("Complete", "#28A745")
-
         # Check if scene detection is enabled
         config = self.get_analysis_config()
         scene_config = config.get('scene_detection', {})
         is_enabled = scene_config.get('enabled', False)
 
         logger.info(f"Scene detection enabled: {is_enabled}")
+
         if is_enabled:
+            # Scene detection will follow - mark as "video comparison complete" but not finished
+            self.duplicate_progress.set_status(
+                self.translator.tr('progress.video_comparison_complete'),
+                "#17A2B8"
+            )
+
             logger.info(f"Scene detection parameters: precision={scene_config.get('precision_mode', 'balanced')}, "
                        f"min_match_ratio={scene_config.get('min_match_ratio', 0)*100:.1f}%")
             # Start scene detection
             self._start_scene_detection()
         else:
+            # No scene detection - mark as complete and finish
+            self.duplicate_progress.set_status(
+                self.translator.tr('progress.analysis_complete'),
+                "#28A745"
+            )
             logger.info("Scene detection skipped (not enabled)")
             # No scene detection, finish analysis
             self._finish_analysis()
@@ -1112,11 +1126,19 @@ class DuplicateFinderWindow(QMainWindow):
                        f"verification={'enabled' if verification_enabled else 'disabled'}, "
                        f"DCT={dct_threshold}%, sequence={sequence_threshold}%")
 
-            # Update UI
+            # Update UI - status indicator
             self.status_indicator.update_status(
-                "🎬", "Detecting scenes (Strategy 3: DCT + Scene Cuts)...",
+                "🎬",
+                self.translator.tr('scene_detection.status_detecting'),
                 "#17A2B8", "#D1ECF1", "#17A2B8"
             )
+
+            # Initialize progress bars
+            # file_progress: will show hashing/frame extraction status
+            # duplicate_progress: will show comparison progress
+            if self.file_progress:
+                self.file_progress.update_progress(0, 100, self.translator.tr('scene_detection.hashing_progress', current=0, total=0))
+                self.file_progress.set_status(self.translator.tr('scene_detection.status_hashing'), "#17A2B8")
 
             # Get all files
             files = self.file_handler.get_all_files()
@@ -1134,11 +1156,26 @@ class DuplicateFinderWindow(QMainWindow):
                 files=files
             )
 
+            # Track matches for progress display
+            self._scene_matches_found = 0
+
             # Connect signals
             def on_progress(current: int, total: int, message: str):
-                """Update progress display."""
+                """Update progress display - this is for comparison phase."""
+                # Mark file_progress as complete when comparison starts
+                if current == 1 and self.file_progress:
+                    self.file_progress.set_status(self.translator.tr('progress.video_hashing_complete'), "#28A745")
+
+                # Update duplicate_progress with comparison progress
                 if self.duplicate_progress:
-                    self.duplicate_progress.update_progress(current, total, message)
+                    self.duplicate_progress.update_progress(
+                        current, total,
+                        self.translator.tr('scene_detection.comparing_progress', current=current, total=total)
+                    )
+                    self.duplicate_progress.set_status(
+                        self.translator.tr('scene_detection.comparing_status', matches=self._scene_matches_found),
+                        "#007BFF"
+                    )
                 self.force_ui_update()
 
             def on_subsequence_found(short_video: str, long_video: str, result: dict):
@@ -1149,8 +1186,16 @@ class DuplicateFinderWindow(QMainWindow):
                 start_frame_idx = result.get('start_frame_idx', 0)
                 confidence = result.get('confidence', 0.0)
 
-                logger.info(f"Subsequence verified: {os.path.basename(short_video)} in "
-                           f"{os.path.basename(long_video)} ({match_ratio*100:.1f}% match)")
+                # Increment match counter
+                self._scene_matches_found += 1
+
+                # Log with translation
+                logger.info(self.translator.tr(
+                    'scene_detection.subsequence_verified',
+                    short=os.path.basename(short_video),
+                    long=os.path.basename(long_video),
+                    match=f"{match_ratio*100:.1f}"
+                ))
 
                 # Store in database
                 self.video_hasher.db.store_subsequence_detection(
@@ -1176,8 +1221,16 @@ class DuplicateFinderWindow(QMainWindow):
                 """Handle completion of subsequence detection."""
                 logger.info(f"Subsequence detection complete: {len(scenes)} scenes found")
 
+                # Update progress bars to show completion
+                if self.duplicate_progress:
+                    self.duplicate_progress.set_status(
+                        self.translator.tr('scene_detection.complete', count=len(scenes)),
+                        "#28A745"
+                    )
+
                 # Clean up
                 self.scene_worker = None
+                self._scene_matches_found = 0
 
                 # Finish analysis
                 self._finish_analysis()
@@ -1187,13 +1240,13 @@ class DuplicateFinderWindow(QMainWindow):
                 logger.error(f"Error during subsequence detection: {error_msg}")
                 QMessageBox.warning(
                     self,
-                    "Erreur de détection de scènes",
-                    f"Une erreur s'est produite lors de la détection de scènes :\n{error_msg}\n\n"
-                    f"Poursuite avec les résultats de doublons..."
+                    self.translator.tr('scene_detection.error_title'),
+                    self.translator.tr('scene_detection.error_message', error=error_msg)
                 )
 
                 # Clean up worker reference
                 self.scene_worker = None
+                self._scene_matches_found = 0
 
                 # Finish analysis anyway
                 self._finish_analysis()
@@ -1211,9 +1264,8 @@ class DuplicateFinderWindow(QMainWindow):
             logger.error(f"Error setting up scene detection: {e}")
             QMessageBox.warning(
                 self,
-                "Erreur de détection de scènes",
-                f"Une erreur s'est produite lors de la configuration de la détection de scènes :\n{str(e)}\n\n"
-                f"Poursuite avec les résultats de doublons..."
+                self.translator.tr('scene_detection.error_title'),
+                self.translator.tr('scene_detection.error_setup', error=str(e))
             )
             self._finish_analysis()
 
@@ -1471,7 +1523,10 @@ class DuplicateFinderWindow(QMainWindow):
     def _on_audio_extraction_finished(self) -> None:
         """Handle audio extraction completion."""
         if self.audio_progress:
-            self.audio_progress.set_status("Complete", "#28A745")
+            self.audio_progress.set_status(
+                self.translator.tr('progress.audio_complete'),
+                "#28A745"
+            )
         logger.info("Phase 1 complete: Audio extraction finished")
 
     def _on_audio_comparison_progress(self, current: int, total: int) -> None:
@@ -1485,13 +1540,19 @@ class DuplicateFinderWindow(QMainWindow):
 
             # Feedback textuel avec pourcentage
             pct = (current / total * 100) if total > 0 else 0
-            self.duplicate_progress.set_status(f"Comparaison audio... {pct:.0f}%", "#007BFF")
+            self.duplicate_progress.set_status(
+                self.translator.tr('progress.audio_comparison', percent=f"{pct:.0f}"),
+                "#007BFF"
+            )
 
     def _on_audio_comparison_finished(self, matches: list) -> None:
         """Handle audio comparison completion."""
         logger.info(f"Phase 2 complete: {len(matches)} audio candidates found")
         if self.duplicate_progress:
-            self.duplicate_progress.set_status("Audio matches found", "#17A2B8")
+            self.duplicate_progress.set_status(
+                self.translator.tr('progress.audio_matches_found'),
+                "#17A2B8"
+            )
 
     def _on_video_hash_progress(self, current: int, total: int) -> None:
         """Update video hash progress."""
@@ -1503,13 +1564,19 @@ class DuplicateFinderWindow(QMainWindow):
             self.file_progress.update_progress(current, total, f"📊 {current}/{total}")
 
             # Feedback textuel
-            self.file_progress.set_status(f"Hash {current}/{total} vidéos", "#007BFF")
+            self.file_progress.set_status(
+                self.translator.tr('progress.video_hashing', current=current, total=total),
+                "#007BFF"
+            )
 
     def _on_video_hash_finished(self) -> None:
         """Handle selective video hashing completion."""
         logger.info("Phase 3 complete: Selective video hashing finished")
         if self.file_progress:
-            self.file_progress.set_status("Complete", "#28A745")
+            self.file_progress.set_status(
+                self.translator.tr('progress.video_hashing_complete'),
+                "#28A745"
+            )
         # Now start video comparison on candidates
         self._start_video_comparison_on_candidates()
 
@@ -1627,8 +1694,14 @@ class DuplicateFinderWindow(QMainWindow):
             total: Total comparison count.
         """
         self.duplicate_progress.progress_bar.setMaximum(total)
-        self.duplicate_progress.update_progress(0, total, "Comparaisons en cours...")
-        self.duplicate_progress.set_status("Comparaisons", "#007BFF")
+        self.duplicate_progress.update_progress(
+            0, total,
+            self.translator.tr('progress.video_comparison')
+        )
+        self.duplicate_progress.set_status(
+            self.translator.tr('progress.video_comparison'),
+            "#007BFF"
+        )
 
     def update_hash_progress_details(
         self,

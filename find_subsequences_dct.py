@@ -23,7 +23,7 @@ from typing import List, Tuple, Dict, Optional
 from collections import defaultdict
 
 # Paths
-DOWNLOADS_DIR = Path("/Users/nico/Downloads")
+DOWNLOADS_DIR = Path("/Users/nico/Downloads/tests")
 
 # Adaptive parameters
 def get_sample_interval(duration: float) -> int:

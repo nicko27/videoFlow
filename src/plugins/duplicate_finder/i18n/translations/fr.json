@@ -109,6 +109,34 @@
       "sec": " sec",
       "percent": "%",
       "items": " éléments"
+    },
+
+    "scene_detection": {
+      "status_detecting": "Détection de scènes (Stratégie 3 : DCT + Scene Cuts)...",
+      "status_hashing": "Extraction des frames vidéo...",
+      "status_comparing": "Comparaison des scènes...",
+      "hashing_progress": "📊 Extraction {current}/{total}",
+      "hashing_status": "Extraction frames {current}/{total} vidéos",
+      "comparing_progress": "🔍 Comparaison {current}/{total}",
+      "comparing_status": "Vérification scène ({matches} trouvées)",
+      "subsequence_verified": "Scène vérifiée : {short} dans {long} ({match}% correspondance)",
+      "complete": "✅ {count} scène(s) détectée(s)",
+      "complete_status": "Détection terminée",
+      "error_title": "Erreur de détection de scènes",
+      "error_message": "Une erreur s'est produite lors de la détection de scènes :\n{error}\n\nPoursuite avec les résultats de doublons...",
+      "error_setup": "Une erreur s'est produite lors de la configuration de la détection de scènes :\n{error}\n\nPoursuite avec les résultats de doublons..."
+    },
+
+    "progress": {
+      "audio_extraction": "Extraction audio...",
+      "audio_complete": "Extraction audio terminée",
+      "audio_comparison": "Comparaison audio... {percent}%",
+      "audio_matches_found": "Candidats audio trouvés",
+      "video_hashing": "Hash {current}/{total} vidéos",
+      "video_hashing_complete": "Hachage terminé",
+      "video_comparison": "Comparaisons en cours...",
+      "video_comparison_complete": "Comparaison vidéo terminée",
+      "analysis_complete": "Analyse terminée"
     }
   }
 }

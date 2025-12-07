@@ -109,6 +109,34 @@
       "sec": " sec",
       "percent": "%",
       "items": " items"
+    },
+
+    "scene_detection": {
+      "status_detecting": "Detecting scenes (Strategy 3: DCT + Scene Cuts)...",
+      "status_hashing": "Extracting video frames...",
+      "status_comparing": "Comparing scenes...",
+      "hashing_progress": "📊 Extraction {current}/{total}",
+      "hashing_status": "Extracting frames {current}/{total} videos",
+      "comparing_progress": "🔍 Comparison {current}/{total}",
+      "comparing_status": "Verifying scene ({matches} found)",
+      "subsequence_verified": "Scene verified: {short} in {long} ({match}% match)",
+      "complete": "✅ {count} scene(s) detected",
+      "complete_status": "Detection complete",
+      "error_title": "Scene Detection Error",
+      "error_message": "An error occurred during scene detection:\n{error}\n\nContinuing with duplicate results...",
+      "error_setup": "An error occurred during scene detection setup:\n{error}\n\nContinuing with duplicate results..."
+    },
+
+    "progress": {
+      "audio_extraction": "Extracting audio...",
+      "audio_complete": "Audio extraction complete",
+      "audio_comparison": "Audio comparison... {percent}%",
+      "audio_matches_found": "Audio candidates found",
+      "video_hashing": "Hash {current}/{total} videos",
+      "video_hashing_complete": "Hashing complete",
+      "video_comparison": "Comparisons in progress...",
+      "video_comparison_complete": "Video comparison complete",
+      "analysis_complete": "Analysis complete"
     }
   }
 }
