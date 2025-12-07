@@ -5,5 +5,6 @@ security-critical operations.
 """
 
 from .file_validator import FileValidator, ValidationError
+from .config_validator import ConfigValidator
 
-__all__ = ['FileValidator', 'ValidationError']
+__all__ = ['FileValidator', 'ValidationError', 'ConfigValidator']
