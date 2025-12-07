@@ -3484,7 +3484,7 @@ class ErrorMessages:
 
 ---
 
-### `validators.py` (Lines 1-339)
+### `validators/config_validator.py` (Lines 1-339)
 
 #### `ConfigValidator.validate(config)` (Lines 25-120)
 ```python
@@ -3494,14 +3494,23 @@ def validate(config: Dict[str, Any]) -> Dict[str, Any]:
 **Purpose**: Validate and sanitize configuration dict
 **Parameters**: `config` - Raw configuration dict
 **Validations**:
-- `hash_workers`: 1-16 (default 4)
-- `comparison_workers`: 1-32 (default 8)
+- `hash_workers`: 1 to min(cpu_count*2, 32) (default: max(4, min(cpu_count, 12)))
+  - Auto-optimized based on available CPUs
+  - On 10-core system: default=10, max=20
+  - On 16-core system: default=12, max=32
+- `comparison_workers`: 1 to min(cpu_count*2, 32) (default: max(4, min(cpu_count, 16)))
+  - Auto-optimized based on available CPUs
+  - On 10-core system: default=10, max=20
+  - On 16-core system: default=16, max=32
 - `hash_timeout`: 30-600 seconds (default 120)
 - `threshold`: 0.0-1.0 (default 0.85)
 - `batch_size`: 10-1000 (default 100)
 - `enable_early_exit`: boolean (default True)
 **Returns**: Sanitized config with safe defaults
-**Location**: validators.py:25-120
+**Location**: validators/config_validator.py:25-120
+
+**Note**: Workers are now CPU-aware for optimal performance. The system automatically
+detects available CPUs and configures defaults to use 60-100% of available cores.
 
 #### `ConfigValidator.validate_audio_config(config)` (Lines 122-220)
 ```python
@@ -3514,7 +3523,9 @@ def validate_audio_config(config: AudioConfig) -> AudioConfig:
 - `extraction_timeout`: 60-600 seconds
 - `cache_enabled`: boolean
 **Returns**: Validated AudioConfig
-**Location**: validators.py:122-220
+**Location**: validators/config_validator.py:122-220
+
+### `validators/file_validator.py`
 
 #### `FileValidator.validate_file(file_path)` (Lines 240-285)
 ```python
@@ -3527,7 +3538,7 @@ def validate_file(file_path: str) -> Tuple[bool, Optional[str]]:
 2. File is readable (os.access)
 3. File size > 0
 **Returns**: (is_valid, error_message)
-**Location**: validators.py:240-285
+**Location**: validators/file_validator.py:240-285
 
 #### `FileValidator.validate_video_file(file_path)` (Lines 287-339)
 ```python
@@ -3540,7 +3551,7 @@ def validate_video_file(file_path: str) -> Tuple[bool, Optional[str]]:
 2. Extension in allowed list (.mp4, .avi, .mov, .mkv, .flv, .wmv, .webm)
 3. Can be opened with OpenCV
 **Returns**: (is_valid, error_message)
-**Location**: validators.py:287-339
+**Location**: validators/file_validator.py:287-339
 
 ---
 
