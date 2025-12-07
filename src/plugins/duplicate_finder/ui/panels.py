@@ -660,86 +660,6 @@ class UIPanels:
         # ═══════════════════════════════════════════════════════════
         # DÉTECTION DE SCÈNES
         # ═══════════════════════════════════════════════════════════
-        advanced_mode_group = QGroupBox("🎬 Détection de Scènes")
-        advanced_mode_layout = QGridLayout(advanced_mode_group)
-        advanced_mode_layout.setSpacing(10)
-
-        # Description
-        advanced_desc = QLabel(
-            "Analyse multi-niveaux pour détecter scènes extraites :\n"
-            "• Audio court (filtrage rapide)\n"
-            "• Audio long (analyse approfondie)\n"
-            "• Visuel (confirmation)\n\n"
-            "Plus lent mais très précis"
-        )
-        advanced_desc.setWordWrap(True)
-        advanced_desc.setStyleSheet("QLabel { color: #6C757D; font-size: 10px; }")
-        advanced_mode_layout.addWidget(advanced_desc, 0, 0, 1, 2)
-
-        # Activer la détection de scènes
-        enable_advanced_mode = QCheckBox("Activer la détection de scènes")
-        enable_advanced_mode.setChecked(False)
-        enable_advanced_mode.setStyleSheet("QCheckBox { font-weight: bold; color: #1565C0; }")
-        enable_advanced_mode.setToolTip(
-            "Active l'analyse multi-niveaux pour détecter scènes extraites.\n"
-            "Idéal pour gros corpus ou vidéos avec variantes."
-        )
-        advanced_mode_layout.addWidget(enable_advanced_mode, 1, 0, 1, 2)
-
-        # Niveau 1 : Seuil audio lâche
-        advanced_mode_layout.addWidget(QLabel("📊 Niveau 1 - Seuil lâche :"), 2, 0)
-        level1_threshold_spin = QDoubleSpinBox()
-        level1_threshold_spin.setRange(0.5, 0.9)
-        level1_threshold_spin.setValue(0.7)
-        level1_threshold_spin.setSingleStep(0.05)
-        level1_threshold_spin.setDecimals(2)
-        level1_threshold_spin.setToolTip("Similarité minimale pour le filtrage initial (0.7 = 70%)")
-        advanced_mode_layout.addWidget(level1_threshold_spin, 2, 1)
-
-        # Niveau 2 : Durée période longue
-        advanced_mode_layout.addWidget(QLabel("⏱️ Niveau 2 - Période longue :"), 3, 0)
-        level2_duration_spin = QSpinBox()
-        level2_duration_spin.setRange(30, 300)
-        level2_duration_spin.setValue(120)
-        level2_duration_spin.setSuffix(" sec")
-        level2_duration_spin.setToolTip("Durée de la fenêtre d'analyse approfondie (120s recommandé)")
-        advanced_mode_layout.addWidget(level2_duration_spin, 3, 1)
-
-        # Niveau 2 : Seuil raffiné
-        advanced_mode_layout.addWidget(QLabel("🎯 Niveau 2 - Seuil raffiné :"), 4, 0)
-        level2_threshold_spin = QDoubleSpinBox()
-        level2_threshold_spin.setRange(0.6, 0.95)
-        level2_threshold_spin.setValue(0.8)
-        level2_threshold_spin.setSingleStep(0.05)
-        level2_threshold_spin.setDecimals(2)
-        level2_threshold_spin.setToolTip("Similarité minimale sur période longue (0.8 = 80%)")
-        advanced_mode_layout.addWidget(level2_threshold_spin, 4, 1)
-
-        # Niveau 3 : Seuil pHash
-        advanced_mode_layout.addWidget(QLabel("👁️ Niveau 3 - Seuil pHash :"), 5, 0)
-        level3_phash_threshold_spin = QSpinBox()
-        level3_phash_threshold_spin.setRange(5, 20)
-        level3_phash_threshold_spin.setValue(10)
-        level3_phash_threshold_spin.setSuffix(" bits")
-        level3_phash_threshold_spin.setToolTip("Distance Hamming max pour pHash (10 bits recommandé)")
-        advanced_mode_layout.addWidget(level3_phash_threshold_spin, 5, 1)
-
-        # Taux minimum de frames OK
-        advanced_mode_layout.addWidget(QLabel("✅ Niveau 3 - Frames OK :"), 6, 0)
-        level3_frame_rate_spin = QDoubleSpinBox()
-        level3_frame_rate_spin.setRange(0.6, 0.95)
-        level3_frame_rate_spin.setValue(0.8)
-        level3_frame_rate_spin.setSingleStep(0.05)
-        level3_frame_rate_spin.setDecimals(2)
-        level3_frame_rate_spin.setSuffix(" %")
-        level3_frame_rate_spin.setToolTip("Pourcentage minimum de frames similaires pour confirmer (0.8 = 80%)")
-        advanced_mode_layout.addWidget(level3_frame_rate_spin, 6, 1)
-
-        layout.addWidget(advanced_mode_group)
-
-        # ═══════════════════════════════════════════════════════════
-        # DÉTECTION DE SCÈNES (Audio Fingerprinting)
-        # ═══════════════════════════════════════════════════════════
         scene_detection_group = QGroupBox("🎬 Détection de Scènes (Audio)")
         scene_detection_layout = QGridLayout(scene_detection_group)
         scene_detection_layout.setSpacing(10)
@@ -953,14 +873,6 @@ class UIPanels:
         tab.batch_size_spin = batch_size_spin
         tab.comparison_timeout_spin = comparison_timeout_spin
         tab.comparison_cache_size_spin = comparison_cache_size_spin
-
-        # Advanced 3-level mode
-        tab.enable_advanced_mode = enable_advanced_mode
-        tab.level1_threshold_spin = level1_threshold_spin
-        tab.level2_duration_spin = level2_duration_spin
-        tab.level2_threshold_spin = level2_threshold_spin
-        tab.level3_phash_threshold_spin = level3_phash_threshold_spin
-        tab.level3_frame_rate_spin = level3_frame_rate_spin
 
         # Scene detection (Audio fingerprinting)
         tab.enable_scene_check = enable_scene_check
