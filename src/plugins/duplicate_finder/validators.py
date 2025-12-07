@@ -17,9 +17,12 @@ logger = Logger.get_logger('DuplicateFinder.Validators')
 class ConfigValidator:
     """Validator for configuration parameters."""
 
-    # Default values
-    DEFAULT_HASH_WORKERS = 4
-    DEFAULT_COMPARISON_WORKERS = 4
+    # CPU-aware default values
+    # Hash workers: Use 80% of CPUs (video hashing is I/O + CPU intensive)
+    # Comparison workers: Use 100% of CPUs (comparison is CPU intensive)
+    _cpu_count = multiprocessing.cpu_count()
+    DEFAULT_HASH_WORKERS = max(4, min(_cpu_count, 12))  # 4-12 workers
+    DEFAULT_COMPARISON_WORKERS = max(4, min(_cpu_count, 16))  # 4-16 workers
     DEFAULT_BATCH_SIZE = 50
     DEFAULT_HASH_TIMEOUT = 120
     DEFAULT_COMPARISON_TIMEOUT = 30
@@ -27,7 +30,7 @@ class ConfigValidator:
 
     # Limits
     MIN_WORKERS = 1
-    MAX_WORKERS = multiprocessing.cpu_count() * 2
+    MAX_WORKERS = min(multiprocessing.cpu_count() * 2, 32)  # Cap at 32 for safety
     MIN_BATCH_SIZE = 1
     MAX_BATCH_SIZE = 500
     MIN_TIMEOUT = 5

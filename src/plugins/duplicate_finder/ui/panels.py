@@ -16,6 +16,7 @@ from PyQt6.QtGui import QFont
 from ..progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator, HashDebuggerV2
 from ..design_system import get_current_theme
 from ..i18n import get_translator
+from ..validators import ConfigValidator
 
 
 class UIPanels:
@@ -559,8 +560,11 @@ class UIPanels:
         # Workers hash
         video_hash_layout.addWidget(QLabel(t.tr('ui.video_hash.workers')), 1, 0)
         hash_workers_spin = QSpinBox()
-        hash_workers_spin.setRange(1, 16)
-        hash_workers_spin.setValue(4)
+        hash_workers_spin.setRange(
+            ConfigValidator.MIN_WORKERS,
+            ConfigValidator.MAX_WORKERS
+        )
+        hash_workers_spin.setValue(ConfigValidator.DEFAULT_HASH_WORKERS)
         hash_workers_spin.setToolTip(t.tr('ui.video_hash.workers_tooltip'))
         video_hash_layout.addWidget(hash_workers_spin, 1, 1)
 
@@ -617,8 +621,11 @@ class UIPanels:
         # Workers de comparaison
         video_comp_layout.addWidget(QLabel(t.tr('ui.video_comparison.workers')), 2, 0)
         comparison_workers_spin = QSpinBox()
-        comparison_workers_spin.setRange(1, 16)
-        comparison_workers_spin.setValue(8)
+        comparison_workers_spin.setRange(
+            ConfigValidator.MIN_WORKERS,
+            ConfigValidator.MAX_WORKERS
+        )
+        comparison_workers_spin.setValue(ConfigValidator.DEFAULT_COMPARISON_WORKERS)
         comparison_workers_spin.setToolTip(t.tr('ui.video_comparison.workers_tooltip'))
         video_comp_layout.addWidget(comparison_workers_spin, 2, 1)
 
