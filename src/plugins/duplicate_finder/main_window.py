@@ -123,7 +123,13 @@ class DuplicateFinderWindow(QMainWindow):
         self.setWindowTitle(
             t("duplicate_finder.window.title", "🔍 Détecteur de doublons vidéo")
         )
+
+        # Set window size and constraints
         self.setMinimumSize(1000, 800)
+        self.resize(1400, 900)  # Default size - larger and more comfortable
+
+        # Center window on screen
+        self._center_on_screen()
 
         # Initialize core components (video_hasher will be created after settings load)
         self.video_hasher = None
@@ -319,7 +325,7 @@ class DuplicateFinderWindow(QMainWindow):
         # ===== FILTERS TAB =====
         self.smart_filters_widget = SmartFiltersWidget()
         self.smart_filters_widget.filter_changed.connect(self._on_filter_changed)
-        self.main_tabs.addTab(self.smart_filters_widget, "🔍 Filters")
+        self.main_tabs.addTab(self.smart_filters_widget, "🎛️ Filters")
 
         # ===== BATCH QUEUE TAB =====
         self.batch_queue_widget = BatchQueueWidget(
@@ -341,6 +347,20 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Apply initial theme
         self.apply_theme()
+
+        # Add status bar at the bottom
+        self.status_bar = self.statusBar()
+        self.status_bar.showMessage(t("duplicate_finder.status.ready", "Ready"))
+        self.status_bar.setStyleSheet("QStatusBar { padding: 4px 8px; }")
+
+    def _center_on_screen(self):
+        """Center the window on the screen."""
+        from PyQt6.QtGui import QGuiApplication
+        screen = QGuiApplication.primaryScreen().geometry()
+        window_geometry = self.frameGeometry()
+        center_point = screen.center()
+        window_geometry.moveCenter(center_point)
+        self.move(window_geometry.topLeft())
 
     def _create_menu_bar(self):
         """Create the menu bar with File, View, and other menus."""
@@ -775,6 +795,10 @@ class DuplicateFinderWindow(QMainWindow):
                 "#28A745", "#D4EDDA", "#28A745"
             )
 
+            # Update status bar
+            total_files = self.file_handler.get_file_count()
+            self.status_bar.showMessage(f"✅ {count} file(s) added - Total: {total_files} files")
+
     def add_folder(self, folder_path: str = None) -> None:
         """
         Add all video files from a folder.
@@ -1052,6 +1076,9 @@ class DuplicateFinderWindow(QMainWindow):
             "#007BFF", "#CCE5FF", "#007BFF"
         )
 
+        # Update status bar
+        self.status_bar.showMessage(f"🔄 Starting analysis of {len(valid_files)} files...")
+
         # Get analysis configuration
         config = self.get_analysis_config()
 
@@ -1163,6 +1190,9 @@ class DuplicateFinderWindow(QMainWindow):
                 "⏹️", "Analysis stopped by user",
                 "#DC3545", "#F8D7DA", "#DC3545"
             )
+
+            # Update status bar
+            self.status_bar.showMessage("⏹️ Analysis stopped by user")
 
     def start_scene_detection_mode(self) -> None:
         """
