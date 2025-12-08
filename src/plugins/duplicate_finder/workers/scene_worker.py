@@ -6,7 +6,7 @@ in the background using audio fingerprinting to avoid blocking the UI.
 """
 from typing import List, Dict, Any
 from PyQt6.QtCore import QThread, pyqtSignal
-import signal
+import concurrent.futures
 from contextlib import contextmanager
 
 from src.core.logger import Logger
@@ -21,34 +21,8 @@ class TimeoutError(Exception):
 
 @contextmanager
 def timeout(seconds):
-    """Context manager for timeout protection.
-
-    Args:
-        seconds: Timeout duration in seconds
-
-    Raises:
-        TimeoutError: If operation exceeds timeout
-
-    Note:
-        This uses SIGALRM which only works on Unix-like systems.
-        On Windows, this is a no-op (no timeout protection).
-    """
-    def timeout_handler(signum, frame):
-        raise TimeoutError(f"Operation timed out after {seconds} seconds")
-
-    # Check if signal.SIGALRM is available (Unix-like systems)
-    if hasattr(signal, 'SIGALRM'):
-        old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(seconds)
-        try:
-            yield
-        finally:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
-    else:
-        # Windows or other systems - no timeout protection
-        logger.warning("Timeout protection not available on this platform")
-        yield
+    """No-op timeout placeholder (kept for backward compatibility)."""
+    yield
 
 
 class SceneDetectionWorker(QThread):
@@ -122,18 +96,18 @@ class SceneDetectionWorker(QThread):
                 # For hash_index and sliding_window, use modified detect_all_scenes
                 scenes = self._detect_with_algorithm(progress_callback)
 
-            # Check if cancelled
-            if self._stop:
-                logger.info("Scene detection cancelled by user")
-                self.status_update.emit("Scene detection cancelled")
-                self.finished.emit([])
-                return
-
-            # Emit each found scene
-            for short_video, long_video, result in scenes:
+                # Check if cancelled
                 if self._stop:
-                    break
-                self.scene_found.emit(short_video, long_video, result)
+                    logger.info("Scene detection cancelled by user")
+                    self.status_update.emit("Scene detection cancelled")
+                    self.finished.emit([])
+                    return
+
+                # Emit each found scene
+                for short_video, long_video, result in scenes:
+                    if self._stop:
+                        break
+                    self.scene_found.emit(short_video, long_video, result)
 
             logger.info(f"Scene detection complete: {len(scenes)} found using {self.algorithm}")
             self.status_update.emit(f"✅ {len(scenes)} scene(s) detected")
@@ -215,31 +189,30 @@ class SceneDetectionWorker(QThread):
                     f"Checking {os.path.basename(short_video)} ({matches_found} found)"
                 )
 
-            # Call the appropriate detection method based on algorithm with timeout protection
+            # Call the appropriate detection method with explicit timeout using a thread pool
             result = None
 
+            def _do_detect():
+                if self.algorithm == 'hash_index':
+                    if hasattr(self.scene_detector, 'find_scene_with_index'):
+                        return self.scene_detector.find_scene_with_index(short_video, long_video)
+                    logger.warning("find_scene_with_index not available, falling back to find_scene")
+                    return self.scene_detector.find_scene(short_video, long_video)
+
+                if self.algorithm in ('sliding_window', 'shazam'):
+                    if hasattr(self.scene_detector, 'find_scene'):
+                        return self.scene_detector.find_scene(short_video, long_video)
+                return None
+
             try:
-                with timeout(self.detection_timeout):
-                    if self.algorithm == 'hash_index':
-                        # Use hash index method
-                        if hasattr(self.scene_detector, 'find_scene_with_index'):
-                            result = self.scene_detector.find_scene_with_index(short_video, long_video)
-                        else:
-                            logger.warning("find_scene_with_index not available, falling back to find_scene")
-                            result = self.scene_detector.find_scene(short_video, long_video)
-
-                    elif self.algorithm == 'sliding_window':
-                        # Use standard sliding window method
-                        if hasattr(self.scene_detector, 'find_scene'):
-                            result = self.scene_detector.find_scene(short_video, long_video)
-
-                    elif self.algorithm == 'shazam':
-                        # Use Shazam method
-                        if hasattr(self.scene_detector, 'find_scene'):
-                            result = self.scene_detector.find_scene(short_video, long_video)
-
-            except TimeoutError as e:
-                logger.error(f"Scene detection timed out for {os.path.basename(short_video)}: {e}")
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(_do_detect)
+                    result = future.result(timeout=self.detection_timeout)
+            except concurrent.futures.TimeoutError:
+                logger.error(
+                    f"Scene detection timed out for {os.path.basename(short_video)} "
+                    f"after {self.detection_timeout}s"
+                )
                 self.error.emit(f"Detection timeout: {os.path.basename(short_video)}")
                 continue  # Skip this pair and continue with next
 

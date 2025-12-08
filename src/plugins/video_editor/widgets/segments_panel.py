@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 from src.core.logger import Logger
+from src.core.i18n import t
 
 logger = Logger.get_logger('VideoEditor.SegmentsPanel')
 
@@ -37,7 +38,7 @@ class SegmentsPanel(QWidget):
 
         # Title
         title_layout = QHBoxLayout()
-        title = QLabel("📋 Segments")
+        title = QLabel(t("video_editor.segments_panel.title", "📋 Segments"))
         title.setStyleSheet("font-weight: bold; font-size: 14px;")
         title_layout.addWidget(title)
 
@@ -51,7 +52,12 @@ class SegmentsPanel(QWidget):
         # Segments table
         self.segments_table = QTableWidget()
         self.segments_table.setColumnCount(4)
-        self.segments_table.setHorizontalHeaderLabels(["#", "Début", "Fin", "Nom"])
+        self.segments_table.setHorizontalHeaderLabels([
+            "#",
+            t("video_editor.segments_panel.start", "Start"),
+            t("video_editor.segments_panel.end", "End"),
+            t("video_editor.segments_panel.name", "Name")
+        ])
 
         # Configure columns
         header = self.segments_table.horizontalHeader()
@@ -77,13 +83,13 @@ class SegmentsPanel(QWidget):
         row1 = QHBoxLayout()
 
         add_btn = QPushButton("➕")
-        add_btn.setToolTip("Ajouter segment (I → O → C)")
+        add_btn.setToolTip(t("video_editor.segments_panel.add_tooltip", "Add segment (I → O → C)"))
         add_btn.setMaximumWidth(40)
         add_btn.clicked.connect(self.add_segment_clicked.emit)
         row1.addWidget(add_btn)
 
         delete_btn = QPushButton("🗑️")
-        delete_btn.setToolTip("Supprimer sélection (Delete)")
+        delete_btn.setToolTip(t("video_editor.segments_panel.delete_tooltip", "Delete selection (Delete)"))
         delete_btn.setMaximumWidth(40)
         delete_btn.clicked.connect(self.delete_segments_clicked.emit)
         row1.addWidget(delete_btn)
@@ -91,13 +97,13 @@ class SegmentsPanel(QWidget):
         row1.addStretch()
 
         cut_btn = QPushButton("✂️")
-        cut_btn.setToolTip("Couper au curseur (S)")
+        cut_btn.setToolTip(t("video_editor.segments_panel.cut_tooltip", "Cut at cursor (S)"))
         cut_btn.setMaximumWidth(40)
         cut_btn.clicked.connect(self.cut_at_cursor_clicked.emit)
         row1.addWidget(cut_btn)
 
         merge_btn = QPushButton("🔗")
-        merge_btn.setToolTip("Fusionner sélection (Ctrl+M)")
+        merge_btn.setToolTip(t("video_editor.segments_panel.merge_tooltip", "Merge selection (Ctrl+M)"))
         merge_btn.setMaximumWidth(40)
         merge_btn.clicked.connect(self.merge_segments_clicked.emit)
         row1.addWidget(merge_btn)
@@ -107,27 +113,27 @@ class SegmentsPanel(QWidget):
         # Row 2
         row2 = QHBoxLayout()
 
-        copy_btn = QPushButton("📋 Copier")
-        copy_btn.setToolTip("Copier sélection (Ctrl+C)")
+        copy_btn = QPushButton(t("video_editor.segments_panel.copy", "📋 Copy"))
+        copy_btn.setToolTip(t("video_editor.segments_panel.copy_tooltip", "Copy selection (Ctrl+C)"))
         copy_btn.clicked.connect(self.copy_segments_clicked.emit)
         row2.addWidget(copy_btn)
 
-        paste_btn = QPushButton("📄 Coller")
-        paste_btn.setToolTip("Coller (Ctrl+V)")
+        paste_btn = QPushButton(t("video_editor.segments_panel.paste", "📄 Paste"))
+        paste_btn.setToolTip(t("video_editor.segments_panel.paste_tooltip", "Paste (Ctrl+V)"))
         paste_btn.clicked.connect(self.paste_segments_clicked.emit)
         row2.addWidget(paste_btn)
 
         # Add transition button
         row2.addWidget(QLabel("|"))
 
-        transition_btn = QPushButton("⚡ Transition")
-        transition_btn.setToolTip("Configurer transition pour le segment sélectionné")
+        transition_btn = QPushButton(t("video_editor.segments_panel.transition", "⚡ Transition"))
+        transition_btn.setToolTip(t("video_editor.segments_panel.transition_tooltip", "Configure transition for selected segment"))
         transition_btn.clicked.connect(self._on_transition_button_clicked)
         row2.addWidget(transition_btn)
 
         # Add text overlay button
-        text_overlay_btn = QPushButton("📝 Texte")
-        text_overlay_btn.setToolTip("Ajouter texte/titre au segment sélectionné")
+        text_overlay_btn = QPushButton(t("video_editor.segments_panel.text", "📝 Text"))
+        text_overlay_btn.setToolTip(t("video_editor.segments_panel.text_tooltip", "Add text/title to selected segment"))
         text_overlay_btn.clicked.connect(self._on_text_overlay_button_clicked)
         row2.addWidget(text_overlay_btn)
 
@@ -195,26 +201,26 @@ class SegmentsPanel(QWidget):
             return
 
         if len(selected) == 1:
-            rename_action = menu.addAction("✏️ Renommer")
+            rename_action = menu.addAction(t("video_editor.segments_panel.rename", "✏️ Rename"))
             rename_action.triggered.connect(lambda: self._rename_segment(selected[0]))
 
-            transition_action = menu.addAction("⚡ Configurer transition")
+            transition_action = menu.addAction(t("video_editor.segments_panel.configure_transition", "⚡ Configure Transition"))
             transition_action.triggered.connect(lambda: self.transition_clicked.emit(selected[0]))
 
-            text_overlay_action = menu.addAction("📝 Ajouter texte/titre")
+            text_overlay_action = menu.addAction(t("video_editor.segments_panel.add_text", "📝 Add Text/Title"))
             text_overlay_action.triggered.connect(lambda: self.text_overlay_clicked.emit(selected[0]))
 
             menu.addSeparator()
 
         if len(selected) >= 2:
-            merge_action = menu.addAction("🔗 Fusionner")
+            merge_action = menu.addAction(t("video_editor.segments_panel.merge", "🔗 Merge"))
             merge_action.triggered.connect(self.merge_segments_clicked.emit)
             menu.addSeparator()
 
-        delete_action = menu.addAction("🗑️ Supprimer")
+        delete_action = menu.addAction(t("video_editor.segments_panel.delete", "🗑️ Delete"))
         delete_action.triggered.connect(self.delete_segments_clicked.emit)
 
-        copy_action = menu.addAction("📋 Copier")
+        copy_action = menu.addAction(t("video_editor.segments_panel.copy_menu", "📋 Copy"))
         copy_action.triggered.connect(self.copy_segments_clicked.emit)
 
         menu.exec(self.segments_table.mapToGlobal(position))
@@ -248,16 +254,16 @@ class SegmentsPanel(QWidget):
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.information(
                 self,
-                "Aucune sélection",
-                "Veuillez sélectionner un segment pour configurer sa transition."
+                t("video_editor.segments_panel.no_selection", "No Selection"),
+                t("video_editor.segments_panel.select_segment_transition", "Please select a segment to configure its transition.")
             )
         else:
             # Multiple selection
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.information(
                 self,
-                "Sélection multiple",
-                "Veuillez sélectionner un seul segment pour configurer sa transition."
+                t("video_editor.segments_panel.multiple_selection", "Multiple Selection"),
+                t("video_editor.segments_panel.select_single_transition", "Please select a single segment to configure its transition.")
             )
 
     def _on_text_overlay_button_clicked(self):
@@ -270,14 +276,14 @@ class SegmentsPanel(QWidget):
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.information(
                 self,
-                "Aucune sélection",
-                "Veuillez sélectionner un segment pour ajouter du texte."
+                t("video_editor.segments_panel.no_selection", "No Selection"),
+                t("video_editor.segments_panel.select_segment_text", "Please select a segment to add text.")
             )
         else:
             # Multiple selection
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.information(
                 self,
-                "Sélection multiple",
-                "Veuillez sélectionner un seul segment pour ajouter du texte."
+                t("video_editor.segments_panel.multiple_selection", "Multiple Selection"),
+                t("video_editor.segments_panel.select_single_text", "Please select a single segment to add text.")
             )

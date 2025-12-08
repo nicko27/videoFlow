@@ -7,6 +7,7 @@ which provides functionality to copy folder structures with flexible options.
 from PyQt6.QtGui import QAction
 from src.core.plugin_interface import PluginInterface
 from src.core.logger import Logger
+from src.core.i18n import t
 
 logger = Logger.get_logger('CopyManager.Plugin')
 
@@ -32,8 +33,8 @@ class CopyManagerPlugin(PluginInterface):
         with the main application.
         """
         super().__init__()
-        self.name = "Copy Manager"
-        self.description = "Copy folder structure with or without files"
+        self.name = t("plugin.copy_manager.name", "Copy Manager")
+        self.description = t("plugin.copy_manager.description", "Copy folder structure with or without files")
         self.version = "1.0.0"
         self.window = None
         logger.debug("CopyManager plugin initialized")

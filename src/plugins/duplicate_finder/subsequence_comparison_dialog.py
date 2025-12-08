@@ -53,6 +53,9 @@ class SubsequenceComparisonDialog(QDialog):
         self.match_info = match_info
         self.result = None
 
+        # Arrange files so smallest is on the left
+        self._arrange_by_size()
+
         # Video properties
         self.short_fps = 0
         self.long_fps = 0
@@ -71,6 +74,21 @@ class SubsequenceComparisonDialog(QDialog):
 
         # Show initial synchronized position
         QTimer.singleShot(500, self.show_initial_position)
+
+    def _arrange_by_size(self):
+        """Arrange videos so the smallest file is on the left."""
+        try:
+            short_size = os.path.getsize(self.short_video)
+            long_size = os.path.getsize(self.long_video)
+
+            # If long video is actually smaller, swap them
+            if long_size < short_size:
+                self.short_video, self.long_video = self.long_video, self.short_video
+                logger.info(f"Swapped videos: smaller file ({long_size/1024/1024:.1f}MB) now on left")
+            else:
+                logger.info(f"Videos arranged: LEFT={short_size/1024/1024:.1f}MB, RIGHT={long_size/1024/1024:.1f}MB")
+        except (OSError, FileNotFoundError) as e:
+            logger.warning(f"Could not get file sizes: {e}")
 
     def _load_video_properties(self):
         """Load FPS and frame count for both videos."""

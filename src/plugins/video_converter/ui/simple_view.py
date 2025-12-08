@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from src.core.logger import Logger
+from src.core.i18n import t
 
 logger = Logger.get_logger('VideoConverter.SimpleView')
 
@@ -34,19 +35,19 @@ class SimpleCompressorView(QWidget):
         layout = QVBoxLayout(self)
 
         # === En-tête ===
-        header_label = QLabel("🎬 Compression Vidéo Simplifiée")
+        header_label = QLabel(t("simple_view.header", "🎬 Simple Video Compression"))
         header_label.setStyleSheet("font-size: 16px; font-weight: bold; padding: 10px;")
         layout.addWidget(header_label)
 
         # === Stratégie de Compression ===
-        strategy_group = QGroupBox("Stratégie de Compression")
+        strategy_group = QGroupBox(t("simple_view.strategy.title", "Compression Strategy"))
         strategy_layout = QVBoxLayout()
 
         self.strategy_combo = QComboBox()
         self.strategy_combo.addItems([
-            "🎯 Target Quality (Qualité fixe)",
-            "💾 Target Size (Taille cible)",
-            "⚖️ Balanced (Équilibré auto)"
+            t("simple_view.strategy.quality", "🎯 Target Quality (Fixed quality)"),
+            t("simple_view.strategy.size", "💾 Target Size (Target size)"),
+            t("simple_view.strategy.balanced", "⚖️ Balanced (Auto)")
         ])
         self.strategy_combo.setCurrentIndex(2)  # Balanced par défaut
         self.strategy_combo.currentIndexChanged.connect(self.on_strategy_changed)
@@ -62,7 +63,7 @@ class SimpleCompressorView(QWidget):
         layout.addWidget(strategy_group)
 
         # === Paramètres de Qualité (Target Quality) ===
-        self.quality_group = QGroupBox("Paramètres de Qualité")
+        self.quality_group = QGroupBox(t("simple_view.quality.title", "Quality Settings"))
         quality_layout = QFormLayout()
 
         # CRF Slider
@@ -79,10 +80,10 @@ class SimpleCompressorView(QWidget):
         self.crf_label.setStyleSheet("font-weight: bold; min-width: 30px;")
         crf_layout.addWidget(self.crf_label)
 
-        quality_layout.addRow("CRF (Qualité):", crf_widget)
+        quality_layout.addRow(t("simple_view.quality.crf", "CRF (Quality):"), crf_widget)
 
         # Info qualité
-        quality_info = QLabel("18 = Haute qualité, 35 = Haute compression")
+        quality_info = QLabel(t("simple_view.quality.info", "18 = High quality, 35 = High compression"))
         quality_info.setStyleSheet("color: #666; font-size: 11px;")
         quality_layout.addRow("", quality_info)
 
@@ -90,7 +91,7 @@ class SimpleCompressorView(QWidget):
         layout.addWidget(self.quality_group)
 
         # === Paramètres de Taille (Target Size) ===
-        self.size_group = QGroupBox("Paramètres de Taille Cible")
+        self.size_group = QGroupBox(t("simple_view.size.title", "Target Size Settings"))
         size_layout = QFormLayout()
 
         # Taille cible
@@ -98,19 +99,19 @@ class SimpleCompressorView(QWidget):
         self.target_size_spin.setRange(10, 10000)
         self.target_size_spin.setValue(300)
         self.target_size_spin.setSuffix(" MB")
-        size_layout.addRow("Taille cible:", self.target_size_spin)
+        size_layout.addRow(t("simple_view.size.target", "Target size:"), self.target_size_spin)
 
         # Max tentatives
         self.max_attempts_spin = QSpinBox()
         self.max_attempts_spin.setRange(1, 10)
         self.max_attempts_spin.setValue(5)
-        size_layout.addRow("Max tentatives:", self.max_attempts_spin)
+        size_layout.addRow(t("simple_view.size.max_attempts", "Max attempts:"), self.max_attempts_spin)
 
         self.size_group.setLayout(size_layout)
         layout.addWidget(self.size_group)
 
         # === Paramètres Balanced (Auto) ===
-        self.balanced_group = QGroupBox("Paramètres Équilibrés")
+        self.balanced_group = QGroupBox(t("simple_view.balanced.title", "Balanced Settings"))
         balanced_layout = QFormLayout()
 
         # Facteur qualité
@@ -127,13 +128,16 @@ class SimpleCompressorView(QWidget):
         self.quality_factor_label.setStyleSheet("font-weight: bold; min-width: 50px;")
         qf_layout.addWidget(self.quality_factor_label)
 
-        balanced_layout.addRow("Facteur qualité:", quality_factor_widget)
+        balanced_layout.addRow(t("simple_view.balanced.factor", "Quality factor:"), quality_factor_widget)
 
         # Info
         balanced_info = QLabel(
-            "< 1.0 = Meilleure qualité\n"
-            "1.0 = Équilibré\n"
-            "> 1.0 = Plus de compression"
+            t(
+                "simple_view.balanced.info",
+                "< 1.0 = Better quality\n"
+                "1.0 = Balanced\n"
+                "> 1.0 = More compression"
+            )
         )
         balanced_info.setStyleSheet("color: #666; font-size: 11px;")
         balanced_layout.addRow("", balanced_info)
@@ -142,7 +146,7 @@ class SimpleCompressorView(QWidget):
         layout.addWidget(self.balanced_group)
 
         # === Paramètres Communs ===
-        common_group = QGroupBox("Paramètres Communs")
+        common_group = QGroupBox(t("simple_view.common.title", "Common Settings"))
         common_layout = QFormLayout()
 
         # Preset
@@ -152,10 +156,10 @@ class SimpleCompressorView(QWidget):
             "fast", "medium", "slow", "slower", "veryslow"
         ])
         self.preset_combo.setCurrentText("medium")
-        common_layout.addRow("Vitesse d'encodage:", self.preset_combo)
+        common_layout.addRow(t("simple_view.common.preset", "Encoding speed:"), self.preset_combo)
 
         # Audio copy
-        self.audio_copy_check = QCheckBox("Copier l'audio sans réencodage")
+        self.audio_copy_check = QCheckBox(t("simple_view.common.audio_copy", "Copy audio without re-encoding"))
         self.audio_copy_check.setChecked(True)
         common_layout.addRow("", self.audio_copy_check)
 
@@ -166,7 +170,7 @@ class SimpleCompressorView(QWidget):
         apply_layout = QHBoxLayout()
         apply_layout.addStretch()
 
-        apply_btn = QPushButton("✅ Appliquer les Paramètres")
+        apply_btn = QPushButton(t("simple_view.apply", "✅ Apply Settings"))
         apply_btn.clicked.connect(self.apply_settings)
         apply_btn.setStyleSheet("""
             QPushButton {
@@ -197,19 +201,28 @@ class SimpleCompressorView(QWidget):
                 'quality': True,
                 'size': False,
                 'balanced': False,
-                'description': "Compresse avec une qualité constante (CRF fixe). Taille de sortie variable."
+                'description': t(
+                    "simple_view.strategy.desc.quality",
+                    "Compress with a constant CRF (fixed quality). Output size will vary."
+                )
             },
             1: {  # Target Size
                 'quality': False,
                 'size': True,
                 'balanced': False,
-                'description': "Compresse jusqu'à atteindre une taille cible précise. Qualité variable."
+                'description': t(
+                    "simple_view.strategy.desc.size",
+                    "Iterative compression until the output file is below the chosen target size."
+                )
             },
             2: {  # Balanced
                 'quality': False,
                 'size': False,
                 'balanced': True,
-                'description': "CRF calculé automatiquement selon la résolution vidéo. Équilibre optimal."
+                'description': t(
+                    "simple_view.strategy.desc.balanced",
+                    "Auto-choose a CRF based on video resolution for a balanced result."
+                )
             }
         }
 

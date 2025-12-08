@@ -14,6 +14,7 @@ from PyQt6.QtGui import QColor
 
 from ..themes import ThemePresets, Theme
 from ..theme_manager import ThemeManager
+from src.core.i18n import t
 
 
 class PreferencesDialog(QDialog):
@@ -53,7 +54,7 @@ class PreferencesDialog(QDialog):
 
     def setup_ui(self):
         """Set up the dialog UI."""
-        self.setWindowTitle("Préférences - Video Editor")
+        self.setWindowTitle(t("video_editor.preferences.title", "Preferences - Video Editor"))
         self.setMinimumWidth(600)
         self.setMinimumHeight(500)
 
@@ -64,11 +65,11 @@ class PreferencesDialog(QDialog):
 
         # Appearance tab
         appearance_tab = self._create_appearance_tab()
-        tabs.addTab(appearance_tab, "🎨 Apparence")
+        tabs.addTab(appearance_tab, t("video_editor.preferences.tab_appearance", "🎨 Appearance"))
 
         # Editor tab
         editor_tab = self._create_editor_tab()
-        tabs.addTab(editor_tab, "✏️ Éditeur")
+        tabs.addTab(editor_tab, t("video_editor.preferences.tab_editor", "✏️ Editor"))
 
         layout.addWidget(tabs)
 
@@ -76,16 +77,16 @@ class PreferencesDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        reset_btn = QPushButton("Réinitialiser")
-        reset_btn.setToolTip("Réinitialiser aux paramètres par défaut")
+        reset_btn = QPushButton(t("video_editor.preferences.reset", "Reset"))
+        reset_btn.setToolTip(t("video_editor.preferences.reset_tooltip", "Reset to default settings"))
         reset_btn.clicked.connect(self.reset_to_defaults)
         button_layout.addWidget(reset_btn)
 
-        cancel_btn = QPushButton("Annuler")
+        cancel_btn = QPushButton(t("video_editor.preferences.cancel", "Cancel"))
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
 
-        apply_btn = QPushButton("Appliquer")
+        apply_btn = QPushButton(t("video_editor.preferences.apply", "Apply"))
         apply_btn.setDefault(True)
         apply_btn.clicked.connect(self.apply_settings)
         button_layout.addWidget(apply_btn)
@@ -102,10 +103,10 @@ class PreferencesDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # Theme selection group
-        theme_group = QGroupBox("Thème")
+        theme_group = QGroupBox(t("video_editor.preferences.theme", "Theme"))
         theme_layout = QGridLayout()
 
-        theme_layout.addWidget(QLabel("Sélectionner un thème:"), 0, 0)
+        theme_layout.addWidget(QLabel(t("video_editor.preferences.select_theme", "Select a theme:")), 0, 0)
 
         self.theme_combo = QComboBox()
         self.theme_combo.addItems(ThemePresets.get_preset_names())
@@ -128,13 +129,13 @@ class PreferencesDialog(QDialog):
         layout.addWidget(theme_group)
 
         # Customization group
-        custom_group = QGroupBox("Personnalisation")
+        custom_group = QGroupBox(t("video_editor.preferences.customization", "Customization"))
         custom_layout = QGridLayout()
 
         # Accent color
-        custom_layout.addWidget(QLabel("Couleur d'accent:"), 0, 0)
+        custom_layout.addWidget(QLabel(t("video_editor.preferences.accent_color", "Accent color:")), 0, 0)
 
-        self.accent_color_btn = QPushButton("Choisir couleur...")
+        self.accent_color_btn = QPushButton(t("video_editor.preferences.choose_color", "Choose color..."))
         self.accent_color_btn.clicked.connect(self.choose_accent_color)
         custom_layout.addWidget(self.accent_color_btn, 0, 1)
 
@@ -144,7 +145,7 @@ class PreferencesDialog(QDialog):
         custom_layout.addWidget(self.accent_color_preview, 0, 2)
 
         # Font size
-        custom_layout.addWidget(QLabel("Taille de police:"), 1, 0)
+        custom_layout.addWidget(QLabel(t("video_editor.preferences.font_size", "Font size:")), 1, 0)
 
         self.font_size_spin = QSpinBox()
         self.font_size_spin.setRange(8, 16)
@@ -168,10 +169,10 @@ class PreferencesDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # Timeline group
-        timeline_group = QGroupBox("Timeline")
+        timeline_group = QGroupBox(t("video_editor.preferences.timeline", "Timeline"))
         timeline_layout = QGridLayout()
 
-        timeline_layout.addWidget(QLabel("Hauteur de la timeline:"), 0, 0)
+        timeline_layout.addWidget(QLabel(t("video_editor.preferences.timeline_height", "Timeline height:")), 0, 0)
 
         self.timeline_height_spin = QSpinBox()
         self.timeline_height_spin.setRange(50, 200)
@@ -192,18 +193,18 @@ class PreferencesDialog(QDialog):
         layout.addWidget(timeline_group)
 
         # Editor options group
-        options_group = QGroupBox("Options de l'éditeur")
+        options_group = QGroupBox(t("video_editor.preferences.editor_options", "Editor Options"))
         options_layout = QVBoxLayout()
 
-        self.auto_save_check = QCheckBox("Sauvegarde automatique du projet")
+        self.auto_save_check = QCheckBox(t("video_editor.preferences.auto_save", "Auto-save project"))
         self.auto_save_check.setChecked(True)
         options_layout.addWidget(self.auto_save_check)
 
-        self.show_waveform_check = QCheckBox("Afficher les formes d'onde audio")
+        self.show_waveform_check = QCheckBox(t("video_editor.preferences.show_waveform", "Show audio waveforms"))
         self.show_waveform_check.setChecked(False)
         options_layout.addWidget(self.show_waveform_check)
 
-        self.snap_to_marker_check = QCheckBox("Aimanter aux marqueurs")
+        self.snap_to_marker_check = QCheckBox(t("video_editor.preferences.snap_to_marker", "Snap to markers"))
         self.snap_to_marker_check.setChecked(True)
         options_layout.addWidget(self.snap_to_marker_check)
 
@@ -272,7 +273,7 @@ class PreferencesDialog(QDialog):
         color = QColorDialog.getColor(
             current_color,
             self,
-            "Choisir couleur d'accent"
+            t("video_editor.preferences.choose_accent_color", "Choose accent color")
         )
 
         if color.isValid():

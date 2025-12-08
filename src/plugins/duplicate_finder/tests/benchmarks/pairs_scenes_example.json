@@ -1,0 +1,38 @@
+[
+  {
+    "short": "tests/data/clip1.mp4",
+    "long": "tests/data/movie1.mp4",
+    "start": 12.0,
+    "duration": 6.0,
+    "expected": "positive",
+    "preference": "fn",
+    "sequence_score": 98.0
+  },
+  {
+    "short": "tests/data/clip2.mp4",
+    "long": "tests/data/movie1.mp4",
+    "start": 120.0,
+    "duration": 8.0,
+    "expected": "negative",
+    "preference": "fp",
+    "sequence_score": 75.0
+  },
+  {
+    "short": "tests/data/clip3_noaudio.mp4",
+    "long": "tests/data/movie2.mp4",
+    "start": 45.0,
+    "duration": 5.0,
+    "expected": "positive",
+    "preference": "balanced",
+    "sequence_score": 92.0
+  },
+  {
+    "short": "tests/data/clip4_noise.mp4",
+    "long": "tests/data/movie2.mp4",
+    "start": 200.0,
+    "duration": 7.0,
+    "expected": "negative",
+    "preference": "fp",
+    "sequence_score": 70.0
+  }
+]

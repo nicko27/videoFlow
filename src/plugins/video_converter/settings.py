@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Dict, Any, List
 from pathlib import Path
+from datetime import datetime
 import json
 from src.core.logger import Logger
 
@@ -19,7 +20,7 @@ class ConversionAttempt:
     def validate_crf(crf: int) -> int:
         """Valider la valeur CRF."""
         if not isinstance(crf, int):
-            logger.warning(f"Type CRF invalide: {type(crf)}, utilisation of the valeur par défaut")
+            logger.warning(f"Invalid CRF type: {type(crf)}, using default value")
             return 28
         return max(18, min(35, crf))  # Plage réduite pour de meilleurs results
     
@@ -29,7 +30,7 @@ class ConversionAttempt:
         valid_presets = ["ultrafast", "superfast", "veryfast", "faster", "fast", 
                         "medium", "slow", "slower", "veryslow"]
         if preset not in valid_presets:
-            logger.warning(f"Preset invalide: {preset}, utilisation de 'fast'")
+            logger.warning(f"Invalid preset: {preset}, using 'fast'")
             return "fast"
         return preset
     
@@ -114,47 +115,91 @@ class ConversionSettings:
         self.balanced_auto_crf = False  # CRF auto calculé selon résolution
         self.balanced_quality_factor = 1.0  # Facteur qualité (0.5-2.0, 1.0=neutre)
 
+        # FFmpeg configuration
+        self.ffmpeg_path = self._detect_ffmpeg()
+        self.ffprobe_path = self._detect_ffprobe()
+
+    @staticmethod
+    def _detect_ffmpeg() -> str:
+        """
+        Detect FFmpeg executable path.
+
+        Returns:
+            Path to ffmpeg or 'ffmpeg' if using system PATH
+        """
+        import shutil
+
+        # Try to find ffmpeg in PATH
+        ffmpeg_path = shutil.which('ffmpeg')
+        if ffmpeg_path:
+            logger.debug(f"FFmpeg found at: {ffmpeg_path}")
+            return ffmpeg_path
+
+        # Fallback to system PATH (let subprocess handle it)
+        logger.warning("FFmpeg not found in PATH, will try system PATH")
+        return 'ffmpeg'
+
+    @staticmethod
+    def _detect_ffprobe() -> str:
+        """
+        Detect FFprobe executable path.
+
+        Returns:
+            Path to ffprobe or 'ffprobe' if using system PATH
+        """
+        import shutil
+
+        # Try to find ffprobe in PATH
+        ffprobe_path = shutil.which('ffprobe')
+        if ffprobe_path:
+            logger.debug(f"FFprobe found at: {ffprobe_path}")
+            return ffprobe_path
+
+        # Fallback to system PATH
+        logger.warning("FFprobe not found in PATH, will try system PATH")
+        return 'ffprobe'
+
     def validate_and_fix(self):
         """Valider et corriger tous les settings."""
         # Valider le seuil de size
         if not isinstance(self.size_threshold, (int, float)) or self.size_threshold <= 0:
-            logger.warning("Seuil de size invalide, utilisation de 500MB par défaut")
+            logger.warning("Invalid size threshold, using default 500MB")
             self.size_threshold = 500 * 1024 * 1024
 
         # Limiter le seuil maximum pour éviter les valeurs aberrantes
         max_threshold = 10 * 1024 * 1024 * 1024  # 10GB max
         if self.size_threshold > max_threshold:
-            logger.warning(f"Seuil de size trop élevé, limitation à {max_threshold // (1024*1024*1024)}GB")
+            logger.warning(f"Size threshold too high, limiting to {max_threshold // (1024*1024*1024)}GB")
             self.size_threshold = max_threshold
 
         # Valider la taille cible
         if not isinstance(self.target_size, (int, float)) or self.target_size <= 0:
-            logger.warning("Taille cible invalide, utilisation de 300MB par défaut")
+            logger.warning("Invalid target size, using default 300MB")
             self.target_size = 300 * 1024 * 1024
 
         if self.target_size > max_threshold:
-            logger.warning(f"Taille cible trop élevée, limitation à {max_threshold // (1024*1024*1024)}GB")
+            logger.warning(f"Target size too high, limiting to {max_threshold // (1024*1024*1024)}GB")
             self.target_size = max_threshold
 
         # Valider les paramètres de compression itérative
         if not isinstance(self.max_compression_attempts, int) or self.max_compression_attempts < 1:
-            logger.warning("Nombre max de tentatives invalide, utilisation de 5")
+            logger.warning("Invalid max attempts, using default 5")
             self.max_compression_attempts = 5
 
         self.max_compression_attempts = max(1, min(10, self.max_compression_attempts))
 
         if not isinstance(self.initial_crf, int) or not (18 <= self.initial_crf <= 35):
-            logger.warning("CRF initial invalide, utilisation de 28")
+            logger.warning("Invalid initial CRF, using default 28")
             self.initial_crf = 28
 
         if not isinstance(self.crf_step, int) or self.crf_step < 1:
-            logger.warning("CRF step invalide, utilisation de 2")
+            logger.warning("Invalid CRF step, using default 2")
             self.crf_step = 2
 
         self.crf_step = max(1, min(5, self.crf_step))
 
         if not isinstance(self.max_crf, int) or not (18 <= self.max_crf <= 51):
-            logger.warning("CRF max invalide, utilisation de 40")
+            logger.warning("Invalid max CRF, using default 40")
             self.max_crf = 40
         
         # Valider CRF et preset
@@ -171,7 +216,7 @@ class ConversionSettings:
         for setting in bool_settings:
             value = getattr(self, setting, False)
             if not isinstance(value, bool):
-                logger.warning(f"Paramètre booléen invalide {setting}, utilisation de False")
+                logger.warning(f"Invalid boolean parameter {setting}, using False")
                 setattr(self, setting, False)
         
         # Valider le number de conversions simultanées
@@ -179,14 +224,14 @@ class ConversionSettings:
             import os
             cpu_count = os.cpu_count() or 1
             self.max_concurrent_conversions = min(cpu_count, 4)
-            logger.warning(f"Number de threads invalide, utilisation de {self.max_concurrent_conversions}")
+            logger.warning(f"Invalid thread count, using {self.max_concurrent_conversions}")
         
         # Limiter entre 1 et 8 threads
         self.max_concurrent_conversions = max(1, min(8, self.max_concurrent_conversions))
         
         # Valider et corriger les tentatives
         if not isinstance(self.attempts, list) or len(self.attempts) == 0:
-            logger.warning("Configuration des tentatives invalide, utilisation des valeurs par défaut")
+            logger.warning("Invalid attempts configuration, using default values")
             self.attempts = [
                 ConversionAttempt(28, "fast"),
                 ConversionAttempt(30, "medium"),
@@ -196,17 +241,94 @@ class ConversionSettings:
         # S'asoner d'avoir exactement 3 tentatives
         while len(self.attempts) < 3:
             self.attempts.append(ConversionAttempt(32, "slow"))
+
+        # Cross-validation: Check for incompatible setting combinations
+        self._validate_cross_settings()
         
         if len(self.attempts) > 3:
             self.attempts = self.attempts[:3]
-            logger.warning("Trop de tentatives configurées, utilisation des 3 premières")
+            logger.warning("Too many attempts configured, using first 3")
         
         # Valider chaque tentative
         for i, attempt in enumerate(self.attempts):
             if not isinstance(attempt, ConversionAttempt):
-                logger.warning(f"Tentative {i+1} invalide, remplacement par défaut")
+                logger.warning(f"Attempt {i+1} invalid, replacing with default")
                 self.attempts[i] = ConversionAttempt(28 + i*2, ["fast", "medium", "slow"][i])
-    
+
+    def _validate_cross_settings(self):
+        """
+        Validate cross-dependencies between settings.
+
+        Checks for incompatible or illogical setting combinations and fixes them.
+        """
+        # 1. Check iterative compression settings
+        if self.use_target_size:
+            # Ensure initial_crf < max_crf for iterative compression
+            if self.initial_crf >= self.max_crf:
+                logger.warning(
+                    f"Initial CRF ({self.initial_crf}) >= Max CRF ({self.max_crf}). "
+                    "Adjusting max_crf to initial_crf + 10"
+                )
+                self.max_crf = min(51, self.initial_crf + 10)
+
+            # Ensure crf_step makes sense
+            range_available = self.max_crf - self.initial_crf
+            if range_available < self.crf_step:
+                logger.warning(
+                    f"CRF step ({self.crf_step}) too large for CRF range ({range_available}). "
+                    "Reducing to 1"
+                )
+                self.crf_step = 1
+
+        # 2. Check threshold vs target size
+        if self.use_target_size and self.use_size_threshold:
+            if self.target_size >= self.size_threshold:
+                logger.warning(
+                    f"Target size ({self.target_size/1024/1024:.0f}MB) >= "
+                    f"Size threshold ({self.size_threshold/1024/1024:.0f}MB). "
+                    "This combination doesn't make sense. Disabling size threshold."
+                )
+                self.use_size_threshold = False
+
+        # 3. Check delete options sanity
+        if self.delete_if_smaller and self.replace_original:
+            logger.warning(
+                "Both 'delete_if_smaller' and 'replace_original' are enabled. "
+                "'replace_original' takes precedence."
+            )
+            self.delete_if_smaller = False
+
+        # 4. Warn about extreme CRF/preset combinations
+        if self.manual_mode:
+            slow_presets = ['slow', 'slower', 'veryslow']
+            if self.crf >= 33 and self.preset in slow_presets:
+                logger.warning(
+                    f"High CRF ({self.crf}) with slow preset ('{self.preset}'): "
+                    "This will be very slow and produce poor quality. "
+                    "Consider using CRF <= 32 or a faster preset."
+                )
+
+        # 5. Validate balanced mode quality factor
+        if self.balanced_auto_crf:
+            if not isinstance(self.balanced_quality_factor, (int, float)):
+                logger.warning("Invalid quality factor, using default 1.0")
+                self.balanced_quality_factor = 1.0
+            else:
+                # Clamp to reasonable range
+                if self.balanced_quality_factor < 0.5 or self.balanced_quality_factor > 2.0:
+                    logger.warning(
+                        f"Quality factor ({self.balanced_quality_factor}) out of range [0.5, 2.0]. "
+                        "Clamping to valid range."
+                    )
+                    self.balanced_quality_factor = max(0.5, min(2.0, self.balanced_quality_factor))
+
+        # 6. Check multiple attempts with manual mode
+        if self.manual_mode and self.multiple_attempts:
+            logger.info(
+                "Manual mode with multiple attempts: all attempts will use the same settings "
+                "(CRF={}, preset='{}')".format(self.crf, self.preset)
+            )
+
     def to_dict(self) -> dict:
         """Convertir les settings en dictionnaire."""
         return {
@@ -241,8 +363,10 @@ class ConversionSettings:
             'simple_strategy': self.simple_strategy,
             'balanced_auto_crf': self.balanced_auto_crf,
             'balanced_quality_factor': self.balanced_quality_factor,
+            'ffmpeg_path': self.ffmpeg_path,
+            'ffprobe_path': self.ffprobe_path,
 
-            'version': '2.2.0'  # Incrémenter la version pour mode simple
+            'version': '2.3.0'  # Incremented version for configurable FFmpeg paths
         }
     
     @classmethod
@@ -281,7 +405,9 @@ class ConversionSettings:
         settings.balanced_auto_crf = data.get('balanced_auto_crf', False)
         settings.balanced_quality_factor = data.get('balanced_quality_factor', 1.0)
 
-
+        # Load FFmpeg paths (with auto-detection fallback)
+        settings.ffmpeg_path = data.get('ffmpeg_path', cls._detect_ffmpeg())
+        settings.ffprobe_path = data.get('ffprobe_path', cls._detect_ffprobe())
 
         # Load le number de threads with valeur par défaut
         import os
@@ -397,7 +523,7 @@ class SettingsManager:
             SettingsManager.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
             return True
         except Exception as e:
-            logger.error(f"Cannot créer le folder de configuration: {e}")
+            logger.error(f"Cannot create configuration folder: {e}")
             return False
     
     @staticmethod
@@ -416,7 +542,7 @@ class SettingsManager:
         settings = ConversionSettings()
         
         if not SettingsManager.CONFIG_FILE.exists():
-            logger.debug("Aucun file de configuration found, utilisation des settings par défaut")
+            logger.debug("No configuration file found, using default settings")
             SettingsManager._cached_settings = settings
             SettingsManager._cache_timestamp = 0
             return settings
@@ -428,16 +554,16 @@ class SettingsManager:
             
             # Valider la structure JSON
             if not isinstance(data, dict):
-                raise ValueError("Le file de configuration n'est pas un objet JSON valide")
+                raise ValueError("Configuration file is not a valid JSON object")
             
             settings = ConversionSettings.from_dict(data)
             
             # Valider les settings chargés
             if not settings.is_valid():
-                logger.warning("Settings chargés invalides, utilisation des settings par défaut")
+                logger.warning("Loaded settings invalid, using default settings")
                 settings = ConversionSettings()
             else:
-                logger.debug("Settings chargés with success")
+                logger.debug("Settings loaded successfully")
             
             # Mettre à jour le cache
             SettingsManager._cached_settings = settings
@@ -446,27 +572,27 @@ class SettingsManager:
             return settings
             
         except json.JSONDecodeError as e:
-            logger.error(f"JSON invalide in le file de configuration: {e}")
+            logger.error(f"Invalid JSON in configuration file: {e}")
         except Exception as e:
-            logger.error(f"Error loading des settings: {e}")
+            logger.error(f"Error loading settings: {e}")
         
         # Essayer le file de sauvegarde
         if SettingsManager.BACKUP_FILE.exists():
             try:
-                logger.info("Tentative de chargement du file de sauvegarde")
+                logger.info("Attempting to load backup file")
                 with open(SettingsManager.BACKUP_FILE, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                
+
                 settings = ConversionSettings.from_dict(data)
                 if settings.is_valid():
-                    logger.info("Settings de sauvegarde chargés with success")
+                    logger.info("Backup settings loaded successfully")
                     SettingsManager._cached_settings = settings
                     return settings
-                    
+
             except Exception as e:
-                logger.error(f"Error loading of the sauvegarde: {e}")
+                logger.error(f"Error loading backup: {e}")
         
-        logger.warning("Utilisation des settings par défaut en raison d'erreurs de configuration")
+        logger.warning("Using default settings due to configuration errors")
         SettingsManager._cached_settings = settings
         return settings
     
@@ -479,7 +605,7 @@ class SettingsManager:
         try:
             # Valider avant sauvegarde
             if not settings.is_valid():
-                logger.error("Cannot save des settings invalides")
+                logger.error("Cannot save invalid settings")
                 return False
             
             # Créer une sauvegarde du file existant
@@ -488,7 +614,7 @@ class SettingsManager:
                     import shutil
                     shutil.copy2(SettingsManager.CONFIG_FILE, SettingsManager.BACKUP_FILE)
                 except Exception as e:
-                    logger.warning(f"Cannot créer une sauvegarde: {e}")
+                    logger.warning(f"Cannot create backup: {e}")
             
             # Convertir en dictionnaire
             data = settings.to_dict()
@@ -503,7 +629,7 @@ class SettingsManager:
                 test_data = json.load(f)
                 test_settings = ConversionSettings.from_dict(test_data)
                 if not test_settings.is_valid():
-                    raise ValueError("Failed of the validation des settings sauvegardés")
+                    raise ValueError("Validation of saved settings failed")
             
             # Déplacer le file temporaire vers l'emplacement final
             temp_file.replace(SettingsManager.CONFIG_FILE)
@@ -511,12 +637,12 @@ class SettingsManager:
             # Mettre à jour le cache
             SettingsManager._cached_settings = settings
             SettingsManager._cache_timestamp = SettingsManager.CONFIG_FILE.stat().st_mtime
-            
-            logger.debug("Settings sauvegardés with success")
+
+            logger.debug("Settings saved successfully")
             return True
             
         except Exception as e:
-            logger.error(f"Error saving des settings: {e}")
+            logger.error(f"Error saving settings: {e}")
             # Nettoyer le file temporaire
             temp_file = SettingsManager.CONFIG_FILE.with_suffix('.tmp')
             if temp_file.exists():
@@ -533,9 +659,9 @@ class SettingsManager:
         
         # Save les nouveaux settings
         if SettingsManager.save_settings(settings):
-            logger.info("Settings réinitialisés aux valeurs par défaut")
+            logger.info("Settings reset to default values")
         else:
-            logger.warning("Failed of the sauvegarde après réinitialisation")
+            logger.warning("Failed to save after reset")
         
         return settings
     
@@ -549,10 +675,10 @@ class SettingsManager:
             
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
-            logger.info(f"Settings exportés vers {file_path}")
+            logger.info(f"Settings exported to {file_path}")
             return True
         except Exception as e:
-            logger.error(f"Error during l'exportation des settings: {e}")
+            logger.error(f"Error during settings export: {e}")
             return False
     
     @staticmethod
@@ -569,16 +695,16 @@ class SettingsManager:
             settings = ConversionSettings.from_dict(data)
             if settings.is_valid():
                 if SettingsManager.save_settings(settings):
-                    logger.info(f"Settings importés depuis {file_path}")
+                    logger.info(f"Settings imported from {file_path}")
                     return settings
                 else:
-                    raise ValueError("Failed of the sauvegarde des settings importés")
+                    raise ValueError("Failed to save imported settings")
             else:
-                raise ValueError("Settings importés invalides")
+                raise ValueError("Imported settings invalid")
                 
         except Exception as e:
-            logger.error(f"Error during l'importation des settings: {e}")
-            return SettingsManager.load_settings()  # Returnsr les settings actuels en cas d'error
+            logger.error(f"Error during settings import: {e}")
+            return SettingsManager.load_settings()  # Return current settings on error
     
     @staticmethod
     def clear_cache():

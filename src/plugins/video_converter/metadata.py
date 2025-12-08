@@ -90,121 +90,198 @@ class MetadataManager:
             MetadataManager._cache_timestamps[cache_key] = datetime.now().timestamp()
     
     @staticmethod
-    def get_metadata(file_path: Path) -> Optional[ConversionMetadata]:
-        """Obtenir les métadonnées de conversion d'un file with cache."""
-        if not file_path.exists():
+    def get_metadata(file_path: Path, ffprobe_path: str = 'ffprobe') -> Optional[ConversionMetadata]:
+        """
+        Get conversion metadata from file with caching.
+
+        Args:
+            file_path: Path to video file
+            ffprobe_path: Path to ffprobe executable
+
+        Returns:
+            ConversionMetadata if found, None otherwise
+        """
+        # Validate file existence and accessibility
+        try:
+            if not file_path.exists():
+                return None
+
+            # Check if file is readable
+            if not file_path.is_file():
+                logger.warning(f"Path is not a file: {file_path}")
+                return None
+
+        except (OSError, PermissionError) as e:
+            logger.error(f"Cannot access file {file_path}: {e}")
             return None
-        
-        # Checksr le cache
+
+        # Check cache
         if MetadataManager._is_cache_valid(file_path):
             cache_key = MetadataManager._get_cache_key(file_path)
             return MetadataManager._metadata_cache.get(cache_key)
-        
+
         try:
             cmd = [
-                'ffprobe',
+                ffprobe_path,
                 '-v', 'quiet',
                 '-print_format', 'json',
                 '-show_format',
                 str(file_path)
             ]
-            
+
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-            if result.returncode == 0:
-                data = json.loads(result.stdout)
-                tags = data.get('format', {}).get('tags', {})
-                
-                metadata = None
-                if MetadataManager.CONVERSION_TAG in tags:
-                    try:
-                        meta_dict = json.loads(tags[MetadataManager.CONVERSION_TAG])
-                        metadata = ConversionMetadata.from_dict(meta_dict)
-                    except (json.JSONDecodeError, KeyError, ValueError) as e:
-                        logger.warning(f"Métadonnées invalides in {file_path}: {e}")
-                        metadata = None
-                
-                # Mettre à jour le cache
-                MetadataManager._update_cache(file_path, metadata)
-                return metadata
-            
-            # Pas de métadonnées, mettre à jour le cache
-            MetadataManager._update_cache(file_path, None)
-            return None
-            
+
+            if result.returncode != 0:
+                # Log stderr only if non-empty and not just warnings
+                if result.stderr and "error" in result.stderr.lower():
+                    logger.warning(f"ffprobe failed for {file_path.name}: {result.stderr[:200]}")
+                # No metadata, cache result
+                MetadataManager._update_cache(file_path, None)
+                return None
+
+            # Parse JSON output
+            if not result.stdout or not result.stdout.strip():
+                logger.warning(f"Empty ffprobe output for {file_path}")
+                MetadataManager._update_cache(file_path, None)
+                return None
+
+            data = json.loads(result.stdout)
+            tags = data.get('format', {}).get('tags', {})
+
+            metadata = None
+            if MetadataManager.CONVERSION_TAG in tags:
+                try:
+                    meta_dict = json.loads(tags[MetadataManager.CONVERSION_TAG])
+                    metadata = ConversionMetadata.from_dict(meta_dict)
+                except (json.JSONDecodeError, KeyError, ValueError, TypeError) as e:
+                    logger.warning(f"Invalid metadata in {file_path.name}: {e}")
+                    metadata = None
+
+            # Update cache with result (even if None)
+            MetadataManager._update_cache(file_path, metadata)
+            return metadata
+
         except subprocess.TimeoutExpired:
-            logger.error(f"Timeout lors of the lecture des métadonnées de {file_path}")
+            logger.error(f"Timeout reading metadata from {file_path.name}")
             return None
         except json.JSONDecodeError as e:
-            logger.error(f"JSON invalide in la sortie ffprobe pour {file_path}: {e}")
+            logger.error(f"Invalid JSON in ffprobe output for {file_path.name}: {e}")
+            return None
+        except (OSError, PermissionError) as e:
+            logger.error(f"Permission denied reading metadata from {file_path}: {e}")
             return None
         except Exception as e:
-            logger.error(f"Error reading des métadonnées de {file_path}: {e}")
+            logger.error(f"Unexpected error reading metadata from {file_path.name}: {e}")
             return None
     
     @staticmethod
-    def set_metadata(file_path: Path, metadata: ConversionMetadata) -> bool:
-        """Définir les métadonnées de conversion pour un file with gestion cross-device."""
-        if not file_path.exists():
-            logger.error(f"Cannot définir les métadonnées: file inexistant: {file_path}")
+    def set_metadata(file_path: Path, metadata: ConversionMetadata, ffmpeg_path: str = 'ffmpeg') -> bool:
+        """
+        Set conversion metadata for file with robust error handling.
+
+        Args:
+            file_path: Path to video file
+            metadata: Metadata to set
+            ffmpeg_path: Path to ffmpeg executable
+
+        Returns:
+            True if metadata was set successfully
+        """
+        # Validate file existence and permissions
+        try:
+            if not file_path.exists():
+                logger.error(f"Cannot set metadata: file does not exist: {file_path}")
+                return False
+
+            if not file_path.is_file():
+                logger.error(f"Cannot set metadata: path is not a file: {file_path}")
+                return False
+
+            # Check write permissions on parent directory
+            parent_dir = file_path.parent
+            if not parent_dir.exists() or not parent_dir.is_dir():
+                logger.error(f"Parent directory does not exist: {parent_dir}")
+                return False
+
+        except (OSError, PermissionError) as e:
+            logger.error(f"Permission error accessing {file_path}: {e}")
             return False
-        
+
         temp_path = None
         try:
-            # Valider les métadonnées
-            meta_json = json.dumps(metadata.to_dict(), separators=(',', ':'))  # Format compact
-            if len(meta_json) > 7000:  # Limite de sécurité FFmpeg
-                logger.warning(f"Métadonnées trop volumineuses pour {file_path}, ignorées")
+            # Validate and serialize metadata
+            meta_json = json.dumps(metadata.to_dict(), separators=(',', ':'))  # Compact format
+            if len(meta_json) > 7000:  # FFmpeg safety limit
+                logger.warning(f"Metadata too large for {file_path.name}, skipping")
                 return False
-            
-            # Créer un file temporaire in le même folder pour éviter cross-device
+
+            # Create temporary file in same directory to avoid cross-device issues
             parent_dir = file_path.parent
             temp_name = f"metadata_temp_{file_path.stem}_{datetime.now().strftime('%H%M%S')}{file_path.suffix}"
             temp_path = parent_dir / temp_name
-            
+
             cmd = [
-                'ffmpeg',
+                ffmpeg_path,
                 '-i', str(file_path),
-                '-c', 'copy',  # Copier sans réencodage
+                '-c', 'copy',  # Copy without re-encoding
                 '-metadata', f'{MetadataManager.CONVERSION_TAG}={meta_json}',
-                '-y',  # Écraser le file de sortie
+                '-y',  # Overwrite output
                 str(temp_path)
             ]
-            
+
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-            if result.returncode == 0:
-                # Checksr que le file temporaire a été créé correctement
-                if temp_path.exists() and temp_path.stat().st_size > 0:
-                    # Remplacer le file original (même device, pas de cross-device link)
-                    file_path.unlink()
-                    temp_path.rename(file_path)
-                    
-                    # Invalider le cache
-                    cache_key = MetadataManager._get_cache_key(file_path)
-                    MetadataManager._metadata_cache.pop(cache_key, None)
-                    MetadataManager._cache_timestamps.pop(cache_key, None)
-                    
-                    logger.debug(f"Métadonnées mises à jour pour {file_path}")
-                    return True
-                else:
-                    logger.error(f"File temporaire vide ou inexistant: {temp_path}")
-                    return False
-            else:
-                logger.error(f"Error ffmpeg lors of the mise à jour des métadonnées pour {file_path}: {result.stderr}")
+
+            if result.returncode != 0:
+                stderr_msg = result.stderr[:500] if result.stderr else "Unknown error"
+                logger.error(f"ffmpeg failed setting metadata for {file_path.name}: {stderr_msg}")
                 return False
-        
+
+            # Verify temporary file was created correctly
+            if not temp_path.exists():
+                logger.error(f"Temporary file not created: {temp_path}")
+                return False
+
+            temp_size = temp_path.stat().st_size
+            if temp_size == 0:
+                logger.error(f"Temporary file is empty: {temp_path}")
+                return False
+
+            # Atomic replacement (same device, no cross-device link)
+            try:
+                file_path.unlink()
+                temp_path.rename(file_path)
+            except (OSError, PermissionError) as e:
+                logger.error(f"Failed to replace original file: {e}")
+                # Try to restore by renaming temp back if needed
+                if temp_path.exists():
+                    logger.error("Temporary file still exists, original was deleted - data loss risk!")
+                return False
+
+            # Invalidate cache after successful update
+            cache_key = MetadataManager._get_cache_key(file_path)
+            MetadataManager._metadata_cache.pop(cache_key, None)
+            MetadataManager._cache_timestamps.pop(cache_key, None)
+
+            logger.debug(f"Metadata updated for {file_path.name}")
+            return True
+
         except subprocess.TimeoutExpired:
-            logger.error(f"Timeout lors of the mise à jour des métadonnées pour {file_path}")
+            logger.error(f"Timeout setting metadata for {file_path.name}")
+            return False
+        except (OSError, PermissionError) as e:
+            logger.error(f"Permission error setting metadata for {file_path}: {e}")
             return False
         except Exception as e:
-            logger.error(f"Error lors of the mise à jour des métadonnées pour {file_path}: {e}")
+            logger.error(f"Unexpected error setting metadata for {file_path.name}: {e}")
             return False
         finally:
-            # Nettoyer le file temporaire
+            # Clean up temporary file
             if temp_path and temp_path.exists():
                 try:
                     temp_path.unlink()
+                    logger.debug(f"Cleaned up temporary file: {temp_path}")
                 except Exception as e:
-                    logger.warning(f"Cannot nettoyer le file temporaire {temp_path}: {e}")
+                    logger.warning(f"Cannot clean up temporary file {temp_path}: {e}")
     
     @staticmethod
     def mark_as_converted(input_path: Path, output_path: Path, params: Dict[str, Any]) -> bool:

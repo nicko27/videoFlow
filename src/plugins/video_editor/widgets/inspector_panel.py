@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
+from src.core.i18n import t
 
 
 class InspectorPanel(QWidget):
@@ -57,7 +58,7 @@ class InspectorPanel(QWidget):
         layout.setSpacing(10)
 
         # Header
-        header = QLabel("⚙️ Propriétés")
+        header = QLabel(t("video_editor.inspector.properties", "⚙️ Properties"))
         header.setStyleSheet("""
             QLabel {
                 font-size: 16px;
@@ -70,7 +71,7 @@ class InspectorPanel(QWidget):
         layout.addWidget(header)
 
         # Segment info group
-        self.info_group = QGroupBox("Segment Sélectionné")
+        self.info_group = QGroupBox(t("video_editor.inspector.selected_segment", "Selected Segment"))
         self.info_group.setStyleSheet("""
             QGroupBox {
                 color: #000;
@@ -92,32 +93,32 @@ class InspectorPanel(QWidget):
 
         # Segment name
         name_layout = QHBoxLayout()
-        name_layout.addWidget(QLabel("Nom:"))
+        name_layout.addWidget(QLabel(t("video_editor.inspector.name", "Name:")))
         self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("Segment sans nom")
+        self.name_edit.setPlaceholderText(t("video_editor.inspector.unnamed_segment", "Unnamed segment"))
         self.name_edit.setStyleSheet("padding: 5px; background-color: #fff; border: 1px solid #ccc; color: #000;")
         name_layout.addWidget(self.name_edit, 1)
         info_layout.addLayout(name_layout)
 
         # Start time
-        self.start_label = QLabel("⏱ Début: --:--:--")
+        self.start_label = QLabel(t("video_editor.inspector.start", "⏱ Start: --:--:--"))
         self.start_label.setStyleSheet("color: #333; padding: 5px; background-color: transparent;")
         info_layout.addWidget(self.start_label)
 
         # End time
-        self.end_label = QLabel("⏱ Fin: --:--:--")
+        self.end_label = QLabel(t("video_editor.inspector.end", "⏱ End: --:--:--"))
         self.end_label.setStyleSheet("color: #333; padding: 5px; background-color: transparent;")
         info_layout.addWidget(self.end_label)
 
         # Duration
-        self.duration_label = QLabel("⏳ Durée: --:--:--")
+        self.duration_label = QLabel(t("video_editor.inspector.duration", "⏳ Duration: --:--:--"))
         self.duration_label.setStyleSheet("color: #0066cc; font-weight: bold; padding: 5px; background-color: transparent;")
         info_layout.addWidget(self.duration_label)
 
         layout.addWidget(self.info_group)
 
         # Quick Actions group
-        actions_group = QGroupBox("Actions Rapides")
+        actions_group = QGroupBox(t("video_editor.inspector.quick_actions", "Quick Actions"))
         actions_group.setStyleSheet("""
             QGroupBox {
                 color: #000;
@@ -138,7 +139,7 @@ class InspectorPanel(QWidget):
         actions_layout.setSpacing(5)
 
         # Transition button
-        transition_btn = QPushButton("⚡ Ajouter Transition")
+        transition_btn = QPushButton(t("video_editor.inspector.add_transition", "⚡ Add Transition"))
         transition_btn.setMinimumHeight(40)
         transition_btn.setStyleSheet("""
             QPushButton {
@@ -163,7 +164,7 @@ class InspectorPanel(QWidget):
         self.transition_btn = transition_btn
 
         # Text overlay button
-        text_btn = QPushButton("📝 Ajouter Texte")
+        text_btn = QPushButton(t("video_editor.inspector.add_text", "📝 Add Text"))
         text_btn.setMinimumHeight(40)
         text_btn.setStyleSheet("""
             QPushButton {
@@ -188,7 +189,7 @@ class InspectorPanel(QWidget):
         self.text_btn = text_btn
 
         # Audio button
-        audio_btn = QPushButton("🎵 Réglages Audio")
+        audio_btn = QPushButton(t("video_editor.inspector.audio_settings", "🎵 Audio Settings"))
         audio_btn.setMinimumHeight(40)
         audio_btn.setStyleSheet("""
             QPushButton {
@@ -219,7 +220,7 @@ class InspectorPanel(QWidget):
         actions_layout.addWidget(separator)
 
         # Delete button
-        delete_btn = QPushButton("🗑 Supprimer Segment")
+        delete_btn = QPushButton(t("video_editor.inspector.delete_segment", "🗑 Delete Segment"))
         delete_btn.setMinimumHeight(40)
         delete_btn.setStyleSheet("""
             QPushButton {
@@ -248,7 +249,7 @@ class InspectorPanel(QWidget):
         layout.addWidget(actions_group)
 
         # Help text
-        help_label = QLabel("💡 Sélectionnez un segment\npour voir ses propriétés")
+        help_label = QLabel(t("video_editor.inspector.help", "💡 Select a segment\nto view its properties"))
         help_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         help_label.setWordWrap(True)
         help_label.setStyleSheet("""
@@ -289,9 +290,9 @@ class InspectorPanel(QWidget):
 
             # Clear fields
             self.name_edit.clear()
-            self.start_label.setText("⏱ Début: --:--:--")
-            self.end_label.setText("⏱ Fin: --:--:--")
-            self.duration_label.setText("⏳ Durée: --:--:--")
+            self.start_label.setText(t("video_editor.inspector.start", "⏱ Start: --:--:--"))
+            self.end_label.setText(t("video_editor.inspector.end", "⏱ End: --:--:--"))
+            self.duration_label.setText(t("video_editor.inspector.duration", "⏳ Duration: --:--:--"))
 
         else:
             # Segment selected
@@ -308,22 +309,22 @@ class InspectorPanel(QWidget):
             # Format times (using stored fps)
             if hasattr(segment, 'start_frame') and segment.start_frame is not None:
                 start_time = self._frames_to_timecode(segment.start_frame, self.fps)
-                self.start_label.setText(f"⏱ Début: {start_time}")
+                self.start_label.setText(t("video_editor.inspector.start_value", "⏱ Start: {time}", time=start_time))
 
                 if hasattr(segment, 'end_frame') and segment.end_frame is not None:
                     end_time = self._frames_to_timecode(segment.end_frame, self.fps)
-                    self.end_label.setText(f"⏱ Fin: {end_time}")
+                    self.end_label.setText(t("video_editor.inspector.end_value", "⏱ End: {time}", time=end_time))
 
                     duration_frames = segment.end_frame - segment.start_frame
                     duration_time = self._frames_to_timecode(duration_frames, self.fps)
-                    self.duration_label.setText(f"⏳ Durée: {duration_time}")
+                    self.duration_label.setText(t("video_editor.inspector.duration_value", "⏳ Duration: {time}", time=duration_time))
                 else:
-                    self.end_label.setText("⏱ Fin: -")
-                    self.duration_label.setText("⏳ Durée: -")
+                    self.end_label.setText(t("video_editor.inspector.end_unknown", "⏱ End: -"))
+                    self.duration_label.setText(t("video_editor.inspector.duration_unknown", "⏳ Duration: -"))
             else:
-                self.start_label.setText("⏱ Début: -")
-                self.end_label.setText("⏱ Fin: -")
-                self.duration_label.setText("⏳ Durée: -")
+                self.start_label.setText(t("video_editor.inspector.start_unknown", "⏱ Start: -"))
+                self.end_label.setText(t("video_editor.inspector.end_unknown", "⏱ End: -"))
+                self.duration_label.setText(t("video_editor.inspector.duration_unknown", "⏳ Duration: -"))
 
     def _frames_to_timecode(self, frames: int, fps: float) -> str:
         """Convert frames to timecode.

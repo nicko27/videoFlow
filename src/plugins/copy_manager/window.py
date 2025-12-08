@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 
 from src.core.logger import Logger
+from src.core.i18n import t
 from .copy_manager import CopyManager
 from send2trash import send2trash
 
@@ -39,7 +40,7 @@ class CopyManagerWindow(QDialog):
         Sets up the UI, loads saved settings, and prepares the copy manager.
         """
         super().__init__()
-        self.setWindowTitle("Copy Manager")
+        self.setWindowTitle(t("copy_manager.window.title", "Copy Manager"))
         self.setMinimumWidth(800)
         self.setMinimumHeight(600)
         
@@ -60,43 +61,49 @@ class CopyManagerWindow(QDialog):
 
         # Folder selection
         source_layout = QHBoxLayout()
-        self.source_label = QLabel("Source folder: Not selected")
+        self.source_label = QLabel(t("copy_manager.window.source_unselected", "Source folder: Not selected"))
         if self.source_path:
-            self.source_label.setText(f"Source folder: {self.source_path}")
-        self.source_button = QPushButton("📁 Select source")
+            self.source_label.setText(
+                t("copy_manager.window.source_selected", "Source folder: {path}", path=self.source_path)
+            )
+        self.source_button = QPushButton(t("copy_manager.window.select_source", "📁 Select source"))
         self.source_button.clicked.connect(self.select_source)
         source_layout.addWidget(self.source_label)
         source_layout.addWidget(self.source_button)
 
         dest_layout = QHBoxLayout()
-        self.dest_label = QLabel("Destination folder: Not selected")
+        self.dest_label = QLabel(t("copy_manager.window.dest_unselected", "Destination folder: Not selected"))
         if self.dest_path:
-            self.dest_label.setText(f"Destination folder: {self.dest_path}")
-        self.dest_button = QPushButton("📁 Select destination")
+            self.dest_label.setText(
+                t("copy_manager.window.dest_selected", "Destination folder: {path}", path=self.dest_path)
+            )
+        self.dest_button = QPushButton(t("copy_manager.window.select_dest", "📁 Select destination"))
         self.dest_button.clicked.connect(self.select_dest)
         dest_layout.addWidget(self.dest_label)
         dest_layout.addWidget(self.dest_button)
 
         # Options
-        options_group = QGroupBox("Options")
+        options_group = QGroupBox(t("copy_manager.window.options", "Options"))
         options_layout = QVBoxLayout()
 
-        self.copy_files_cb = QCheckBox("Copy files")
+        self.copy_files_cb = QCheckBox(t("copy_manager.window.copy_files", "Copy files"))
         self.copy_files_cb.setChecked(True)  # Checked by default
 
-        self.preserve_metadata_cb = QCheckBox("Preserve metadata")
+        self.preserve_metadata_cb = QCheckBox(t("copy_manager.window.preserve_metadata", "Preserve metadata"))
         self.preserve_metadata_cb.setToolTip(
-            "Copy tags, comments, colors and other macOS metadata"
+            t("copy_manager.window.preserve_metadata_tooltip", "Copy tags, comments, colors and other macOS metadata")
         )
         self.preserve_metadata_cb.setChecked(True)
 
-        self.include_hidden_cb = QCheckBox("Include hidden files")
+        self.include_hidden_cb = QCheckBox(t("copy_manager.window.include_hidden", "Include hidden files"))
         self.include_hidden_cb.setToolTip(
-            "Include files and folders starting with a dot (.)"
+            t("copy_manager.window.include_hidden_tooltip", "Include files and folders starting with a dot (.)")
         )
 
-        self.delete_after_copy = QCheckBox("Delete files after copy")
-        self.delete_after_copy.setToolTip("Source files will be moved to trash after copying")
+        self.delete_after_copy = QCheckBox(t("copy_manager.window.delete_after_copy", "Delete files after copy"))
+        self.delete_after_copy.setToolTip(
+            t("copy_manager.window.delete_after_copy_tooltip", "Source files will be moved to trash after copying")
+        )
         
         options_layout.addWidget(self.copy_files_cb)
         options_layout.addWidget(self.preserve_metadata_cb)
@@ -113,16 +120,16 @@ class CopyManagerWindow(QDialog):
 
         buttons_layout.addStretch()
 
-        self.copy_btn = QPushButton("✨ Copy")
+        self.copy_btn = QPushButton(t("copy_manager.window.copy_action", "✨ Copy"))
         self.copy_btn.clicked.connect(self.start_copy)
         buttons_layout.addWidget(self.copy_btn)
 
-        self.stop_btn = QPushButton("⏹️ Stop")
+        self.stop_btn = QPushButton(t("copy_manager.window.stop", "⏹️ Stop"))
         self.stop_btn.clicked.connect(self.stop_copy)
         self.stop_btn.setEnabled(False)
         buttons_layout.addWidget(self.stop_btn)
 
-        self.close_btn = QPushButton("❌ Close")
+        self.close_btn = QPushButton(t("copy_manager.window.close", "❌ Close"))
         self.close_btn.clicked.connect(self.close)
         buttons_layout.addWidget(self.close_btn)
 
@@ -165,19 +172,29 @@ class CopyManagerWindow(QDialog):
 
     def select_source(self):
         """Select source folder"""
-        path = QFileDialog.getExistingDirectory(self, "Select source folder")
+        path = QFileDialog.getExistingDirectory(
+            self,
+            t("copy_manager.dialog.select_source", "Select source folder")
+        )
         if path:
             self.source_path = path
-            self.source_label.setText(f"Source folder: {path}")
+            self.source_label.setText(
+                t("copy_manager.window.source_selected", "Source folder: {path}", path=path)
+            )
             self.update_copy_button()
             self.save_settings()
 
     def select_dest(self):
         """Select destination folder"""
-        path = QFileDialog.getExistingDirectory(self, "Select destination folder")
+        path = QFileDialog.getExistingDirectory(
+            self,
+            t("copy_manager.dialog.select_dest", "Select destination folder")
+        )
         if path:
             self.dest_path = path
-            self.dest_label.setText(f"Destination folder: {path}")
+            self.dest_label.setText(
+                t("copy_manager.window.dest_selected", "Destination folder: {path}", path=path)
+            )
             self.update_copy_button()
             self.save_settings()
 
@@ -196,7 +213,11 @@ class CopyManagerWindow(QDialog):
     def start_copy(self):
         """Start copying files"""
         if not self.source_path or not self.dest_path:
-            QMessageBox.warning(self, "Error", "Please select source and destination folders")
+            QMessageBox.warning(
+                self,
+                t("copy_manager.dialog.error_title", "Error"),
+                t("copy_manager.dialog.select_both", "Please select source and destination folders")
+            )
             return
 
         # Disable controls during copy
@@ -217,7 +238,13 @@ class CopyManagerWindow(QDialog):
 
         # Calculate total size
         total_size = self.copy_thread.copy_manager.calculate_total_size(self.source_path)
-        self.log_message(f"Total size to copy: {self.format_size(total_size)}")
+        self.log_message(
+            t(
+                "copy_manager.log.total_size",
+                f"Total size to copy: {self.format_size(total_size)}",
+                size=self.format_size(total_size)
+            )
+        )
         
         self.copy_thread.progress.connect(self.update_progress)
         self.copy_thread.message.connect(self.log_message)
@@ -250,8 +277,12 @@ class CopyManagerWindow(QDialog):
     def copy_finished(self):
         """Called when copy is finished"""
         self.copy_btn.setEnabled(True)
-        self.log_message("Copy completed")
-        QMessageBox.information(self, "Completed", "Copy completed")
+        self.log_message(t("copy_manager.log.copy_completed", "Copy completed"))
+        QMessageBox.information(
+            self,
+            t("copy_manager.dialog.completed_title", "Completed"),
+            t("copy_manager.dialog.copy_completed", "Copy completed")
+        )
         self.setEnabled(True)
         self.stop_btn.setEnabled(False)
 
@@ -265,9 +296,9 @@ class CopyManagerWindow(QDialog):
         """Stop the ongoing copy operation."""
         if hasattr(self, 'copy_thread') and self.copy_thread and self.copy_thread.isRunning():
             self.copy_thread.stop()
-            self.log_message("Stopping copy operation...")
+            self.log_message(t("copy_manager.log.stopping", "Stopping copy operation..."))
         else:
-            self.log_message("No copy operation is currently running")
+            self.log_message(t("copy_manager.log.none_running", "No copy operation is currently running"))
 
 class CopyThread(QThread):
     """Worker thread for background copy operations.
@@ -326,7 +357,9 @@ class CopyThread(QThread):
             for root, dirs, files in os.walk(self.source):
                 # Check if stop was requested
                 if self._stop_requested:
-                    self.message.emit("Copy operation cancelled by user")
+                    self.message.emit(
+                        t("copy_manager.log.cancelled", "Copy operation cancelled by user")
+                    )
                     return
 
                 # Filter hidden files if necessary
@@ -342,7 +375,9 @@ class CopyThread(QThread):
                     os.makedirs(dest_root)
                     if self.preserve_metadata:
                         self.copy_manager.copy_metadata(root, dest_root)
-                    self.message.emit(f"Created folder: {dest_root}")
+                    self.message.emit(
+                        t("copy_manager.log.created_folder", f"Created folder: {dest_root}", path=dest_root)
+                    )
                     copied_items += 1
                     self.progress.emit(int(copied_items * 100 / total_items))
 
@@ -351,7 +386,9 @@ class CopyThread(QThread):
                     for file in files:
                         # Check if stop was requested
                         if self._stop_requested:
-                            self.message.emit("Copy operation cancelled by user")
+                            self.message.emit(
+                                t("copy_manager.log.cancelled", "Copy operation cancelled by user")
+                            )
                             return
 
                         src_file = os.path.join(root, file)
@@ -365,17 +402,23 @@ class CopyThread(QThread):
                         if self.preserve_metadata:
                             self.copy_manager.copy_metadata(src_file, dest_file)
 
-                        self.message.emit(f"Copied: {dest_file}")
+                        self.message.emit(
+                            t("copy_manager.log.copied_file", f"Copied: {dest_file}", path=dest_file)
+                        )
                         copied_items += 1
                         self.progress.emit(int(copied_items * 100 / total_items))
 
                         # Delete source file if requested
                         if self.delete_after_copy:
                             send2trash(src_file)
-                            self.message.emit(f"Deleted: {src_file}")
+                            self.message.emit(
+                                t("copy_manager.log.deleted_file", f"Deleted: {src_file}", path=src_file)
+                            )
 
         except Exception as e:
-            self.message.emit(f"Error: {str(e)}")
+            self.message.emit(
+                t("copy_manager.log.error", f"Error: {str(e)}", error=e)
+            )
             logger.error(f"Error during copy: {str(e)}")
 
     def stop(self):

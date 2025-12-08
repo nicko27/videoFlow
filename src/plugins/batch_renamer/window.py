@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QMimeData
 from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QColor
 from src.core.logger import Logger
+from src.core.i18n import t
 from .pattern_parser import PatternParser, FindReplaceProcessor
 from .advanced_pattern_parser import AdvancedPatternParser
 from .renamer import RenameEngine
@@ -43,7 +44,7 @@ class BatchRenamerWindow(QMainWindow):
     def __init__(self):
         """Initialize the Batch Renamer window."""
         super().__init__()
-        self.setWindowTitle("🏷️ Batch Renamer - Enhanced")
+        self.setWindowTitle(t("batch_renamer.window.title", "🏷️ Batch Renamer - Enhanced"))
         self.setMinimumSize(1200, 800)
 
         # Enable drag and drop
@@ -80,35 +81,47 @@ class BatchRenamerWindow(QMainWindow):
         main_layout.setSpacing(10)
 
         # Title
-        title = QLabel("Batch Renamer")
+        title = QLabel(t("batch_renamer.window.header", "Batch Renamer"))
         title.setStyleSheet("font-size: 18px; font-weight: bold;")
         main_layout.addWidget(title)
 
         # File management buttons
         file_buttons = QHBoxLayout()
 
-        add_files_btn = QPushButton("📁 Add Files")
+        add_files_btn = QPushButton(t("batch_renamer.window.add_files", "📁 Add Files"))
         add_files_btn.clicked.connect(self.add_files)
         file_buttons.addWidget(add_files_btn)
 
-        add_folder_btn = QPushButton("📂 Add Folder")
+        add_folder_btn = QPushButton(t("batch_renamer.window.add_folder", "📂 Add Folder"))
         add_folder_btn.clicked.connect(self.add_folder)
         file_buttons.addWidget(add_folder_btn)
 
         # Include subfolders checkbox
-        self.include_subfolders_check = QCheckBox("Include Subfolders")
+        self.include_subfolders_check = QCheckBox(
+            t("batch_renamer.window.include_subfolders", "Include Subfolders")
+        )
         self.include_subfolders_check.setChecked(True)
-        self.include_subfolders_check.setToolTip("When adding a folder, also include all videos in subfolders")
+        self.include_subfolders_check.setToolTip(
+            t(
+                "batch_renamer.window.include_subfolders_tooltip",
+                "When adding a folder, also include all videos in subfolders"
+            )
+        )
         file_buttons.addWidget(self.include_subfolders_check)
 
-        clear_btn = QPushButton("🗑️ Clear List")
+        clear_btn = QPushButton(t("batch_renamer.window.clear_list", "🗑️ Clear List"))
         clear_btn.clicked.connect(self.clear_list)
         file_buttons.addWidget(clear_btn)
 
         # Pattern management button
-        patterns_btn = QPushButton("🏷️ Manage Patterns")
+        patterns_btn = QPushButton(t("batch_renamer.window.manage_patterns", "🏷️ Manage Patterns"))
         patterns_btn.clicked.connect(self.open_pattern_manager)
-        patterns_btn.setToolTip("Manage removal patterns (x264, YIFY, etc.)")
+        patterns_btn.setToolTip(
+            t(
+                "batch_renamer.window.manage_patterns_tooltip",
+                "Manage removal patterns (x264, YIFY, etc.)"
+            )
+        )
         patterns_btn.setStyleSheet("""
             QPushButton {
                 background-color: #6c757d;
@@ -128,32 +141,43 @@ class BatchRenamerWindow(QMainWindow):
         # File table
         self.files_table = QTableWidget()
         self.files_table.setColumnCount(3)
-        self.files_table.setHorizontalHeaderLabels(["Original Name", "Patterns Removed", "New Name"])
+        self.files_table.setHorizontalHeaderLabels([
+            t("batch_renamer.table.original", "Original Name"),
+            t("batch_renamer.table.removed", "Patterns Removed"),
+            t("batch_renamer.table.new", "New Name")
+        ])
         self.files_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.files_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self.files_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         main_layout.addWidget(self.files_table)
 
         # Renaming options
-        options_group = QGroupBox("Renaming Options")
+        options_group = QGroupBox(t("batch_renamer.window.options", "Renaming Options"))
         options_layout = QVBoxLayout()
 
         # Pattern input
         pattern_layout = QHBoxLayout()
-        pattern_layout.addWidget(QLabel("Pattern:"))
+        pattern_layout.addWidget(QLabel(t("batch_renamer.window.pattern_label", "Pattern:")))
         self.pattern_input = QLineEdit()
-        self.pattern_input.setPlaceholderText("{name}_{date}_{resolution}")
+        self.pattern_input.setPlaceholderText(
+            t("batch_renamer.window.pattern_placeholder", "{name}_{date}_{resolution}")
+        )
         self.pattern_input.textChanged.connect(self.update_preview)
         pattern_layout.addWidget(self.pattern_input)
 
-        update_btn = QPushButton("🔄 Update Preview")
+        update_btn = QPushButton(t("batch_renamer.window.update_preview", "🔄 Update Preview"))
         update_btn.clicked.connect(self.update_preview)
         pattern_layout.addWidget(update_btn)
 
         options_layout.addLayout(pattern_layout)
 
         # Variables help
-        variables_label = QLabel("Variables: {name} {ext} {date} {time} {resolution} {width} {height} {codec} {duration} {size} {fps} {#} {##} {###}")
+        variables_label = QLabel(
+            t(
+                "batch_renamer.window.variables",
+                "Variables: {name} {ext} {date} {time} {resolution} {width} {height} {codec} {duration} {size} {fps} {#} {##} {###}"
+            )
+        )
         variables_label.setStyleSheet("color: gray; font-size: 10px;")
         variables_label.setWordWrap(True)
         options_layout.addWidget(variables_label)
@@ -161,21 +185,21 @@ class BatchRenamerWindow(QMainWindow):
         # Find/Replace section
         find_replace_layout = QHBoxLayout()
 
-        find_replace_layout.addWidget(QLabel("Find:"))
+        find_replace_layout.addWidget(QLabel(t("batch_renamer.window.find", "Find:")))
         self.find_input = QLineEdit()
         self.find_input.textChanged.connect(self.update_preview)
         find_replace_layout.addWidget(self.find_input)
 
-        find_replace_layout.addWidget(QLabel("Replace:"))
+        find_replace_layout.addWidget(QLabel(t("batch_renamer.window.replace", "Replace:")))
         self.replace_input = QLineEdit()
         self.replace_input.textChanged.connect(self.update_preview)
         find_replace_layout.addWidget(self.replace_input)
 
-        self.regex_check = QCheckBox("Regex")
+        self.regex_check = QCheckBox(t("batch_renamer.window.regex", "Regex"))
         self.regex_check.stateChanged.connect(self.update_preview)
         find_replace_layout.addWidget(self.regex_check)
 
-        self.case_check = QCheckBox("Case Sensitive")
+        self.case_check = QCheckBox(t("batch_renamer.window.case_sensitive", "Case Sensitive"))
         self.case_check.setChecked(True)
         self.case_check.stateChanged.connect(self.update_preview)
         find_replace_layout.addWidget(self.case_check)
@@ -184,10 +208,16 @@ class BatchRenamerWindow(QMainWindow):
 
         # Case conversion
         case_layout = QHBoxLayout()
-        case_layout.addWidget(QLabel("Case:"))
+        case_layout.addWidget(QLabel(t("batch_renamer.window.case_label", "Case:")))
 
         self.case_combo = QComboBox()
-        self.case_combo.addItems(["No Change", "lowercase", "UPPERCASE", "Title Case", "Sentence case"])
+        self.case_combo.addItems([
+            t("batch_renamer.window.case_none", "No Change"),
+            t("batch_renamer.window.case_lower", "lowercase"),
+            t("batch_renamer.window.case_upper", "UPPERCASE"),
+            t("batch_renamer.window.case_title", "Title Case"),
+            t("batch_renamer.window.case_sentence", "Sentence case")
+        ])
         self.case_combo.currentIndexChanged.connect(self.update_preview)
         case_layout.addWidget(self.case_combo)
 
@@ -200,7 +230,7 @@ class BatchRenamerWindow(QMainWindow):
         # Action buttons
         action_layout = QHBoxLayout()
 
-        self.rename_btn = QPushButton("✏️ Rename All")
+        self.rename_btn = QPushButton(t("batch_renamer.window.rename_all", "✏️ Rename All"))
         self.rename_btn.setEnabled(False)
         self.rename_btn.clicked.connect(self.rename_all)
         self.rename_btn.setStyleSheet("""
@@ -221,14 +251,14 @@ class BatchRenamerWindow(QMainWindow):
         """)
         action_layout.addWidget(self.rename_btn)
 
-        self.undo_btn = QPushButton("↶ Undo Last")
+        self.undo_btn = QPushButton(t("batch_renamer.window.undo_last", "↶ Undo Last"))
         self.undo_btn.setEnabled(False)
         self.undo_btn.clicked.connect(self.undo_last)
         action_layout.addWidget(self.undo_btn)
 
         action_layout.addStretch()
 
-        close_btn = QPushButton("✖ Close")
+        close_btn = QPushButton(t("batch_renamer.window.close", "✖ Close"))
         close_btn.clicked.connect(self.close)
         action_layout.addWidget(close_btn)
 
@@ -238,9 +268,12 @@ class BatchRenamerWindow(QMainWindow):
         """Add files through file dialog."""
         files, _ = QFileDialog.getOpenFileNames(
             self,
-            "Select Files",
+            t("batch_renamer.dialog.select_files", "Select Files"),
             "",
-            "Video Files (*.mp4 *.avi *.mkv *.mov *.flv *.wmv *.webm *.m4v);;All Files (*)"
+            t(
+                "batch_renamer.dialog.file_filter",
+                "Video Files (*.mp4 *.avi *.mkv *.mov *.flv *.wmv *.webm *.m4v);;All Files (*)"
+            )
         )
 
         if files:
@@ -248,7 +281,10 @@ class BatchRenamerWindow(QMainWindow):
 
     def add_folder(self):
         """Add all videos from a folder."""
-        folder = QFileDialog.getExistingDirectory(self, "Select Folder")
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            t("batch_renamer.dialog.select_folder", "Select Folder")
+        )
 
         if folder:
             video_extensions = {'.mp4', '.avi', '.mkv', '.mov', '.flv', '.wmv', '.webm', '.m4v'}
@@ -270,7 +306,11 @@ class BatchRenamerWindow(QMainWindow):
                 self.add_file_list(video_files)
                 logger.info(f"Added {len(video_files)} files from folder (subfolders: {self.include_subfolders_check.isChecked()})")
             else:
-                QMessageBox.information(self, "No Videos", "No video files found in selected folder")
+                QMessageBox.information(
+                    self,
+                    t("batch_renamer.dialog.no_videos_title", "No Videos"),
+                    t("batch_renamer.dialog.no_videos_body", "No video files found in selected folder")
+                )
 
     def add_file_list(self, files):
         """
@@ -400,7 +440,13 @@ class BatchRenamerWindow(QMainWindow):
                 removed_text = ", ".join(removed_patterns)
                 removed_item = QTableWidgetItem(removed_text)
                 removed_item.setForeground(QColor(200, 50, 50))  # Red color
-                removed_item.setToolTip(f"Patterns removed: {removed_text}")
+                removed_item.setToolTip(
+                    t(
+                        "batch_renamer.tooltip.patterns_removed",
+                        f"Patterns removed: {removed_text}",
+                        patterns=removed_text
+                    )
+                )
                 self.files_table.setItem(row, 1, removed_item)
             else:
                 self.files_table.setItem(row, 1, QTableWidgetItem("—"))
@@ -457,8 +503,12 @@ class BatchRenamerWindow(QMainWindow):
         # Confirm with user
         reply = QMessageBox.question(
             self,
-            "Confirm Rename",
-            f"Rename {len(self.files)} file(s)?",
+            t("batch_renamer.dialog.confirm_rename_title", "Confirm Rename"),
+            t(
+                "batch_renamer.dialog.confirm_rename_body",
+                f"Rename {len(self.files)} file(s)?",
+                count=len(self.files)
+            ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
 
@@ -494,12 +544,24 @@ class BatchRenamerWindow(QMainWindow):
             if len(failed) > 5:
                 error_msg += f"...and {len(failed) - 5} more"
 
-            QMessageBox.warning(self, "Rename Complete with Errors", error_msg)
+            QMessageBox.warning(
+                self,
+                t("batch_renamer.dialog.rename_errors_title", "Rename Complete with Errors"),
+                t(
+                    "batch_renamer.dialog.rename_errors_body",
+                    error_msg,
+                    success=successful
+                )
+            )
         else:
             QMessageBox.information(
                 self,
-                "Rename Complete",
-                f"Successfully renamed {successful} file(s)!"
+                t("batch_renamer.dialog.rename_complete_title", "Rename Complete"),
+                t(
+                    "batch_renamer.dialog.rename_complete_body",
+                    f"Successfully renamed {successful} file(s)!",
+                    count=successful
+                )
             )
 
         # Enable undo
@@ -515,11 +577,19 @@ class BatchRenamerWindow(QMainWindow):
         success, error = self.renamer.undo_last()
 
         if success:
-            QMessageBox.information(self, "Undo Complete", "Last rename operation undone")
+            QMessageBox.information(
+                self,
+                t("batch_renamer.dialog.undo_complete_title", "Undo Complete"),
+                t("batch_renamer.dialog.undo_complete_body", "Last rename operation undone")
+            )
             self.undo_btn.setEnabled(self.renamer.can_undo())
             # Note: File list might be out of sync after undo
         else:
-            QMessageBox.critical(self, "Undo Failed", f"Could not undo: {error}")
+            QMessageBox.critical(
+                self,
+                t("batch_renamer.dialog.undo_failed_title", "Undo Failed"),
+                t("batch_renamer.dialog.undo_failed_body", f"Could not undo: {error}", error=error)
+            )
 
     def open_pattern_manager(self):
         """Open the pattern management dialog."""

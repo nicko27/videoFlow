@@ -9,6 +9,7 @@ from PyQt6.QtGui import QPainter, QColor, QPen, QFont, QPixmap, QImage, QPolygon
 from typing import Optional, List
 import cv2
 import numpy as np
+from src.core.i18n import t
 from .utils.time_utils import TimeCode
 from .segment_manager import SegmentManager
 
@@ -104,7 +105,7 @@ class EnhancedTimeline(QWidget):
 
         zoom_out_btn = QPushButton("−")
         zoom_out_btn.setFixedSize(30, 30)
-        zoom_out_btn.setToolTip("Zoom arrière")
+        zoom_out_btn.setToolTip(t("video_editor.timeline.tooltip_zoom_out", "Zoom out"))
         zoom_out_btn.clicked.connect(self.zoom_out)
         controls.addWidget(zoom_out_btn)
 
@@ -118,14 +119,14 @@ class EnhancedTimeline(QWidget):
 
         zoom_in_btn = QPushButton("+")
         zoom_in_btn.setFixedSize(30, 30)
-        zoom_in_btn.setToolTip("Zoom avant")
+        zoom_in_btn.setToolTip(t("video_editor.timeline.tooltip_zoom_in", "Zoom in"))
         zoom_in_btn.clicked.connect(self.zoom_in)
         controls.addWidget(zoom_in_btn)
 
         controls.addStretch()
 
         # Info label
-        self.info_label = QLabel("Aucune vidéo")
+        self.info_label = QLabel(t("video_editor.timeline.label_no_video", "No video"))
         font = self.info_label.font()
         font.setPointSize(11)
         self.info_label.setFont(font)
@@ -247,11 +248,11 @@ class EnhancedTimeline(QWidget):
             total_secs = self.total_frames / 30.0  # Assuming 30fps
             segments_count = len(self.segments)
             self.info_label.setText(
-                f"Segments: {segments_count} │ "
-                f"Durée: {self._format_time(total_secs)}"
+                t("video_editor.timeline.label_info", "Segments: {count} │ Duration: {duration}",
+                  count=segments_count, duration=self._format_time(total_secs))
             )
         else:
-            self.info_label.setText("Aucune vidéo")
+            self.info_label.setText(t("video_editor.timeline.label_no_video", "No video"))
 
     def _format_time(self, seconds: float) -> str:
         """Format seconds to HH:MM:SS using TimeCode utility.

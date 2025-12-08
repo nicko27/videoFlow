@@ -17,6 +17,7 @@ import shutil
 import subprocess
 
 from src.core.logger import Logger
+from src.core.i18n import t
 from .advanced_settings import AdvancedSettingsDialog
 from .utils import format_size, format_duration, is_converted_file, should_add_file
 from .conversion_timer import ConversionTimer
@@ -56,8 +57,10 @@ class VideoConverterWindow(QMainWindow):
     def __init__(self):
         """Initialize the VideoConverter window."""
         super().__init__()
-        self.setWindowTitle("🎬 Video Converter Pro")
+        self.setWindowTitle(t("video_converter.window.title", "🎬 Video Converter Pro"))
         self.setMinimumSize(900, 700)
+        self.ready_text = t("video_converter.window.status.ready", "Ready")
+        self.updated_text = t("video_converter.window.status.updated", "Settings updated")
 
         # Thread-safe file management
         self.files_to_convert: Dict[Path, Dict] = {}
@@ -118,7 +121,7 @@ class VideoConverterWindow(QMainWindow):
         # Add mode toggle button
         toggle_layout = QHBoxLayout()
         toggle_layout.addStretch()
-        self.mode_toggle_btn = QPushButton("🎯 Mode Simple")
+        self.mode_toggle_btn = QPushButton(t("video_converter.window.toggle_simple", "🎯 Mode Simple"))
         self.mode_toggle_btn.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -198,15 +201,15 @@ class VideoConverterWindow(QMainWindow):
             # Context menu
             tray_menu = QMenu()
 
-            show_action = tray_menu.addAction("Show")
+            show_action = tray_menu.addAction(t("video_converter.window.tray.show", "Show"))
             show_action.triggered.connect(self.show_and_raise)
 
-            start_action = tray_menu.addAction("Start Conversions")
+            start_action = tray_menu.addAction(t("video_converter.window.tray.start", "Start Conversions"))
             start_action.triggered.connect(self.start_conversion)
 
             tray_menu.addSeparator()
 
-            quit_action = tray_menu.addAction("Quit")
+            quit_action = tray_menu.addAction(t("video_converter.window.tray.quit", "Quit"))
             quit_action.triggered.connect(self.close)
 
             self.tray_icon.setContextMenu(tray_menu)
@@ -254,7 +257,7 @@ class VideoConverterWindow(QMainWindow):
             if has_video:
                 event.acceptProposedAction()
                 self.status_label.setText(
-                    "📁 Drop to add files/folders"
+                    t("video_converter.window.drop_hint", "📁 Drop to add files/folders")
                 )
             else:
                 event.ignore()
@@ -264,7 +267,7 @@ class VideoConverterWindow(QMainWindow):
     def dragLeaveEvent(self, event) -> None:
         """Handle drag leave event."""
         if not self.active_workers:
-            self.status_label.setText("Ready")
+            self.status_label.setText(self.ready_text)
 
     def dropEvent(self, event: QDropEvent) -> None:
         """Handle drop event."""
@@ -279,7 +282,7 @@ class VideoConverterWindow(QMainWindow):
             self._add_dropped_files(files_and_folders)
             event.acceptProposedAction()
 
-        self.status_label.setText("Ready")
+        self.status_label.setText(self.ready_text)
 
     def _add_dropped_files(self, paths: List[Path]) -> None:
         """Add dropped files and folders.
@@ -290,7 +293,7 @@ class VideoConverterWindow(QMainWindow):
         added_files = 0
         added_from_folders = 0
 
-        self.status_label.setText("💥 Processing dropped files...")
+        self.status_label.setText(t("video_converter.window.processing_drop", "💥 Processing dropped files..."))
         QApplication.processEvents()
 
         settings = self._get_settings()
@@ -320,12 +323,21 @@ class VideoConverterWindow(QMainWindow):
         total_added = added_files + added_from_folders
         if total_added > 0:
             self.refresh_table()
-            message = f"✅ {total_added} files added"
+            message = t(
+                "video_converter.window.files_added",
+                f"✅ {total_added} files added",
+                count=total_added
+            )
             if added_files > 0 and added_from_folders > 0:
-                message += f" ({added_files} individual, {added_from_folders} from folders)"
+                message += t(
+                    "video_converter.window.files_added_breakdown",
+                    f" ({added_files} individual, {added_from_folders} from folders)",
+                    files=added_files,
+                    folders=added_from_folders
+                )
             self.status_label.setText(message)
         else:
-            self.status_label.setText("❌ No valid video files found")
+            self.status_label.setText(t("video_converter.window.no_valid_files", "❌ No valid video files found"))
 
     # ========================================================================
     # File Management
@@ -335,9 +347,9 @@ class VideoConverterWindow(QMainWindow):
         """Add files manually via file dialog."""
         files, _ = QFileDialog.getOpenFileNames(
             self,
-            "Select Video Files",
+            t("video_converter.window.dialog.select_files", "Select Video Files"),
             "",
-            "Videos (*.mp4 *.avi *.mkv *.mov *.flv *.webm *.wmv);;All Files (*.*)"
+            t("video_converter.window.dialog.filter", "Videos (*.mp4 *.avi *.mkv *.mov *.flv *.webm *.wmv);;All Files (*.*)")
         )
 
         added = 0
@@ -353,11 +365,20 @@ class VideoConverterWindow(QMainWindow):
 
         if added > 0:
             self.refresh_table()
-            self.status_label.setText(f"✅ {added} files added")
+            self.status_label.setText(
+                t(
+                    "video_converter.window.files_added",
+                    f"✅ {added} files added",
+                    count=added
+                )
+            )
 
     def add_folder(self) -> None:
         """Add all video files from a folder."""
-        folder = QFileDialog.getExistingDirectory(self, "Select Folder")
+        folder = QFileDialog.getExistingDirectory(
+            self,
+            t("video_converter.window.dialog.select_folder", "Select Folder")
+        )
         if not folder:
             return
 
@@ -365,7 +386,7 @@ class VideoConverterWindow(QMainWindow):
         added = 0
         settings = self._get_settings()
 
-        self.status_label.setText("📂 Scanning folder...")
+        self.status_label.setText(t("video_converter.window.scanning_folder", "📂 Scanning folder..."))
         QApplication.processEvents()
 
         video_extensions = [
@@ -388,10 +409,16 @@ class VideoConverterWindow(QMainWindow):
 
         if added > 0:
             self.refresh_table()
-            self.status_label.setText(f"✅ {added} files added from folder")
+            self.status_label.setText(
+                t(
+                    "video_converter.window.files_added_from_folder",
+                    f"✅ {added} files added from folder",
+                    count=added
+                )
+            )
         else:
             self.status_label.setText(
-                "❌ No video files found in folder"
+                t("video_converter.window.no_files_in_folder", "❌ No video files found in folder")
             )
 
     def _add_single_file(
@@ -422,9 +449,9 @@ class VideoConverterWindow(QMainWindow):
                     if is_converted and deselect_converted:
                         default_selected = False
 
-                    state = 'Pending'
+                    state = t("video_converter.window.state_pending", "Pending")
                     if is_converted:
-                        state = 'Pending (converted)'
+                        state = t("video_converter.window.state_pending_converted", "Pending (converted)")
 
                     self.files_to_convert[path] = {
                         'state': state,
@@ -442,14 +469,16 @@ class VideoConverterWindow(QMainWindow):
 
     def clear_files(self) -> None:
         """Clear the file list."""
-        if not self.files_to_convert:
-            return
+        # Check if empty and if there are active conversions (thread-safe)
+        with QMutexLocker(self.files_mutex):
+            if not self.files_to_convert:
+                return
 
-        # Check for active conversions
-        active_conversions = any(
-            info.get('worker') is not None
-            for info in self.files_to_convert.values()
-        )
+            # Check for active conversions
+            active_conversions = any(
+                info.get('worker') is not None
+                for info in self.files_to_convert.values()
+            )
 
         if active_conversions:
             if not self.dialog_manager.confirm_clear_with_active():
@@ -464,7 +493,9 @@ class VideoConverterWindow(QMainWindow):
         self.time_estimation_label.setText("")
 
         self.refresh_table()
-        self.status_label.setText("🗑️ List cleared")
+        self.status_label.setText(
+            t("video_converter.window.list_cleared", "🗑️ List cleared")
+        )
 
     def remove_file(self, path: Path) -> None:
         """Remove a single file from the list.
@@ -481,7 +512,9 @@ class VideoConverterWindow(QMainWindow):
                 del self.files_to_convert[path]
 
         self.refresh_table()
-        self.status_label.setText("🗑️ File removed")
+        self.status_label.setText(
+            t("video_converter.window.file_removed", "🗑️ File removed")
+        )
 
     def remove_selected_files(self) -> None:
         """Remove selected files from the list."""
@@ -506,7 +539,14 @@ class VideoConverterWindow(QMainWindow):
                     del self.files_to_convert[path]
 
         self.refresh_table()
-        self.status_label.setText(f"🗑️ {len(files_to_remove)} files removed")
+        removed_count = len(files_to_remove)
+        self.status_label.setText(
+            t(
+                "video_converter.window.files_removed",
+                f"🗑️ {removed_count} files removed",
+                count=removed_count
+            )
+        )
 
     # ========================================================================
     # File Selection
@@ -544,7 +584,11 @@ class VideoConverterWindow(QMainWindow):
 
         self.refresh_table()
         self.status_label.setText(
-            f"🔄 {selected_count} converted files selected"
+            t(
+                "video_converter.window.converted_selected",
+                f"🔄 {selected_count} converted files selected",
+                count=selected_count
+            )
         )
 
     def select_only_new_files(self) -> None:
@@ -562,7 +606,11 @@ class VideoConverterWindow(QMainWindow):
 
         self.refresh_table()
         self.status_label.setText(
-            f"🆕 {selected_count} new files selected"
+            t(
+                "video_converter.window.new_selected",
+                f"🆕 {selected_count} new files selected",
+                count=selected_count
+            )
         )
 
     def update_selection(self, path: Path, state: int) -> None:
@@ -595,8 +643,13 @@ class VideoConverterWindow(QMainWindow):
 
         if hasattr(self, 'file_count_label'):
             self.file_count_label.setText(
-                f"{total_count} files "
-                f"({selected_count} selected, {format_size(selected_size)})"
+                t(
+                    "video_converter.window.file_count",
+                    f"{total_count} files ({selected_count} selected, {format_size(selected_size)})",
+                    total=total_count,
+                    selected=selected_count,
+                    size=format_size(selected_size)
+                )
             )
 
     # ========================================================================
@@ -629,8 +682,12 @@ class VideoConverterWindow(QMainWindow):
             min_size_mb: Minimum file size in MB.
         """
         self.discover_btn.setEnabled(False)
-        self.discover_btn.setText("🔍 Searching...")
-        self.status_label.setText("Discovery in progress...")
+        self.discover_btn.setText(
+            t("video_converter.window.searching", "🔍 Searching...")
+        )
+        self.status_label.setText(
+            t("video_converter.window.discovery_in_progress", "Discovery in progress...")
+        )
         self.discovery_in_progress = True
 
         # Create and start worker
@@ -675,9 +732,9 @@ class VideoConverterWindow(QMainWindow):
 
         with QMutexLocker(self.files_mutex):
             if path not in self.files_to_convert:
-                state = 'Pending'
+                state = t("video_converter.window.state_pending", "Pending")
                 if is_converted:
-                    state = 'Pending (converted)'
+                    state = t("video_converter.window.state_pending_converted", "Pending (converted)")
 
                 self.files_to_convert[path] = {
                     'state': state,
@@ -705,7 +762,13 @@ class VideoConverterWindow(QMainWindow):
                 self.refresh_table()
                 with QMutexLocker(self.files_mutex):
                     count = len(self.files_to_convert)
-                self.discover_btn.setText(f"🔍 Found: {count}")
+                self.discover_btn.setText(
+                    t(
+                        "video_converter.window.found_count",
+                        f"🔍 Found: {count}",
+                        count=count
+                    )
+                )
             except Exception as e:
                 logger.debug(f"Error during batch UI update: {e}")
 
@@ -717,7 +780,12 @@ class VideoConverterWindow(QMainWindow):
             current_folder: Current folder being scanned.
         """
         self.status_label.setText(
-            f"Scan: {Path(current_folder).name}... ({count} found)"
+            t(
+                "video_converter.window.scan_progress",
+                f"Scan: {Path(current_folder).name}... ({count} found)",
+                folder=Path(current_folder).name,
+                count=count
+            )
         )
 
     def _on_discovery_finished(self, count: int) -> None:
@@ -730,7 +798,9 @@ class VideoConverterWindow(QMainWindow):
         self.pending_ui_update = False
 
         self.discover_btn.setEnabled(True)
-        self.discover_btn.setText("🔍 Auto-Discovery")
+        self.discover_btn.setText(
+            t("video_converter.window.auto_discovery", "🔍 Auto-Discovery")
+        )
 
         # Final complete update
         self.refresh_table()
@@ -740,22 +810,33 @@ class VideoConverterWindow(QMainWindow):
                 info['size'] for info in self.files_to_convert.values()
             )
             self.status_label.setText(
-                f"✅ Discovery complete: {count} files "
-                f"({format_size(total_size)})"
+                t(
+                    "video_converter.window.discovery_complete_status",
+                    f"✅ Discovery complete: {count} files ({format_size(total_size)})",
+                    count=count,
+                    size=format_size(total_size)
+                )
             )
 
             # System notification
             if hasattr(self, 'tray_icon') and self.tray_icon.isVisible():
                 self.tray_icon.showMessage(
-                    "Discovery Complete",
-                    f"Found {count} video files ({format_size(total_size)})",
+                    t("video_converter.window.discovery_complete_title", "Discovery Complete"),
+                    t(
+                        "video_converter.window.discovery_complete_body",
+                        f"Found {count} video files ({format_size(total_size)})",
+                        count=count,
+                        size=format_size(total_size)
+                    ),
                     QSystemTrayIcon.MessageIcon.Information,
                     3000
                 )
 
             self.dialog_manager.show_discovery_complete(count, total_size)
         else:
-            self.status_label.setText("❌ No files found")
+            self.status_label.setText(
+                t("video_converter.window.no_files_found", "❌ No files found")
+            )
             self.dialog_manager.show_discovery_complete(count, 0)
 
     # ========================================================================
@@ -784,7 +865,11 @@ class VideoConverterWindow(QMainWindow):
 
         self.refresh_table()
         self.status_label.setText(
-            f"🔍 Filter applied: {removed_count} files removed"
+            t(
+                "video_converter.window.filter_applied",
+                f"🔍 Filter applied: {removed_count} files removed",
+                count=removed_count
+            )
         )
 
     # ========================================================================
@@ -831,14 +916,22 @@ class VideoConverterWindow(QMainWindow):
 
         self.start_time = time.time()
         self.status_label.setText(
-            f"🚀 Starting {len(selected_files)} conversions..."
+            t(
+                "video_converter.window.starting_conversions",
+                f"🚀 Starting {len(selected_files)} conversions...",
+                count=len(selected_files)
+            )
         )
 
         # System notification
         if hasattr(self, 'tray_icon') and self.tray_icon.isVisible():
             self.tray_icon.showMessage(
-                "Conversion Started",
-                f"Starting {len(selected_files)} conversions",
+                t("video_converter.window.conversion_started_title", "Conversion Started"),
+                t(
+                    "video_converter.window.conversion_started_body",
+                    f"Starting {len(selected_files)} conversions",
+                    count=len(selected_files)
+                ),
                 QSystemTrayIcon.MessageIcon.Information,
                 2000
             )
@@ -849,14 +942,20 @@ class VideoConverterWindow(QMainWindow):
         """Pause conversions after current ones complete."""
         self.paused_after_current = True
         self.pause_btn.setEnabled(False)
-        self.start_btn.setText("▶️ Resume")
+        self.start_btn.setText(
+            t("video_converter.window.resume", "▶️ Resume")
+        )
         self.start_btn.setEnabled(True)
 
         active_count = len(self.active_workers)
         queue_count = len(self.conversion_queue)
         self.status_label.setText(
-            f"⏸️ Paused: {active_count} conversions finishing, "
-            f"{queue_count} pending"
+            t(
+                "video_converter.window.paused_status",
+                f"⏸️ Paused: {active_count} conversions finishing, {queue_count} pending",
+                active=active_count,
+                pending=queue_count
+            )
         )
 
         logger.info("⏸️ Pause requested - current conversions will finish")
@@ -883,7 +982,7 @@ class VideoConverterWindow(QMainWindow):
 
         # Update UI
         self.start_btn.setEnabled(True)
-        self.start_btn.setText("▶️ Start")
+        self.start_btn.setText(t("video_converter.window.start", "▶️ Start"))
         self.pause_btn.setEnabled(False)
         self.stop_btn.setEnabled(False)
         self.paused_after_current = False
@@ -892,13 +991,18 @@ class VideoConverterWindow(QMainWindow):
         self.global_progress.setVisible(False)
         self.time_estimation_label.setText("")
 
-        self.status_label.setText("⏹️ Conversions stopped")
+        self.status_label.setText(
+            t("video_converter.window.conversions_stopped", "⏹️ Conversions stopped")
+        )
 
         # System notification
         if hasattr(self, 'tray_icon') and self.tray_icon.isVisible():
             self.tray_icon.showMessage(
-                "Conversion Stopped",
-                "All conversions have been stopped",
+                t("video_converter.window.conversion_stopped_title", "Conversion Stopped"),
+                t(
+                    "video_converter.window.conversion_stopped_body",
+                    "All conversions have been stopped"
+                ),
                 QSystemTrayIcon.MessageIcon.Warning,
                 2000
             )
@@ -968,11 +1072,19 @@ class VideoConverterWindow(QMainWindow):
             active_count = len(self.active_workers)
             queue_count = len(self.conversion_queue)
             status_text = (
-                f"🔄 Conversions: {active_count}/{self.max_concurrent} active, "
-                f"{queue_count} pending"
+                t(
+                    "video_converter.window.conversion_status",
+                    f"🔄 Conversions: {active_count}/{self.max_concurrent} active, {queue_count} pending",
+                    active=active_count,
+                    max=self.max_concurrent,
+                    pending=queue_count
+                )
             )
             if self.paused_after_current:
-                status_text += " (Paused after current)"
+                status_text += t(
+                    "video_converter.window.paused_after_current",
+                    " (Paused after current)"
+                )
             self.status_label.setText(status_text)
 
         # Check if all conversions finished
@@ -1113,11 +1225,11 @@ class VideoConverterWindow(QMainWindow):
         total_time = ""
         if self.start_time:
             elapsed = time.time() - self.start_time
-            total_time = f" en {format_duration(elapsed)}"
+            total_time = f" in {format_duration(elapsed)}"
 
         # Update UI
         self.start_btn.setEnabled(True)
-        self.start_btn.setText("▶️ Start")
+        self.start_btn.setText(t("video_converter.window.start", "▶️ Start"))
         self.pause_btn.setEnabled(False)
         self.stop_btn.setEnabled(False)
         self.paused_after_current = False
@@ -1133,16 +1245,30 @@ class VideoConverterWindow(QMainWindow):
         # Status message
         if successful + failed > 0:
             self.status_label.setText(
-                f"✅ Completed{total_time}: {successful} success, {failed} failed"
+                t(
+                    "video_converter.window.completed_status",
+                    f"✅ Completed{total_time}: {successful} success, {failed} failed",
+                    time=total_time,
+                    success=successful,
+                    failed=failed
+                )
             )
         else:
-            self.status_label.setText("✅ Conversions completed")
+            self.status_label.setText(
+                t("video_converter.window.conversions_completed", "✅ Conversions completed")
+            )
 
         # System notification
         if hasattr(self, 'tray_icon') and self.tray_icon.isVisible():
             self.tray_icon.showMessage(
-                "🎬 Conversions Complete",
-                f"✅ {successful} success, ❌ {failed} failed{total_time}",
+                t("video_converter.window.conversions_complete_title", "🎬 Conversions Complete"),
+                t(
+                    "video_converter.window.conversions_complete_body",
+                    f"✅ {successful} success, ❌ {failed} failed{total_time}",
+                    success=successful,
+                    failed=failed,
+                    time=total_time
+                ),
                 QSystemTrayIcon.MessageIcon.Information,
                 5000
             )
@@ -1209,7 +1335,11 @@ class VideoConverterWindow(QMainWindow):
                 )
 
                 self.time_estimation_label.setText(
-                    f"⏱️ {remaining_time_str} remaining"
+                    t(
+                        "video_converter.window.remaining_time",
+                        f"⏱️ {remaining_time_str} remaining",
+                        time=remaining_time_str
+                    )
                 )
 
                 if not self.global_progress.isVisible():
@@ -1219,10 +1349,16 @@ class VideoConverterWindow(QMainWindow):
                 self.global_progress.setValue(completed)
             else:
                 self.time_estimation_label.setText(
-                    f"⏱️ ~{remaining_time_str}"
+                    t(
+                        "video_converter.window.approx_time",
+                        f"⏱️ ~{remaining_time_str}",
+                        time=remaining_time_str
+                    )
                 )
         else:
-            self.time_estimation_label.setText("⏱️ Estimating...")
+            self.time_estimation_label.setText(
+                t("video_converter.window.estimating", "⏱️ Estimating...")
+            )
 
     # ========================================================================
     # Settings and Dialogs
@@ -1235,7 +1371,9 @@ class VideoConverterWindow(QMainWindow):
         if self.simple_mode:
             # Switch to Simple mode
             self.mode_stack.setCurrentIndex(1)
-            self.mode_toggle_btn.setText("🔧 Mode Avancé")
+            self.mode_toggle_btn.setText(
+                t("video_converter.window.toggle_advanced", "🔧 Advanced Mode")
+            )
             self.mode_toggle_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #2196F3;
@@ -1253,7 +1391,9 @@ class VideoConverterWindow(QMainWindow):
         else:
             # Switch to Advanced mode
             self.mode_stack.setCurrentIndex(0)
-            self.mode_toggle_btn.setText("🎯 Mode Simple")
+            self.mode_toggle_btn.setText(
+                t("video_converter.window.toggle_simple", "🎯 Simple Mode")
+            )
             self.mode_toggle_btn.setStyleSheet("""
                 QPushButton {
                     background-color: #4CAF50;
@@ -1276,10 +1416,12 @@ class VideoConverterWindow(QMainWindow):
         settings = self._get_settings()
 
         # Update display
-        self.status_label.setText("✅ Paramètres simple appliqués")
+        self.status_label.setText(
+            t("video_converter.window.simple_applied", "✅ Simple settings applied")
+        )
         QTimer.singleShot(
             3000,
-            lambda: self.status_label.setText("Ready")
+            lambda: self.status_label.setText(self.ready_text)
         )
 
         logger.info("Simple mode settings applied")
@@ -1315,8 +1457,13 @@ class VideoConverterWindow(QMainWindow):
         # Update concurrent threads
         self.max_concurrent = settings.max_concurrent_conversions
 
-        # Offer to filter list
-        if hasattr(self, 'files_to_convert') and self.files_to_convert:
+        # Offer to filter list (thread-safe check)
+        has_files = False
+        if hasattr(self, 'files_to_convert'):
+            with QMutexLocker(self.files_mutex):
+                has_files = bool(self.files_to_convert)
+
+        if has_files:
             if self.dialog_manager.confirm_apply_filters():
                 self.filter_current_list()
 
@@ -1324,10 +1471,10 @@ class VideoConverterWindow(QMainWindow):
         self.refresh_table()
         self.button_manager.update_disk_space_info()
 
-        self.status_label.setText("✅ Settings updated")
+        self.status_label.setText(self.updated_text)
         QTimer.singleShot(
             3000,
-            lambda: self.status_label.setText("Ready")
+            lambda: self.status_label.setText(self.ready_text)
         )
 
     def show_help(self) -> None:
@@ -1355,14 +1502,16 @@ class VideoConverterWindow(QMainWindow):
             ]
 
     def _check_ffmpeg(self) -> bool:
-        """Check if FFmpeg is available.
+        """Check if FFmpeg is available using configured path.
 
         Returns:
             True if FFmpeg is available.
         """
         try:
+            settings = self._get_settings()
+            ffmpeg_path = getattr(settings, 'ffmpeg_path', 'ffmpeg')
             result = subprocess.run(
-                ['ffmpeg', '-version'],
+                [ffmpeg_path, '-version'],
                 capture_output=True,
                 timeout=5
             )

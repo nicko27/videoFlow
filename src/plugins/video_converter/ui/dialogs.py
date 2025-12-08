@@ -14,6 +14,7 @@ import shutil
 
 from ..utils import format_size, format_duration
 from src.core.logger import Logger
+from src.core.i18n import t
 
 if TYPE_CHECKING:
     from ..window import VideoConverterWindow
@@ -38,7 +39,9 @@ class DialogManager:
 
     def show_help(self) -> None:
         """Display the help dialog with keyboard shortcuts and tips."""
-        help_text = """
+        help_text = t(
+            "video_converter.dialog.help.text",
+            """
 <h2>🎬 Video Converter Pro - Quick Guide</h2>
 
 <h3>📁 Adding Files:</h3>
@@ -69,11 +72,12 @@ class DialogManager:
 • Time estimation improves with usage
 • Conversions are automatically paused if disk space is insufficient
 • Use system icon to view notifications
-        """
+            """
+        )
 
         QMessageBox.information(
             self.window,
-            "Help - Video Converter Pro",
+            t("video_converter.dialog.help.title", "Help - Video Converter Pro"),
             help_text
         )
 
@@ -96,7 +100,7 @@ Average attempts: {summary['average_attempts']:.1f}
             """
 
             dialog = QMessageBox(self.window)
-            dialog.setWindowTitle("📊 Statistics")
+            dialog.setWindowTitle(t("video_converter.dialog.stats.title", "📊 Statistics"))
             dialog.setIcon(QMessageBox.Icon.Information)
             dialog.setText(stats_text.strip())
             dialog.exec()
@@ -104,8 +108,8 @@ Average attempts: {summary['average_attempts']:.1f}
         except Exception as e:
             QMessageBox.warning(
                 self.window,
-                "Error",
-                f"Unable to load statistics: {e}"
+                t("video_converter.dialog.error.title", "Error"),
+                t("video_converter.dialog.stats.error", f"Unable to load statistics: {e}", error=e)
             )
 
     def show_discovery_dialog(self) -> Optional[Tuple[List[Path], int]]:
@@ -115,14 +119,14 @@ Average attempts: {summary['average_attempts']:.1f}
             Tuple of (selected_folders, min_size_mb) or None if cancelled.
         """
         dialog = QDialog(self.window)
-        dialog.setWindowTitle("🔍 Discovery Configuration")
+        dialog.setWindowTitle(t("video_converter.dialog.discovery.title", "🔍 Discovery Configuration"))
         dialog.setMinimumWidth(400)
 
         layout = QVBoxLayout(dialog)
 
         # Minimum size selection
         size_layout = QHBoxLayout()
-        size_layout.addWidget(QLabel("Minimum size:"))
+        size_layout.addWidget(QLabel(t("video_converter.dialog.discovery.min_size", "Minimum size:")))
         size_spin = QSpinBox()
         size_spin.setRange(50, 5000)
         size_spin.setValue(500)  # 500MB default
@@ -132,13 +136,13 @@ Average attempts: {summary['average_attempts']:.1f}
         layout.addLayout(size_layout)
 
         # Folders to scan
-        layout.addWidget(QLabel("Folders to scan:"))
+        layout.addWidget(QLabel(t("video_converter.dialog.discovery.folders", "Folders to scan:")))
 
         # Default folders
         default_folders = [
-            (Path.home() / "Videos", "Videos Folder"),
-            (Path.home() / "Downloads", "Downloads"),
-            (Path.home() / "Desktop", "Desktop"),
+            (Path.home() / "Videos", t("video_converter.dialog.discovery.folder_videos", "Videos Folder")),
+            (Path.home() / "Downloads", t("video_converter.dialog.discovery.folder_downloads", "Downloads")),
+            (Path.home() / "Desktop", t("video_converter.dialog.discovery.folder_desktop", "Desktop")),
         ]
 
         checkboxes = []
@@ -152,19 +156,25 @@ Average attempts: {summary['average_attempts']:.1f}
 
         # Custom folder option
         custom_layout = QHBoxLayout()
-        custom_cb = QCheckBox("Custom folder:")
-        custom_btn = QPushButton("Browse...")
+        custom_cb = QCheckBox(t("video_converter.dialog.discovery.custom_label", "Custom folder:"))
+        custom_btn = QPushButton(t("video_converter.dialog.discovery.browse", "Browse..."))
         custom_path = None
 
         def browse_custom():
             nonlocal custom_path
             folder = QFileDialog.getExistingDirectory(
                 dialog,
-                "Select Folder"
+                t("video_converter.window.dialog.select_folder", "Select Folder")
             )
             if folder:
                 custom_path = Path(folder)
-                custom_cb.setText(f"Custom: {custom_path.name}")
+                custom_cb.setText(
+                    t(
+                        "video_converter.dialog.discovery.custom_selected",
+                        f"Custom: {custom_path.name}",
+                        folder=custom_path.name
+                    )
+                )
                 custom_cb.setChecked(True)
 
         custom_btn.clicked.connect(browse_custom)
@@ -208,10 +218,15 @@ Average attempts: {summary['average_attempts']:.1f}
         """
         reply = QMessageBox.warning(
             self.window,
-            "⚠️ Insufficient Disk Space",
-            f"Free space: {format_size(free_space)}\n"
-            f"Estimated space needed: {format_size(estimated_needed)}\n\n"
-            f"Do you want to continue anyway?",
+            t("video_converter.dialog.disk_space.title", "⚠️ Insufficient Disk Space"),
+            t(
+                "video_converter.dialog.disk_space.body",
+                f"Free space: {format_size(free_space)}\n"
+                f"Estimated space needed: {format_size(estimated_needed)}\n\n"
+                f"Do you want to continue anyway?",
+                free=format_size(free_space),
+                needed=format_size(estimated_needed)
+            ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         return reply == QMessageBox.StandardButton.Yes
@@ -227,8 +242,12 @@ Average attempts: {summary['average_attempts']:.1f}
         """
         reply = QMessageBox.question(
             self.window,
-            "Confirm Removal",
-            f"Remove {count} file(s) from the list?",
+            t("video_converter.dialog.removal.title", "Confirm Removal"),
+            t(
+                "video_converter.dialog.removal.body",
+                f"Remove {count} file(s) from the list?",
+                count=count
+            ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         return reply == QMessageBox.StandardButton.Yes
@@ -241,8 +260,8 @@ Average attempts: {summary['average_attempts']:.1f}
         """
         reply = QMessageBox.question(
             self.window,
-            "Stop Discovery",
-            "File discovery is in progress. Stop and close?",
+            t("video_converter.dialog.stop_discovery.title", "Stop Discovery"),
+            t("video_converter.dialog.stop_discovery.body", "File discovery is in progress. Stop and close?"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         return reply == QMessageBox.StandardButton.Yes
@@ -255,8 +274,8 @@ Average attempts: {summary['average_attempts']:.1f}
         """
         reply = QMessageBox.question(
             self.window,
-            "Stop Conversions",
-            "Conversions are in progress. Stop and close?",
+            t("video_converter.dialog.stop_conversions.title", "Stop Conversions"),
+            t("video_converter.dialog.stop_conversions.body", "Conversions are in progress. Stop and close?"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         return reply == QMessageBox.StandardButton.Yes
@@ -269,8 +288,8 @@ Average attempts: {summary['average_attempts']:.1f}
         """
         reply = QMessageBox.question(
             self.window,
-            "Confirm",
-            "Conversions are in progress. Stop and clear the list?",
+            t("video_converter.dialog.clear_active.title", "Confirm"),
+            t("video_converter.dialog.clear_active.body", "Conversions are in progress. Stop and clear the list?"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         return reply == QMessageBox.StandardButton.Yes
@@ -283,9 +302,11 @@ Average attempts: {summary['average_attempts']:.1f}
         """
         reply = QMessageBox.question(
             self.window,
-            "Filter List",
-            "Settings updated. Do you want to apply the new filters "
-            "to the current list?",
+            t("video_converter.dialog.apply_filters.title", "Filter List"),
+            t(
+                "video_converter.dialog.apply_filters.body",
+                "Settings updated. Do you want to apply the new filters to the current list?"
+            ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         return reply == QMessageBox.StandardButton.Yes
@@ -313,14 +334,22 @@ Average attempts: {summary['average_attempts']:.1f}
 
         QMessageBox.information(
             self.window,
-            "🎬 Conversions Complete",
-            f"All conversions are complete{total_time}!\n\n"
-            f"📊 Results:\n"
-            f"• Total processed: {successful + failed}\n"
-            f"• ✅ Successful: {successful}\n"
-            f"• ❌ Failed: {failed}\n"
-            f"• 📈 Success rate: {success_rate:.1f}%\n\n"
-            f"💡 Check statistics for more details."
+            t("video_converter.dialog.completion.title", "🎬 Conversions Complete"),
+            t(
+                "video_converter.dialog.completion.body",
+                f"All conversions are complete{total_time}!\n\n"
+                f"📊 Results:\n"
+                f"• Total processed: {successful + failed}\n"
+                f"• ✅ Successful: {successful}\n"
+                f"• ❌ Failed: {failed}\n"
+                f"• 📈 Success rate: {success_rate:.1f}%\n\n"
+                f"💡 Check statistics for more details.",
+                time=total_time,
+                total=successful + failed,
+                success=successful,
+                failed=failed,
+                rate=f"{success_rate:.1f}%"
+            )
         )
 
     def show_discovery_complete(self, count: int, total_size: int) -> None:
@@ -333,59 +362,68 @@ Average attempts: {summary['average_attempts']:.1f}
         if count > 0:
             QMessageBox.information(
                 self.window,
-                "Discovery Complete",
-                f"Found {count} large files\n"
-                f"Total size: {format_size(total_size)}\n\n"
-                f"Use settings to adjust conversion criteria."
+                t("video_converter.dialog.discovery_complete.title", "Discovery Complete"),
+                t(
+                    "video_converter.dialog.discovery_complete.body_found",
+                    f"Found {count} large files\nTotal size: {format_size(total_size)}\n\nUse settings to adjust conversion criteria.",
+                    count=count,
+                    size=format_size(total_size)
+                )
             )
         else:
             QMessageBox.information(
                 self.window,
-                "Discovery Complete",
-                "No large video files found.\n\n"
-                "Try reducing the minimum size or selecting "
-                "other folders."
+                t("video_converter.dialog.discovery_complete.title", "Discovery Complete"),
+                t(
+                    "video_converter.dialog.discovery_complete.body_none",
+                    "No large video files found.\n\nTry reducing the minimum size or selecting other folders."
+                )
             )
 
     def show_no_ffmpeg_error(self) -> None:
         """Show FFmpeg not found error dialog."""
         QMessageBox.critical(
             self.window,
-            "❌ Error",
-            "FFmpeg is not installed or accessible.\n\n"
-            "💡 Solution: Install FFmpeg from https://ffmpeg.org\n"
-            "Or add it to the system PATH."
+            t("video_converter.dialog.ffmpeg_error.title", "❌ Error"),
+            t(
+                "video_converter.dialog.ffmpeg_error.body",
+                "FFmpeg is not installed or accessible.\n\n"
+                "💡 Solution: Install FFmpeg from https://ffmpeg.org\n"
+                "Or add it to the system PATH."
+            )
         )
 
     def show_no_files_selected_warning(self) -> None:
         """Show no files selected warning."""
         QMessageBox.warning(
             self.window,
-            "Warning",
-            "No files selected for conversion"
+            t("video_converter.dialog.no_files_selected.title", "Warning"),
+            t("video_converter.dialog.no_files_selected.body", "No files selected for conversion")
         )
 
     def show_no_files_to_remove_info(self) -> None:
         """Show no files to remove info."""
         QMessageBox.information(
             self.window,
-            "Info",
-            "No files selected to remove\n"
-            "(Files being converted cannot be removed)"
+            t("video_converter.dialog.no_files_to_remove.title", "Info"),
+            t(
+                "video_converter.dialog.no_files_to_remove.body",
+                "No files selected to remove\n(Files being converted cannot be removed)"
+            )
         )
 
     def show_discovery_in_progress_info(self) -> None:
         """Show discovery already in progress info."""
         QMessageBox.information(
             self.window,
-            "Info",
-            "Discovery already in progress..."
+            t("video_converter.dialog.discovery_in_progress.title", "Info"),
+            t("video_converter.dialog.discovery_in_progress.body", "Discovery already in progress...")
         )
 
     def show_no_folders_selected_info(self) -> None:
         """Show no folders selected info."""
         QMessageBox.information(
             self.window,
-            "Info",
-            "No folders selected"
+            t("video_converter.dialog.no_folders_selected.title", "Info"),
+            t("video_converter.dialog.no_folders_selected.body", "No folders selected")
         )

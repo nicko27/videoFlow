@@ -1,4 +1,4 @@
-"""Interface de settings améliorée with onglets et gestion avancée des suffixes"""
+"""Advanced settings interface with tabs and advanced suffix management"""
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
@@ -9,16 +9,17 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QTimer, QMutex, QMutexLocker, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
+from src.core.i18n import t
 
 class AdvancedSettingsDialog(QDialog):
-    """Interface de settings avancée with onglets et fonctionnalités étendues."""
+    """Advanced settings interface with tabs and extended features."""
     
     def __init__(self, parent, settings):
         super().__init__(parent)
         self.settings = settings
         self.parent_window = parent
         
-        self.setWindowTitle("⚙️ Settings Video Converter - Avancé")
+        self.setWindowTitle(t("advanced_settings.window.title", "⚙️ Video Converter Settings - Advanced"))
         self.setMinimumSize(800, 600)
         self.setModal(True)
         
@@ -27,39 +28,39 @@ class AdvancedSettingsDialog(QDialog):
         self.connect_signals()
     
     def setup_ui(self):
-        """Configuration de l'interface principale with onglets."""
+        """Main interface configuration with tabs."""
         layout = QVBoxLayout(self)
-        
-        # En-tête with info et preset rapide
+
+        # Header with info and quick preset
         self.setup_header(layout)
-        
-        # Onglets principaux
+
+        # Main tabs
         self.tab_widget = QTabWidget()
         layout.addWidget(self.tab_widget)
-        
-        # Onglet 1: Détection et Filtrage
+
+        # Tab 1: Detection and Filtering
         self.setup_detection_tab()
-        
-        # Onglet 2: Qualité et Performance
+
+        # Tab 2: Quality and Performance
         self.setup_quality_tab()
-        
-        # Onglet 3: Handling des Fichiers
+
+        # Tab 3: File Management
         self.setup_file_management_tab()
-        
-        # Onglet 4: Avancé et Debugging
+
+        # Tab 4: Advanced and Debugging
         self.setup_advanced_tab()
-        
-        # Boutons de validation
+
+        # Validation buttons
         self.setup_buttons(layout)
     
     def setup_header(self, layout):
-        """En-tête with sélection de preset rapide."""
+        """Header with quick preset selection."""
         header_frame = QFrame()
         header_frame.setStyleSheet("QFrame { background-color: #f0f0f0; border-radius: 5px; padding: 10px; }")
         header_layout = QHBoxLayout(header_frame)
         
-        # Titre
-        title_label = QLabel("🎬 Configuration Video Converter")
+        # Title
+        title_label = QLabel(t("advanced_settings.header.title", "🎬 Video Converter Configuration"))
         title_font = QFont()
         title_font.setPointSize(14)
         title_font.setBold(True)
@@ -68,8 +69,8 @@ class AdvancedSettingsDialog(QDialog):
         
         header_layout.addStretch()
         
-        # Presets rapides
-        preset_label = QLabel("Preset rapide:")
+        # Quick presets
+        preset_label = QLabel(t("advanced_settings.header.quick_preset", "Quick Preset:"))
         header_layout.addWidget(preset_label)
         
         self.preset_combo = QComboBox()
@@ -86,15 +87,15 @@ class AdvancedSettingsDialog(QDialog):
         layout.addWidget(header_frame)
     
     def setup_detection_tab(self):
-        """Onglet: Détection et Filtrage des files."""
+        """Tab: File detection and filtering."""
         tab = QWidget()
         layout = QVBoxLayout(tab)
         
-        # === SECTION: Critères de Sélection ===
+        # === SECTION: Selection Criteria ===
         selection_group = QGroupBox("🎯 Critères de Sélection des Fichiers")
         selection_layout = QFormLayout()
         
-        # Seuil de size with slider
+        # Size threshold with slider
         size_widget = QWidget()
         size_layout = QVBoxLayout(size_widget)
         
@@ -103,7 +104,7 @@ class AdvancedSettingsDialog(QDialog):
         size_control_layout.addWidget(self.use_size_threshold)
         size_layout.addLayout(size_control_layout)
         
-        # Slider for the size
+        # Slider for size
         slider_layout = QHBoxLayout()
         slider_layout.addWidget(QLabel("50 MB"))
         
@@ -123,7 +124,7 @@ class AdvancedSettingsDialog(QDialog):
         
         selection_layout.addRow("Filtrage par size:", size_widget)
         
-        # Extensions de files
+        # File extensions
         ext_widget = QWidget()
         ext_layout = QVBoxLayout(ext_widget)
         
@@ -140,11 +141,11 @@ class AdvancedSettingsDialog(QDialog):
         selection_group.setLayout(selection_layout)
         layout.addWidget(selection_group)
         
-        # === SECTION: Handling des Fichiers Traités ===
+        # === SECTION: Processed File Handling ===
         processed_group = QGroupBox("🏷️ Handling des Fichiers Déjà Traités")
         processed_layout = QFormLayout()
         
-        # Suffixe pour files convertis with success
+        # Suffix for successfully converted files
         success_widget = QWidget()
         success_layout = QVBoxLayout(success_widget)
         
@@ -160,13 +161,13 @@ class AdvancedSettingsDialog(QDialog):
         suffix_layout.addStretch()
         success_layout.addLayout(suffix_layout)
         
-        # Actions pour files with suffixe de success
+        # Actions for files with success suffix
         self.ignore_converted = QCheckBox("Ignorer complètement ces files")
         success_layout.addWidget(self.ignore_converted)
         
         processed_layout.addRow("✅ Fichiers convertis:", success_widget)
         
-        # Suffixe pour files non-compressibles
+        # Suffix for non-compressible files
         failed_widget = QWidget()
         failed_layout = QVBoxLayout(failed_widget)
         
@@ -182,7 +183,7 @@ class AdvancedSettingsDialog(QDialog):
         failed_suffix_layout.addStretch()
         failed_layout.addLayout(failed_suffix_layout)
         
-        # Actions pour files non-compressibles
+        # Actions for non-compressible files
         failed_action_layout = QHBoxLayout()
         self.mark_non_compressible = QCheckBox("Marquer les files non-compressibles")
         self.mark_non_compressible.setToolTip("Add un suffixe aux files dont aucune tentative n'a réduit la size")
@@ -197,19 +198,19 @@ class AdvancedSettingsDialog(QDialog):
         processed_group.setLayout(processed_layout)
         layout.addWidget(processed_group)
         
-        # === SECTION: Actions Rapides ===
+        # === SECTION: Quick Actions ===
         actions_group = QGroupBox("🚀 Actions Rapides")
         actions_layout = QHBoxLayout()
         
-        self.select_converted_btn = QPushButton("🔍 Sélectionner convertis")
+        self.select_converted_btn = QPushButton(t("advanced_settings.actions.select_converted", "🔍 Select converted"))
         self.select_converted_btn.clicked.connect(self.select_converted_files)
         actions_layout.addWidget(self.select_converted_btn)
         
-        self.select_failed_btn = QPushButton("🚫 Sélectionner non-compressibles")
+        self.select_failed_btn = QPushButton(t("advanced_settings.actions.select_failed", "🚫 Select non-compressible"))
         self.select_failed_btn.clicked.connect(self.select_failed_files)
         actions_layout.addWidget(self.select_failed_btn)
         
-        self.remove_converted_btn = QPushButton("🗑️ Remove convertis")
+        self.remove_converted_btn = QPushButton(t("advanced_settings.actions.remove_converted", "🗑️ Remove converted"))
         self.remove_converted_btn.clicked.connect(self.remove_converted_files)
         actions_layout.addWidget(self.remove_converted_btn)
         
@@ -218,18 +219,18 @@ class AdvancedSettingsDialog(QDialog):
         layout.addWidget(actions_group)
         
         layout.addStretch()
-        self.tab_widget.addTab(tab, "🎯 Détection")
+        self.tab_widget.addTab(tab, t("advanced_settings.tab.detection", "🎯 Detection"))
     
     def setup_quality_tab(self):
-        """Onglet: Qualité et Performance with configuration simple et avancée."""
+        """Tab: Quality and performance with simple and advanced configuration."""
         tab = QWidget()
         layout = QVBoxLayout(tab)
         
-        # === SECTION: Mode de Configuration ===
+        # === SECTION: Configuration Mode ===
         mode_group = QGroupBox("🎯 Mode de Configuration")
         mode_layout = QFormLayout()
         
-        # Choix du mode
+        # Mode selection
         mode_widget = QWidget()
         mode_widget_layout = QVBoxLayout(mode_widget)
         
@@ -243,7 +244,7 @@ class AdvancedSettingsDialog(QDialog):
         self.advanced_mode.stateChanged.connect(self.toggle_compression_mode)
         mode_widget_layout.addWidget(self.advanced_mode)
         
-        # S'asoner qu'un seul mode est sélectionné
+        # Ensure only one mode is selected
         self.simple_mode.stateChanged.connect(
             lambda state: self.advanced_mode.setChecked(False) if state else None
         )
@@ -255,11 +256,11 @@ class AdvancedSettingsDialog(QDialog):
         mode_group.setLayout(mode_layout)
         layout.addWidget(mode_group)
         
-        # === SECTION: Configuration Simple ===
+        # === SECTION: Simple Configuration ===
         self.simple_config_group = QGroupBox("⚙️ Configuration Simple")
         simple_layout = QFormLayout()
         
-        # CRF with slider et indicateurs visuels
+        # CRF with slider and visual indicators
         crf_widget = QWidget()
         crf_layout = QVBoxLayout(crf_widget)
         
@@ -272,7 +273,7 @@ class AdvancedSettingsDialog(QDialog):
         crf_control_layout.addStretch()
         crf_layout.addLayout(crf_control_layout)
         
-        # Slider CRF
+        # CRF Slider
         crf_slider_layout = QHBoxLayout()
         
         quality_labels = QVBoxLayout()
@@ -315,11 +316,11 @@ class AdvancedSettingsDialog(QDialog):
         self.simple_config_group.setLayout(simple_layout)
         layout.addWidget(self.simple_config_group)
         
-        # === SECTION: Configuration Avancée des 3 Tentatives ===
+        # === SECTION: Advanced Configuration of 3 Attempts ===
         self.advanced_config_group = QGroupBox("🔄 Configuration des 3 Tentatives")
         advanced_layout = QVBoxLayout()
         
-        # En-tête explicatif
+        # Explanatory header
         explanation = QLabel(
             "💡 Configurez individuellement chaque tentative de compression.\n"
             "Si la première échoue, la deuxième sera essayée, puis la troisième."
@@ -328,14 +329,14 @@ class AdvancedSettingsDialog(QDialog):
         explanation.setWordWrap(True)
         advanced_layout.addWidget(explanation)
         
-        # Configuration des 3 tentatives
+        # Configuration of 3 attempts
         self.attempts_widgets = []
         
         for attempt_num in range(1, 4):
             attempt_group = QGroupBox(f"🎯 Tentative {attempt_num}")
             attempt_layout = QGridLayout()
             
-            # Description de l'objectif de chaque tentative
+            # Description of each attempt's objective
             objectives = [
                 "⚡ Rapide et équilibrée - Premier essai with de bons settings",
                 "⚖️ Compression renforcée - Si la première n'a pas assez compressé", 
@@ -346,7 +347,7 @@ class AdvancedSettingsDialog(QDialog):
             objective_label.setStyleSheet("color: #666; font-style: italic;")
             attempt_layout.addWidget(objective_label, 0, 0, 1, 4)
             
-            # CRF pour cette tentative
+            # CRF for this attempt
             attempt_layout.addWidget(QLabel("CRF:"), 1, 0)
             
             crf_spin = QSpinBox()
@@ -355,13 +356,13 @@ class AdvancedSettingsDialog(QDialog):
             crf_spin.setToolTip(f"Qualité pour tentative {attempt_num} (18=haute qualité, 35=haute compression)")
             attempt_layout.addWidget(crf_spin, 1, 1)
             
-            # Affichage du niveau de qualité
+            # Quality level display
             quality_label = QLabel()
             self.update_quality_label(quality_label, crf_spin.value())
             crf_spin.valueChanged.connect(lambda val, label=quality_label: self.update_quality_label(label, val))
             attempt_layout.addWidget(quality_label, 1, 2)
             
-            # Preset pour cette tentative
+            # Preset for this attempt
             attempt_layout.addWidget(QLabel("Preset:"), 2, 0)
             
             preset_combo = QComboBox()
@@ -370,25 +371,25 @@ class AdvancedSettingsDialog(QDialog):
             preset_combo.setToolTip(f"Speed pour tentative {attempt_num}")
             attempt_layout.addWidget(preset_combo, 2, 1)
             
-            # Affichage de l'info preset
+            # Preset info display
             preset_info_label = QLabel()
             self.update_preset_label(preset_info_label, preset_combo.currentText())
             preset_combo.currentTextChanged.connect(lambda text, label=preset_info_label: self.update_preset_label(label, text))
             attempt_layout.addWidget(preset_info_label, 2, 2)
             
-            # Estimation du time relatif
+            # Relative time estimation
             time_estimate = QLabel()
             self.update_time_estimate(time_estimate, preset_combo.currentText())
             preset_combo.currentTextChanged.connect(lambda text, label=time_estimate: self.update_time_estimate(label, text))
             attempt_layout.addWidget(time_estimate, 2, 3)
             
-            # Bouton de test pour cette configuration
+            # Test button for this configuration
             test_btn = QPushButton(f"🧪 Tester T{attempt_num}")
             test_btn.setToolTip(f"Tester uniquement la configuration of the tentative {attempt_num}")
             test_btn.clicked.connect(lambda checked, num=attempt_num: self.test_single_attempt(num))
             attempt_layout.addWidget(test_btn, 3, 0, 1, 2)
             
-            # Copier vers les autres tentatives
+            # Copy to other attempts
             copy_btn = QPushButton("📋 Copier")
             copy_menu = QMenu(copy_btn)
             for i in range(1, 4):
@@ -401,7 +402,7 @@ class AdvancedSettingsDialog(QDialog):
             attempt_group.setLayout(attempt_layout)
             advanced_layout.addWidget(attempt_group)
             
-            # Stocker les widgets pour pouvoir les récupérer plus tard
+            # Store widgets for later retrieval
             self.attempts_widgets.append({
                 'crf': crf_spin,
                 'preset': preset_combo,
@@ -410,7 +411,7 @@ class AdvancedSettingsDialog(QDialog):
                 'time_estimate': time_estimate
             })
         
-        # Boutons de preset rapide pour les 3 tentatives
+        # Quick preset buttons for all 3 attempts
         presets_layout = QHBoxLayout()
         presets_layout.addWidget(QLabel("Presets rapides:"))
         
@@ -435,17 +436,17 @@ class AdvancedSettingsDialog(QDialog):
         self.advanced_config_group.setLayout(advanced_layout)
         layout.addWidget(self.advanced_config_group)
         
-        # === SECTION: Options Globales ===
+        # === SECTION: Global Options ===
         global_group = QGroupBox("🌍 Options Globales")
         global_layout = QFormLayout()
         
-        # Activer les tentatives multiples
+        # Enable multiple attempts
         self.enable_multiple_attempts = QCheckBox("Activer les tentatives multiples")
         self.enable_multiple_attempts.setChecked(True)
         self.enable_multiple_attempts.stateChanged.connect(self.toggle_attempts_availability)
         global_layout.addRow("Tentatives:", self.enable_multiple_attempts)
         
-        # Number de threads
+        # Number of threads
         threads_widget = QWidget()
         threads_layout = QHBoxLayout(threads_widget)
         
@@ -469,7 +470,7 @@ class AdvancedSettingsDialog(QDialog):
         global_group.setLayout(global_layout)
         layout.addWidget(global_group)
 
-        # === SECTION: Compression Itérative avec Taille Cible ===
+        # === SECTION: Iterative Compression with Target Size ===
         target_size_group = QGroupBox("🎯 Compression Itérative avec Taille Cible")
         target_size_layout = QFormLayout()
 
@@ -482,7 +483,7 @@ class AdvancedSettingsDialog(QDialog):
         target_desc.setWordWrap(True)
         target_size_layout.addRow(target_desc)
 
-        # Activer le mode taille cible
+        # Enable target size mode
         self.use_target_size = QCheckBox("Activer la compression avec taille cible")
         self.use_target_size.setToolTip("Active le mode compression itérative pour atteindre une taille précise")
         self.use_target_size.stateChanged.connect(self.toggle_target_size_mode)
@@ -511,11 +512,11 @@ class AdvancedSettingsDialog(QDialog):
 
         target_size_layout.addRow("Taille cible:", target_size_widget)
 
-        # Paramètres de compression itérative
+        # Iterative compression parameters
         iterations_widget = QWidget()
         iterations_layout = QGridLayout(iterations_widget)
 
-        # Nombre max de tentatives
+        # Maximum attempts
         iterations_layout.addWidget(QLabel("Max tentatives:"), 0, 0)
         self.max_compression_attempts = QSpinBox()
         self.max_compression_attempts.setRange(1, 10)
@@ -523,7 +524,7 @@ class AdvancedSettingsDialog(QDialog):
         self.max_compression_attempts.setToolTip("Nombre maximum d'itérations de compression")
         iterations_layout.addWidget(self.max_compression_attempts, 0, 1)
 
-        # CRF initial
+        # Initial CRF
         iterations_layout.addWidget(QLabel("CRF initial:"), 1, 0)
         self.initial_crf = QSpinBox()
         self.initial_crf.setRange(18, 35)
@@ -539,7 +540,7 @@ class AdvancedSettingsDialog(QDialog):
         self.crf_step.setToolTip("Augmentation du CRF à chaque itération")
         iterations_layout.addWidget(self.crf_step, 2, 1)
 
-        # CRF max
+        # Maximum CRF
         iterations_layout.addWidget(QLabel("CRF max:"), 3, 0)
         self.max_crf = QSpinBox()
         self.max_crf.setRange(18, 51)
@@ -547,7 +548,7 @@ class AdvancedSettingsDialog(QDialog):
         self.max_crf.setToolTip("CRF maximum à ne pas dépasser (limite de qualité)")
         iterations_layout.addWidget(self.max_crf, 3, 1)
 
-        # Info sur le fonctionnement
+        # Operation info
         iterations_info = QLabel(
             "ℹ️ Le système commence au CRF initial et l'augmente progressivement\n"
             "jusqu'à atteindre la taille cible ou le CRF max."
@@ -560,24 +561,24 @@ class AdvancedSettingsDialog(QDialog):
         target_size_group.setLayout(target_size_layout)
         layout.addWidget(target_size_group)
 
-        # Initialiser en mode simple par défaut
+        # Initialize in simple mode by default
         self.simple_mode.setChecked(True)
         self.toggle_compression_mode()
-        self.toggle_target_size_mode()  # Initialiser l'état des widgets de taille cible
+        self.toggle_target_size_mode()  # Initialize target size widgets state
 
         layout.addStretch()
-        self.tab_widget.addTab(tab, "⚙️ Qualité")
+        self.tab_widget.addTab(tab, t("advanced_settings.tab.quality", "⚙️ Quality"))
     
     def setup_file_management_tab(self):
-        """Onglet: Handling des Fichiers."""
+        """Tab: File management."""
         tab = QWidget()
         layout = QVBoxLayout(tab)
         
-        # === SECTION: Actions Post-Conversion ===
+        # === SECTION: Post-Conversion Actions ===
         actions_group = QGroupBox("📂 Actions Après Conversion Réussie")
         actions_layout = QFormLayout()
         
-        # Options de gestion des files
+        # File management options
         file_actions_widget = QWidget()
         file_actions_layout = QVBoxLayout(file_actions_widget)
         
@@ -591,7 +592,7 @@ class AdvancedSettingsDialog(QDialog):
         self.delete_if_smaller = QCheckBox("Remove l'original seulement si le nouveau est plus petit")
         file_actions_layout.addWidget(self.delete_if_smaller)
         
-        # Connecter les checkboxes pour éviter les conflits
+        # Connect checkboxes to avoid conflicts
         self.keep_both.stateChanged.connect(self.manage_file_action_conflicts)
         self.replace_original.stateChanged.connect(self.manage_file_action_conflicts)
         self.delete_if_smaller.stateChanged.connect(self.manage_file_action_conflicts)
@@ -601,21 +602,21 @@ class AdvancedSettingsDialog(QDialog):
         actions_group.setLayout(actions_layout)
         layout.addWidget(actions_group)
         
-        # === SECTION: Statistics et Monitoring ===
+        # === SECTION: Statistics and Monitoring ===
         stats_group = QGroupBox("📊 Statistics et Monitoring")
         stats_layout = QFormLayout()
         
-        # Affichage des statistics
+        # Statistics display
         self.stats_display = QTextEdit()
         self.stats_display.setMaximumHeight(150)
         self.stats_display.setReadOnly(True)
         
-        # Load les statistics actuelles
+        # Load current statistics
         self.refresh_stats_display()
         
         stats_layout.addRow("Historique:", self.stats_display)
         
-        # Boutons de gestion des stats
+        # Stats management buttons
         stats_buttons_widget = QWidget()
         stats_buttons_layout = QHBoxLayout(stats_buttons_widget)
         
@@ -638,18 +639,18 @@ class AdvancedSettingsDialog(QDialog):
         layout.addWidget(stats_group)
         
         layout.addStretch()
-        self.tab_widget.addTab(tab, "📂 Fichiers")
+        self.tab_widget.addTab(tab, t("advanced_settings.tab.files", "📂 Files"))
     
     def setup_advanced_tab(self):
-        """Onglet: Settings Avancés."""
+        """Tab: Advanced settings."""
         tab = QWidget()
         layout = QVBoxLayout(tab)
         
-        # === SECTION: Options FFmpeg ===
+        # === SECTION: FFmpeg Options ===
         ffmpeg_group = QGroupBox("🔧 Options FFmpeg Avancées")
         ffmpeg_layout = QFormLayout()
         
-        # Settings audio
+        # Audio settings
         audio_widget = QWidget()
         audio_layout = QHBoxLayout(audio_widget)
         
@@ -666,7 +667,7 @@ class AdvancedSettingsDialog(QDialog):
         audio_layout.addStretch()
         ffmpeg_layout.addRow("Audio:", audio_widget)
         
-        # Options de compatibilité
+        # Compatibility options
         compat_widget = QWidget()
         compat_layout = QVBoxLayout(compat_widget)
         
@@ -680,7 +681,7 @@ class AdvancedSettingsDialog(QDialog):
         
         ffmpeg_layout.addRow("Compatibilité:", compat_widget)
         
-        # Settings personnalisés
+        # Custom settings
         self.custom_params = QLineEdit()
         self.custom_params.setPlaceholderText("Settings FFmpeg additionnels (optionnel)")
         ffmpeg_layout.addRow("Settings custom:", self.custom_params)
@@ -688,11 +689,11 @@ class AdvancedSettingsDialog(QDialog):
         ffmpeg_group.setLayout(ffmpeg_layout)
         layout.addWidget(ffmpeg_group)
         
-        # === SECTION: Debugging et Logs ===
+        # === SECTION: Debugging and Logs ===
         debug_group = QGroupBox("🐛 Debugging et Monitoring")
         debug_layout = QFormLayout()
         
-        # Niveau de log
+        # Log level
         log_widget = QWidget()
         log_layout = QHBoxLayout(log_widget)
         
@@ -705,7 +706,7 @@ class AdvancedSettingsDialog(QDialog):
         log_layout.addStretch()
         debug_layout.addRow("Logging:", log_widget)
         
-        # Options de monitoring
+        # Monitoring options
         monitoring_widget = QWidget()
         monitoring_layout = QVBoxLayout(monitoring_widget)
         
@@ -742,13 +743,13 @@ class AdvancedSettingsDialog(QDialog):
         layout.addWidget(config_group)
         
         layout.addStretch()
-        self.tab_widget.addTab(tab, "🔧 Avancé")
+        self.tab_widget.addTab(tab, t("advanced_settings.tab.advanced", "🔧 Advanced"))
     
     def setup_buttons(self, layout):
-        """Boutons de validation du dialog."""
+        """Dialog validation buttons."""
         buttons_layout = QHBoxLayout()
         
-        # Bouton test
+        # Test button
         test_btn = QPushButton("🧪 Tester on 1 file")
         test_btn.clicked.connect(self.test_settings)
         test_btn.setToolTip("Tester la configuration on un seul file avant conversion de masse")
@@ -756,15 +757,15 @@ class AdvancedSettingsDialog(QDialog):
         
         buttons_layout.addStretch()
         
-        # Boutons standard
+        # Standard buttons
         self.buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | 
             QDialogButtonBox.StandardButton.Cancel | 
             QDialogButtonBox.StandardButton.Apply
         )
         
-        self.buttons.button(QDialogButtonBox.StandardButton.Apply).setText("Appliquer")
-        self.buttons.button(QDialogButtonBox.StandardButton.Ok).setText("OK et Convertir")
+        self.buttons.button(QDialogButtonBox.StandardButton.Apply).setText("Apply")
+        self.buttons.button(QDialogButtonBox.StandardButton.Ok).setText("OK and Convert")
         self.buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancel")
         
         self.buttons.accepted.connect(self.accept_and_convert)
@@ -775,15 +776,15 @@ class AdvancedSettingsDialog(QDialog):
         layout.addLayout(buttons_layout)
     
     def connect_signals(self):
-        """Connecter les signaux for the mise à jour en time réel."""
-        # Connecter les contrôles pour mise à jour time réel
+        """Connect signals for real-time updates."""
+        # Connect controls for real-time updates
         self.use_size_threshold.stateChanged.connect(self.update_size_threshold_state)
         self.mark_non_compressible.stateChanged.connect(self.update_failed_options_state)
     
-    # === MÉTHODES DE MISE À JOUR DE L'INTERFACE ===
-    
+    # === UI UPDATE METHODS ===
+
     def update_size_display(self, value):
-        """Mettre à jour l'affichage of the size."""
+        """Update size display."""
         if value < 1000:
             size_text = f"{value} MB"
         else:
@@ -792,7 +793,7 @@ class AdvancedSettingsDialog(QDialog):
         self.size_display.setText(f"💾 Size minimale: {size_text}")
 
     def update_target_size_display(self, value):
-        """Mettre à jour l'affichage de la taille cible."""
+        """Update target size display."""
         if value < 1000:
             size_text = f"{value} MB"
         else:
@@ -801,18 +802,18 @@ class AdvancedSettingsDialog(QDialog):
         self.target_size_display.setText(f"🎯 Taille cible: {size_text}")
 
     def toggle_target_size_mode(self):
-        """Activer/désactiver les widgets de taille cible selon le checkbox."""
+        """Enable/disable target size widgets based on checkbox."""
         enabled = self.use_target_size.isChecked()
 
-        # Enable/disable tous les widgets de la section taille cible
+        # Enable/disable all target size section widgets
         self.target_size_slider.setEnabled(enabled)
         self.max_compression_attempts.setEnabled(enabled)
         self.initial_crf.setEnabled(enabled)
         self.crf_step.setEnabled(enabled)
         self.max_crf.setEnabled(enabled)
 
-        # Si activé, désactiver le mode tentatives multiples normales
-        # (car le mode taille cible gère ses propres itérations)
+        # If enabled, disable normal multiple attempts mode
+        # (because target size mode manages its own iterations)
         if enabled and hasattr(self, 'enable_multiple_attempts'):
             self.enable_multiple_attempts.setEnabled(False)
             self.simple_config_group.setEnabled(False)
@@ -823,43 +824,43 @@ class AdvancedSettingsDialog(QDialog):
             self.advanced_config_group.setEnabled(True)
 
     def toggle_compression_mode(self):
-        """Basculer entre mode simple et avancé."""
+        """Toggle between simple and advanced mode."""
         simple_enabled = self.simple_mode.isChecked()
         advanced_enabled = self.advanced_mode.isChecked()
         
         self.simple_config_group.setVisible(simple_enabled)
         self.advanced_config_group.setVisible(advanced_enabled)
         
-        # S'asoner qu'un mode est toujours sélectionné
+        # Ensure a mode is always selected
         if not simple_enabled and not advanced_enabled:
             self.simple_mode.setChecked(True)
 
     def update_simple_crf_display(self, value):
-        """Mettre à jour l'affichage du CRF en mode simple."""
+        """Update CRF display in simple mode."""
         quality_text, color = self.get_quality_info(value)
         self.crf_display_simple.setText(f"{value} - {quality_text}")
         self.crf_display_simple.setStyleSheet(f"font-weight: bold; color: {color};")
 
     def update_simple_preset_info(self, preset):
-        """Mettre à jour l'info du preset en mode simple."""
+        """Update preset info in simple mode."""
         text, color = self.get_preset_info(preset)
         self.preset_info_simple.setText(text)
         self.preset_info_simple.setStyleSheet(f"color: {color}; font-weight: bold;")
 
     def update_quality_label(self, label, crf_value):
-        """Mettre à jour le label de qualité."""
+        """Update quality label."""
         quality_text, color = self.get_quality_info(crf_value)
         label.setText(quality_text)
         label.setStyleSheet(f"color: {color}; font-weight: bold;")
 
     def update_preset_label(self, label, preset):
-        """Mettre à jour le label d'info preset."""
+        """Update preset info label."""
         text, color = self.get_preset_info(preset)
-        label.setText(text.split(' - ')[0])  # Prendre seulement la partie avant le tiret
+        label.setText(text.split(' - ')[0])  # Only take the part before the dash
         label.setStyleSheet(f"color: {color}; font-size: 11px;")
 
     def update_time_estimate(self, label, preset):
-        """Mettre à jour l'estimation de time."""
+        """Update time estimation."""
         time_multipliers = {
             "ultrafast": "0.5x", "superfast": "0.7x", "veryfast": "0.8x", "faster": "0.9x",
             "fast": "1x", "medium": "1.5x", "slow": "2x", "slower": "3x", "veryslow": "4x"
@@ -870,7 +871,7 @@ class AdvancedSettingsDialog(QDialog):
         label.setStyleSheet("color: #666; font-size: 11px;")
 
     def get_quality_info(self, crf):
-        """Obtenir les information de qualité pour un CRF donné."""
+        """Get quality information for a given CRF."""
         if crf <= 23:
             return "Très Haute Qualité", "#4CAF50"
         elif crf <= 28:
@@ -881,7 +882,7 @@ class AdvancedSettingsDialog(QDialog):
             return "Compression Maximale", "#f44336"
 
     def get_preset_info(self, preset):
-        """Obtenir les information pour un preset donné."""
+        """Get information for a given preset."""
         preset_info = {
             "ultrafast": ("⚡⚡⚡ Ultra rapide", "#f44336"),
             "superfast": ("⚡⚡ Très rapide", "#FF9800"),
@@ -896,7 +897,7 @@ class AdvancedSettingsDialog(QDialog):
         return preset_info.get(preset, ("Inconnu", "#666"))
 
     def copy_attempt_config(self, source_attempt, target_attempt):
-        """Copier la configuration d'une tentative vers une autre."""
+        """Copy configuration from one attempt to another."""
         if 1 <= source_attempt <= 3 and 1 <= target_attempt <= 3:
             source_idx = source_attempt - 1
             target_idx = target_attempt - 1
@@ -904,16 +905,16 @@ class AdvancedSettingsDialog(QDialog):
             source_widgets = self.attempts_widgets[source_idx]
             target_widgets = self.attempts_widgets[target_idx]
             
-            # Copier CRF
+            # Copy CRF
             target_widgets['crf'].setValue(source_widgets['crf'].value())
             
-            # Copier Preset
+            # Copy Preset
             target_widgets['preset'].setCurrentText(source_widgets['preset'].currentText())
             
             self.show_info_message(f"Configuration copiée de T{source_attempt} vers T{target_attempt}")
 
     def apply_attempts_preset(self, preset_type):
-        """Appliquer un preset prédéfini aux 3 tentatives."""
+        """Apply a predefined preset to all 3 attempts."""
         presets = {
             "conservative": [
                 (26, "fast"),
@@ -940,32 +941,32 @@ class AdvancedSettingsDialog(QDialog):
             self.show_info_message(f"Preset '{preset_type}' appliqué aux 3 tentatives")
 
     def test_single_attempt(self, attempt_number):
-        """Tester une seule tentative de compression."""
+        """Test a single compression attempt."""
         if hasattr(self.parent_window, 'test_specific_attempt'):
             self.parent_window.test_specific_attempt(attempt_number)
         else:
             self.show_info_message(f"Test of the tentative {attempt_number} - Fonctionnalité à implémenter")
 
     def toggle_attempts_availability(self, state):
-        """Activer/désactiver la disponibilité des tentatives multiples."""
+        """Enable/disable availability of multiple attempts."""
         enabled = state == Qt.CheckState.Checked.value
         self.simple_config_group.setEnabled(enabled)
         self.advanced_config_group.setEnabled(enabled)
     
     def update_size_threshold_state(self, state):
-        """Activer/désactiver les contrôles de seuil de size."""
+        """Enable/disable size threshold controls."""
         enabled = state == Qt.CheckState.Checked.value
         self.size_slider.setEnabled(enabled)
         self.size_display.setEnabled(enabled)
     
     def update_failed_options_state(self, state):
-        """Activer/désactiver les options de files non-compressibles."""
+        """Enable/disable non-compressible file options."""
         enabled = state == Qt.CheckState.Checked.value
         self.failed_suffix.setEnabled(enabled)
         self.ignore_non_compressible.setEnabled(enabled)
     
     def manage_file_action_conflicts(self):
-        """Gérer les conflits entre les options de gestion de files."""
+        """Manage conflicts between file management options."""
         sender = self.sender()
         
         if sender == self.keep_both and self.keep_both.isChecked():
@@ -979,9 +980,9 @@ class AdvancedSettingsDialog(QDialog):
             self.replace_original.setChecked(False)
     
     def apply_preset(self, preset_name):
-        """Appliquer un preset prédéfini."""
+        """Apply a predefined preset."""
         if "Débutant" in preset_name:
-            # Mode débutant - settings sûrs
+            # Beginner mode - safe settings
             self.crf_slider_simple.setValue(28)
             self.preset_simple.setCurrentText("fast")
             self.enable_multiple_attempts.setChecked(True)
@@ -990,7 +991,7 @@ class AdvancedSettingsDialog(QDialog):
             self.keep_both.setChecked(True)
             
         elif "Rapide" in preset_name:
-            # Mode rapide - speed prioritaire
+            # Fast mode - speed priority
             self.crf_slider_simple.setValue(30)
             self.preset_simple.setCurrentText("veryfast")
             self.enable_multiple_attempts.setChecked(False)
@@ -998,7 +999,7 @@ class AdvancedSettingsDialog(QDialog):
             self.size_slider.setValue(200)
             
         elif "Équilibré" in preset_name:
-            # Mode équilibré - compromis qualité/speed
+            # Balanced mode - quality/speed compromise
             self.crf_slider_simple.setValue(28)
             self.preset_simple.setCurrentText("medium")
             self.enable_multiple_attempts.setChecked(True)
@@ -1006,39 +1007,39 @@ class AdvancedSettingsDialog(QDialog):
             self.size_slider.setValue(500)
             
         elif "Compression Max" in preset_name:
-            # Mode compression maximale
+            # Maximum compression mode
             self.crf_slider_simple.setValue(32)
             self.preset_simple.setCurrentText("slow")
             self.enable_multiple_attempts.setChecked(True)
             self.use_size_threshold.setChecked(False)
             
-        # Expert = pas de changement, l'utilisateur configure manuellement
+        # Expert = no changes, user configures manually
     
-    # === MÉTHODES D'ACTION ===
-    
+    # === ACTION METHODS ===
+
     def select_converted_files(self):
-        """Sélectionner les files convertis in the window principale."""
+        """Select converted files in main window."""
         suffix = self.success_suffix.text().strip() or '_cvt'
         if hasattr(self.parent_window, 'select_files_by_suffix'):
             count = self.parent_window.select_files_by_suffix(suffix)
             self.show_info_message(f"{count} files convertis sélectionnés")
     
     def select_failed_files(self):
-        """Sélectionner les files non-compressibles in the window principale."""
+        """Select non-compressible files in main window."""
         suffix = self.failed_suffix.text().strip() or '_nocomp'
         if hasattr(self.parent_window, 'select_files_by_suffix'):
             count = self.parent_window.select_files_by_suffix(suffix)
             self.show_info_message(f"{count} files non-compressibles sélectionnés")
     
     def remove_converted_files(self):
-        """Remove les files convertis de the list."""
+        """Remove converted files from list."""
         suffix = self.success_suffix.text().strip() or '_cvt'
         if hasattr(self.parent_window, 'remove_files_by_suffix'):
             count = self.parent_window.remove_files_by_suffix(suffix)
             self.show_info_message(f"{count} files convertis supprimés de the list")
     
     def refresh_stats_display(self):
-        """Load et display the statistics."""
+        """Load and display statistics."""
         try:
             from .stats import StatsManager
             stats_manager = StatsManager()
@@ -1059,11 +1060,11 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             self.stats_display.setText("📊 Aucune statistique disponible pour le moment.")
     
     def refresh_stats(self):
-        """Rafraîchir l'affichage des statistics."""
+        """Refresh statistics display."""
         self.refresh_stats_display()
     
     def export_stats(self):
-        """Exporter les statistics vers un file."""
+        """Export statistics to file."""
         try:
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "Exporter les statistics", 
@@ -1085,7 +1086,7 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             self.show_error_message(f"Error: {e}")
     
     def clear_stats(self):
-        """Effacer toutes les statistics."""
+        """Clear all statistics."""
         reply = QMessageBox.question(
             self, "Confirmer", 
             "Are you one you want effacer toutes les statistics ?",
@@ -1105,11 +1106,11 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
                 self.show_error_message(f"Error: {e}")
     
     def test_settings(self):
-        """Tester la configuration on un seul file."""
-        # Save les settings actuels
+        """Test configuration on a single file."""
+        # Save current settings
         self.apply_settings()
         
-        # Demander à the window main faire un test
+        # Ask main window to run a test
         if hasattr(self.parent_window, 'test_single_conversion'):
             self.parent_window.test_single_conversion()
             self.show_info_message("Test lancé - vérifiez la progression in the window principale")
@@ -1117,7 +1118,7 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             self.show_info_message("Fonction de test non disponible")
     
     def export_config(self):
-        """Exporter la configuration actuelle."""
+        """Export current configuration."""
         try:
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "Exporter la configuration", 
@@ -1126,7 +1127,7 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             )
             
             if file_path:
-                # Save d'abord les settings actuels
+                # Save current settings first
                 self.save_current_settings()
                 
                 from .settings import SettingsManager
@@ -1141,7 +1142,7 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             self.show_error_message(f"Error: {e}")
     
     def import_config(self):
-        """Importer une configuration depuis un file."""
+        """Import configuration from file."""
         try:
             file_path, _ = QFileDialog.getOpenFileName(
                 self, "Importer une configuration", 
@@ -1161,7 +1162,7 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             self.show_error_message(f"Error during l'importation: {e}")
     
     def reset_config(self):
-        """Réinitialiser la configuration aux valeurs par défaut."""
+        """Reset configuration to default values."""
         reply = QMessageBox.question(
             self, "Confirmer", 
             "Réinitialiser tous les settings aux valeurs par défaut ?",
@@ -1175,32 +1176,32 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             self.show_info_message("Configuration réinitialisée")
     
     def accept_and_convert(self):
-        """Accepter et lancer directement la conversion."""
+        """Accept and start conversion directly."""
         self.apply_settings()
         self.accept()
         
-        # Signaler à the window main start la conversion
+        # Signal main window to start conversion
         if hasattr(self.parent_window, 'start_conversion_after_settings'):
             self.parent_window.start_conversion_after_settings()
     
     def apply_settings(self):
-        """Appliquer les settings sans close le dialog."""
+        """Apply settings without closing dialog."""
         self.save_current_settings()
         
         from .settings import SettingsManager
         if SettingsManager.save_settings(self.settings):
             self.show_info_message("Settings sauvegardés")
             
-            # Notifier the window principale du changement
+            # Notify main window of change
             if hasattr(self.parent_window, 'on_settings_updated'):
                 self.parent_window.on_settings_updated()
         else:
             self.show_error_message("Error saving")
     
-    # === MÉTHODES DE CHARGEMENT/SAUVEGARDE ===
-    
+    # === LOAD/SAVE METHODS ===
+
     def load_settings(self):
-        """Load les settings in l'interface."""
+        """Load settings into interface."""
         try:
             # Onglet Détection
             self.use_size_threshold.setChecked(self.settings.use_size_threshold)
@@ -1209,7 +1210,7 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             self.size_slider.setValue(size_mb)
             self.update_size_display(size_mb)
             
-            # Extensions vidéo
+            # Video extensions
             extensions = getattr(self.settings, 'video_extensions', 'mp4,avi,mkv,mov,flv,webm,wmv')
             self.video_extensions.setText(extensions)
             
@@ -1222,7 +1223,7 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             self.mark_non_compressible.setChecked(getattr(self.settings, 'mark_non_compressible', False))
             self.ignore_non_compressible.setChecked(getattr(self.settings, 'ignore_non_compressible', False))
             
-            # Onglet Qualité - Déterminer le mode selon la configuration
+            # Quality tab - Determine mode based on configuration
             if getattr(self.settings, 'manual_mode', False):
                 # Mode simple
                 self.simple_mode.setChecked(True)
@@ -1234,7 +1235,7 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
                 # Mode avancé
                 self.advanced_mode.setChecked(True)
                 
-                # Load chaque tentative
+                # Load each attempt
                 for i, widgets in enumerate(self.attempts_widgets):
                     if i < len(self.settings.attempts):
                         attempt = self.settings.attempts[i]
@@ -1261,7 +1262,7 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             self.replace_original.setChecked(self.settings.replace_original)
             self.delete_if_smaller.setChecked(self.settings.delete_if_smaller)
             
-            # Si aucune option n'est cochée, cocher "garder les deux"
+            # If no option is checked, check "keep both"
             if not any([self.replace_original.isChecked(), self.delete_if_smaller.isChecked()]):
                 self.keep_both.setChecked(True)
             
@@ -1274,13 +1275,13 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             self.show_error_message(f"Error loading des settings: {e}")
     
     def save_current_settings(self):
-        """Save les settings actuels de l'interface."""
+        """Save current settings from interface."""
         try:
             # Onglet Détection
             self.settings.use_size_threshold = self.use_size_threshold.isChecked()
             self.settings.size_threshold = self.size_slider.value() * 1024 * 1024
             
-            # Extensions et suffixes
+            # Extensions and suffixes
             self.settings.video_extensions = self.video_extensions.text().strip()
             self.settings.converted_suffix = self.success_suffix.text().strip() or '_cvt'
             self.settings.failed_suffix = self.failed_suffix.text().strip() or '_nocomp'
@@ -1290,9 +1291,9 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             self.settings.mark_non_compressible = self.mark_non_compressible.isChecked()
             self.settings.ignore_non_compressible = self.ignore_non_compressible.isChecked()
             
-            # Onglet Qualité
+            # Quality tab
             if self.simple_mode.isChecked():
-                # Mode simple - utiliser la même config pour toutes les tentatives
+                # Simple mode - use same config for all attempts
                 crf = self.crf_slider_simple.value()
                 preset = self.preset_simple.currentText()
                 
@@ -1305,7 +1306,7 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
                 self.settings.preset = preset
                 
             else:
-                # Mode avancé - configurer chaque tentative individuellement
+                # Advanced mode - configure each attempt individually
                 for i, widgets in enumerate(self.attempts_widgets):
                     if i < len(self.settings.attempts):
                         self.settings.attempts[i].crf = widgets['crf'].value()
@@ -1336,10 +1337,10 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
         except Exception as e:
             self.show_error_message(f"Error saving des settings: {e}")
     
-    # === MÉTHODES UTILITAIRES ===
-    
+    # === UTILITY METHODS ===
+
     def format_size(self, size: int) -> str:
-        """Formatter la size des files."""
+        """Format file size."""
         if size < 1024:
             return f"{size} B"
         elif size < 1048576:
@@ -1350,9 +1351,9 @@ Réussies: {summary['successful_conversions']} (Rate: {summary['success_rate']:.
             return f"{size/1073741824:.1f} GB"
     
     def show_info_message(self, message: str):
-        """Show un message d'information."""
+        """Show information message."""
         QMessageBox.information(self, "Information", message)
     
     def show_error_message(self, message: str):
-        """Show un message d'error."""
+        """Show error message."""
         QMessageBox.warning(self, "Error", message)

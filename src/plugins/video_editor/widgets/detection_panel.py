@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                             QGroupBox, QSlider, QProgressBar)
 from PyQt6.QtCore import Qt, pyqtSignal
 from src.core.logger import Logger
+from src.core.i18n import t
 
 logger = Logger.get_logger('VideoEditor.DetectionPanel')
 
@@ -32,22 +33,22 @@ class DetectionPanel(QWidget):
         layout.setSpacing(10)
 
         # Title
-        title = QLabel("🔍 Détection Automatique")
+        title = QLabel(t("video_editor.detection.title", "🔍 Automatic Detection"))
         title.setStyleSheet("font-weight: bold; font-size: 14px;")
         layout.addWidget(title)
 
         # Black Frames Detection
-        black_group = QGroupBox("🖤 Fenêtres Noires")
+        black_group = QGroupBox(t("video_editor.detection.black_frames", "🖤 Black Frames"))
         black_layout = QVBoxLayout()
 
         # Threshold
         threshold_layout = QHBoxLayout()
-        threshold_layout.addWidget(QLabel("Seuil luminosité:"))
+        threshold_layout.addWidget(QLabel(t("video_editor.detection.brightness_threshold", "Brightness threshold:")))
 
         self.black_threshold_spin = QSpinBox()
         self.black_threshold_spin.setRange(0, 255)
         self.black_threshold_spin.setValue(20)
-        self.black_threshold_spin.setToolTip("0 = noir complet, 255 = blanc")
+        self.black_threshold_spin.setToolTip(t("video_editor.detection.brightness_tooltip", "0 = complete black, 255 = white"))
         threshold_layout.addWidget(self.black_threshold_spin)
 
         threshold_layout.addStretch()
@@ -55,20 +56,20 @@ class DetectionPanel(QWidget):
 
         # Min duration
         duration_layout = QHBoxLayout()
-        duration_layout.addWidget(QLabel("Durée minimale:"))
+        duration_layout.addWidget(QLabel(t("video_editor.detection.min_duration", "Minimum duration:")))
 
         self.black_min_duration = QSpinBox()
         self.black_min_duration.setRange(1, 100)
         self.black_min_duration.setValue(10)
         self.black_min_duration.setSuffix(" frames")
-        self.black_min_duration.setToolTip("Nombre minimum de frames noires consécutives")
+        self.black_min_duration.setToolTip(t("video_editor.detection.min_duration_tooltip", "Minimum number of consecutive black frames"))
         duration_layout.addWidget(self.black_min_duration)
 
         duration_layout.addStretch()
         black_layout.addLayout(duration_layout)
 
         # Detect button
-        detect_black_btn = QPushButton("🔍 Détecter Fenêtres Noires")
+        detect_black_btn = QPushButton(t("video_editor.detection.detect_black", "🔍 Detect Black Frames"))
         detect_black_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007bff;
@@ -88,18 +89,18 @@ class DetectionPanel(QWidget):
         layout.addWidget(black_group)
 
         # Scene Detection
-        scene_group = QGroupBox("🎬 Changements de Scènes")
+        scene_group = QGroupBox(t("video_editor.detection.scene_changes", "🎬 Scene Changes"))
         scene_layout = QVBoxLayout()
 
         # Sensitivity
         sensitivity_layout = QHBoxLayout()
-        sensitivity_layout.addWidget(QLabel("Sensibilité:"))
+        sensitivity_layout.addWidget(QLabel(t("video_editor.detection.sensitivity", "Sensitivity:")))
 
         self.scene_threshold_spin = QDoubleSpinBox()
         self.scene_threshold_spin.setRange(1.0, 100.0)
         self.scene_threshold_spin.setValue(30.0)
         self.scene_threshold_spin.setDecimals(1)
-        self.scene_threshold_spin.setToolTip("Plus bas = plus sensible (détecte plus de scènes)")
+        self.scene_threshold_spin.setToolTip(t("video_editor.detection.sensitivity_tooltip", "Lower = more sensitive (detects more scenes)"))
         sensitivity_layout.addWidget(self.scene_threshold_spin)
 
         sensitivity_layout.addStretch()
@@ -107,13 +108,13 @@ class DetectionPanel(QWidget):
 
         # Min scene length
         min_scene_layout = QHBoxLayout()
-        min_scene_layout.addWidget(QLabel("Longueur minimale:"))
+        min_scene_layout.addWidget(QLabel(t("video_editor.detection.min_length", "Minimum length:")))
 
         self.scene_min_length = QSpinBox()
         self.scene_min_length.setRange(1, 300)
         self.scene_min_length.setValue(30)
         self.scene_min_length.setSuffix(" frames")
-        self.scene_min_length.setToolTip("Nombre minimum de frames par scène")
+        self.scene_min_length.setToolTip(t("video_editor.detection.min_length_tooltip", "Minimum number of frames per scene"))
         min_scene_layout.addWidget(self.scene_min_length)
 
         min_scene_layout.addStretch()
@@ -122,7 +123,7 @@ class DetectionPanel(QWidget):
         # Detect button and stop button
         buttons_layout = QHBoxLayout()
 
-        detect_scene_btn = QPushButton("🔍 Détecter Scènes")
+        detect_scene_btn = QPushButton(t("video_editor.detection.detect_scenes", "🔍 Detect Scenes"))
         detect_scene_btn.setStyleSheet("""
             QPushButton {
                 background-color: #28a745;
@@ -139,7 +140,7 @@ class DetectionPanel(QWidget):
         buttons_layout.addWidget(detect_scene_btn)
         self.detect_scene_btn = detect_scene_btn
 
-        self.stop_scene_btn = QPushButton("⏹️ Arrêter")
+        self.stop_scene_btn = QPushButton(t("video_editor.detection.stop", "⏹️ Stop"))
         self.stop_scene_btn.setStyleSheet("""
             QPushButton {
                 background-color: #dc3545;
@@ -163,7 +164,7 @@ class DetectionPanel(QWidget):
         self.scene_progress.setRange(0, 100)
         self.scene_progress.setValue(0)
         self.scene_progress.setTextVisible(True)
-        self.scene_progress.setFormat("Analyse: %p%")
+        self.scene_progress.setFormat(t("video_editor.detection.progress_format", "Analysis: %p%"))
         self.scene_progress.hide()  # Hidden by default
         scene_layout.addWidget(self.scene_progress)
 
@@ -171,24 +172,24 @@ class DetectionPanel(QWidget):
         layout.addWidget(scene_group)
 
         # Quick Actions
-        actions_group = QGroupBox("⚡ Actions Rapides")
+        actions_group = QGroupBox(t("video_editor.detection.quick_actions", "⚡ Quick Actions"))
         actions_layout = QVBoxLayout()
 
         # Split N parts
-        split_n_btn = QPushButton("📊 Diviser en N parties")
-        split_n_btn.setToolTip("Diviser la vidéo en N segments égaux")
+        split_n_btn = QPushButton(t("video_editor.detection.split_n_parts", "📊 Split into N Parts"))
+        split_n_btn.setToolTip(t("video_editor.detection.split_n_tooltip", "Split video into N equal segments"))
         split_n_btn.clicked.connect(self.split_n_parts_clicked.emit)
         actions_layout.addWidget(split_n_btn)
 
         # Split by duration
-        split_duration_btn = QPushButton("⏱️ Diviser par durée")
-        split_duration_btn.setToolTip("Créer segments de durée fixe")
+        split_duration_btn = QPushButton(t("video_editor.detection.split_by_duration", "⏱️ Split by Duration"))
+        split_duration_btn.setToolTip(t("video_editor.detection.split_duration_tooltip", "Create fixed-duration segments"))
         split_duration_btn.clicked.connect(self.split_by_duration_clicked.emit)
         actions_layout.addWidget(split_duration_btn)
 
         # Merge all
-        merge_all_btn = QPushButton("🔗 Fusionner tout")
-        merge_all_btn.setToolTip("Fusionner tous les segments en un seul")
+        merge_all_btn = QPushButton(t("video_editor.detection.merge_all", "🔗 Merge All"))
+        merge_all_btn.setToolTip(t("video_editor.detection.merge_all_tooltip", "Merge all segments into one"))
         merge_all_btn.clicked.connect(self.merge_all_clicked.emit)
         actions_layout.addWidget(merge_all_btn)
 

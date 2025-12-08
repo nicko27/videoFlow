@@ -46,25 +46,44 @@ class SubsequenceDetector:
         temporal_window_frames: int = 5,
         sliding_window_tolerance: int = 3,
         enable_adaptive_refinement: bool = False,  # DISABLED by default - can be VERY slow
-        enable_verification: bool = True,  # NEW: Enable Strategy 3 verification
-        verification_dct_threshold: float = 75.0,  # NEW: DCT threshold for verification
-        verification_sequence_threshold: float = 95.0,  # NEW: Sequence threshold for verification
-        verification_workers: int = 2  # NEW: Workers for parallel verification
+        # Pipeline configuration (NEW)
+        verification_pipeline=None,  # NEW: VerificationPipeline instance (replaces Phase 2)
+        pipeline_run_label: str = None,
+        pipeline_debug_flag: bool = False,
+        # Phase configuration (DEPRECATED - use verification_pipeline instead)
+        enable_phase1: bool = True,  # NEW: Enable/disable Phase 1
+        phase1_method: str = "dense_hash",  # NEW: Phase 1 method (dense_hash, signature_adaptive, fast_scan)
+        enable_phase2: bool = True,  # NEW: Enable/disable Phase 2
+        phase2_method: str = "strategy3",  # NEW: Phase 2 method (strategy3, dct_only, frame_diff, multipoint)
+        # Phase 2 parameters
+        verification_dct_threshold: float = 75.0,  # DCT threshold for verification
+        verification_sequence_threshold: float = 95.0,  # Sequence threshold for verification
+        verification_correlation_threshold: float = 90.0,  # NEW: Correlation threshold for frame_diff
+        verification_points: int = 3,  # NEW: Number of validation points for multipoint
+        verification_workers: int = 2,  # Workers for parallel verification
+        # Backward compatibility
+        enable_verification: bool = None  # Deprecated: Use enable_phase2 instead
     ):
-        """Initialize subsequence detector with temporal desynchronization handling.
+        """Initialize subsequence detector with multi-phase configuration.
 
         Args:
             hasher: VideoHasher instance to use for hashing
             max_cache_memory_mb: Maximum cache memory in MB (default: 500MB)
-            sample_interval_seconds: Dense sampling interval (default: 0.75 seconds) - REDUCED from 1.5s
+            sample_interval_seconds: Dense sampling interval (default: 0.75 seconds)
             min_match_ratio: Minimum match ratio to consider a subsequence (default: 0.70)
-            temporal_window_frames: Number of frames for temporal averaging (default: 5) - SOLUTION 4
-            sliding_window_tolerance: Frame tolerance for sliding window (default: 3) - SOLUTION 1
-            enable_adaptive_refinement: Enable adaptive refinement (default: False) - SOLUTION 5
-            enable_verification: Enable Strategy 3 verification (default: True)
+            temporal_window_frames: Number of frames for temporal averaging (default: 5)
+            sliding_window_tolerance: Frame tolerance for sliding window (default: 3)
+            enable_adaptive_refinement: Enable adaptive refinement (default: False)
+            enable_phase1: Enable Phase 1 detection (default: True)
+            phase1_method: Phase 1 detection method - "dense_hash", "signature_adaptive", "fast_scan"
+            enable_phase2: Enable Phase 2 verification (default: True)
+            phase2_method: Phase 2 verification method - "strategy3", "dct_only", "frame_diff", "multipoint"
             verification_dct_threshold: DCT threshold for verification (default: 75.0%)
             verification_sequence_threshold: Sequence threshold for verification (default: 95.0%)
+            verification_correlation_threshold: Correlation threshold for frame_diff (default: 90.0%)
+            verification_points: Number of validation points for multipoint (default: 3)
             verification_workers: Number of workers for parallel verification (default: 2)
+            enable_verification: DEPRECATED - Use enable_phase2 instead
         """
         self.hasher = hasher
         self.db = hasher.db
@@ -74,24 +93,57 @@ class SubsequenceDetector:
         self.temporal_window_frames = temporal_window_frames
         self.sliding_window_tolerance = sliding_window_tolerance
         self.enable_adaptive_refinement = enable_adaptive_refinement
-        self.enable_verification = enable_verification
+
+        # Pipeline configuration (NEW)
+        self.verification_pipeline = verification_pipeline
+        self.pipeline_run_label = pipeline_run_label
+        self.pipeline_debug_flag = pipeline_debug_flag
+
+        # Multi-phase configuration (DEPRECATED)
+        self.enable_phase1 = enable_phase1
+        self.phase1_method = phase1_method
+
+        # Backward compatibility for enable_verification
+        if enable_verification is not None:
+            self.enable_phase2 = enable_verification
+        else:
+            self.enable_phase2 = enable_phase2
+
+        self.phase2_method = phase2_method
+        self.verification_dct_threshold = verification_dct_threshold
+        self.verification_sequence_threshold = verification_sequence_threshold
+        self.verification_correlation_threshold = verification_correlation_threshold
+        self.verification_points = verification_points
+        self.verification_workers = verification_workers
+
         self._cancelled = False  # Cancellation flag
 
-        # Initialize verification methods (Strategy 3: Scene Cuts Veto)
-        if enable_verification:
+        # Backward compatibility
+        self.enable_verification = self.enable_phase2
+
+        # Initialize verification methods
+        # Use pipeline if provided, otherwise fall back to old Phase 2 system
+        if self.verification_pipeline is not None:
+            self.verifier = None  # Pipeline replaces verifier
+            logger.info(f"SubsequenceDetector initialized with VerificationPipeline: "
+                       f"{len(self.verification_pipeline.methods)} methods configured, "
+                       f"{sample_interval_seconds}s intervals, {max_cache_memory_mb}MB cache, "
+                       f"{min_match_ratio*100}% min match")
+        elif self.enable_phase2:
             self.verifier = SubsequenceVerificationMethods(
                 dct_threshold=verification_dct_threshold,
                 sequence_threshold=verification_sequence_threshold,
                 max_workers=verification_workers
             )
+            logger.info(f"SubsequenceDetector initialized: Phase1={phase1_method if enable_phase1 else 'disabled'}, "
+                       f"Phase2={phase2_method if self.enable_phase2 else 'disabled'}, "
+                       f"{sample_interval_seconds}s intervals, {max_cache_memory_mb}MB cache, "
+                       f"{min_match_ratio*100}% min match")
         else:
             self.verifier = None
-
-        logger.info(f"SubsequenceDetector initialized: {sample_interval_seconds}s intervals, "
-                   f"{max_cache_memory_mb}MB cache limit, {min_match_ratio*100}% min match, "
-                   f"temporal_window={temporal_window_frames}, tolerance=±{sliding_window_tolerance}, "
-                   f"adaptive_refinement={enable_adaptive_refinement}, "
-                   f"verification={enable_verification} (dct={verification_dct_threshold}%, seq={verification_sequence_threshold}%)")
+            logger.info(f"SubsequenceDetector initialized (no verification): "
+                       f"{sample_interval_seconds}s intervals, {max_cache_memory_mb}MB cache, "
+                       f"{min_match_ratio*100}% min match")
 
     def _is_frame_blank(self, frame: np.ndarray, threshold: float = 0.1) -> bool:
         """
@@ -168,7 +220,7 @@ class SubsequenceDetector:
         """Compute dense hash for a video with memory-safe caching and progress feedback.
 
         Samples frames at regular intervals (default: every 3 seconds) for better
-        subsequence detection. Results are cached in memory-bounded LRU cache.
+        subsequence detection. Results are cached in memory (LRU) and database.
 
         Args:
             video_path: Path to video file
@@ -177,13 +229,24 @@ class SubsequenceDetector:
         Returns:
             Tuple of (hash_array, duration) or (None, 0.0) on error
         """
-        # Check LRU cache first
+        # Check LRU cache first (fastest)
         cached = self.dense_cache.get(video_path)
         if cached is not None:
             if progress_callback:
-                progress_callback(1, 1, "Loaded from cache")
+                progress_callback(1, 1, "Loaded from memory cache")
             return cached['hash'], cached['duration']
 
+        # Check database cache (persistent)
+        db_hash, db_duration = self.hasher.db.get_dense_hash(video_path, self.sample_interval_seconds)
+        if db_hash is not None:
+            # Found in DB - add to memory cache and return
+            self.dense_cache.put(video_path, db_hash, db_duration)
+            if progress_callback:
+                progress_callback(1, 1, "Loaded from database cache")
+            logger.debug(f"Dense hash loaded from DB: {os.path.basename(video_path)}")
+            return db_hash, db_duration
+
+        # Not in cache - compute it
         try:
             cv2.setLogLevel(0)
             cap = cv2.VideoCapture(video_path)
@@ -258,6 +321,9 @@ class SubsequenceDetector:
 
                 # Store in LRU cache (will auto-evict if memory limit reached)
                 self.dense_cache.put(video_path, final_hash, duration)
+
+                # Store in database (persistent cache)
+                self.hasher.db.store_dense_hash(video_path, final_hash, duration, self.sample_interval_seconds)
 
                 logger.info(f"Dense hash computed: {os.path.basename(video_path)} "
                           f"({len(hashes)} frames, ~{self.dense_cache.get_stats()['memory_mb']:.1f}MB cached)")
@@ -550,12 +616,44 @@ class SubsequenceDetector:
                     'verification_result': None
                 }
 
-            # PHASE 3: Strategy 3 Verification (Scene Cuts Veto + DCT) with caching
+            # PHASE 2: Verification with configurable methods
             verification_result = None
             from_cache = False
 
-            if self.enable_verification and self.verifier is not None:
+            # Use pipeline if available, otherwise fall back to old Phase 2 system
+            if self.verification_pipeline is not None:
                 # Calculate start time in long video
+                start_time = best_start_idx * self.sample_interval_seconds
+
+                logger.info(f"Initial match {best_match_ratio*100:.1f}% - running pipeline verification...")
+
+                # Run verification pipeline
+                verification_result = self.verification_pipeline.verify(
+                    short_video=short_video,
+                    long_video=long_video,
+                    start_time=start_time,
+                    duration=dur_short,
+                    sequence_score=best_match_ratio * 100.0,
+                    run_label=self.pipeline_run_label,
+                    debug_flag=self.pipeline_debug_flag
+                )
+
+                # Update is_subsequence based on pipeline result
+                is_subsequence = verification_result['accepted']
+
+                if is_subsequence:
+                    methods_str = ', '.join(verification_result.get('pipeline_config', []))
+                    logger.info(f"✅ Subsequence VERIFIED (pipeline: {methods_str}): {os.path.basename(short_video)} "
+                              f"in {os.path.basename(long_video)} "
+                              f"(seq: {best_match_ratio*100:.1f}%, "
+                              f"frame {best_start_idx}, refined={refined})")
+                else:
+                    rejection_method = verification_result.get('rejection_method', 'unknown')
+                    logger.info(f"❌ Subsequence REJECTED by {rejection_method}: "
+                              f"{verification_result.get('rejection_reason', 'N/A')}")
+
+            elif self.enable_phase2 and self.verifier is not None:
+                # OLD SYSTEM: Calculate start time in long video
                 # Convert frame index to time using sampling interval
                 start_time = best_start_idx * self.sample_interval_seconds
 
@@ -565,20 +663,34 @@ class SubsequenceDetector:
                 )
 
                 if cached_result:
-                    logger.info(f"✓ Using cached verification result")
+                    logger.info(f"✓ Using cached verification result ({self.phase2_method})")
                     verification_result = cached_result
                     from_cache = True
                 else:
-                    logger.info(f"Initial match {best_match_ratio*100:.1f}% - running Strategy 3 verification...")
+                    logger.info(f"Initial match {best_match_ratio*100:.1f}% - running {self.phase2_method} verification...")
 
-                    # Run verification
-                    verification_result = self.verifier.verify_with_strategy3(
-                        short_video=short_video,
-                        long_video=long_video,
-                        start_time=start_time,
-                        duration=dur_short,
-                        sequence_score=best_match_ratio * 100.0  # Convert to percentage
-                    )
+                    # Dispatch to appropriate verification method
+                    if self.phase2_method == "strategy3":
+                        verification_result = self._verify_strategy3(
+                            short_video, long_video, start_time, dur_short, best_match_ratio
+                        )
+                    elif self.phase2_method == "dct_only":
+                        verification_result = self._verify_dct_only(
+                            short_video, long_video, start_time, dur_short, best_match_ratio
+                        )
+                    elif self.phase2_method == "frame_diff":
+                        verification_result = self._verify_frame_diff(
+                            short_video, long_video, start_time, dur_short, best_match_ratio
+                        )
+                    elif self.phase2_method == "multipoint":
+                        verification_result = self._verify_multipoint(
+                            short_video, long_video, start_time, dur_short, best_match_ratio
+                        )
+                    else:
+                        logger.warning(f"Unknown phase2_method: {self.phase2_method}, using strategy3")
+                        verification_result = self._verify_strategy3(
+                            short_video, long_video, start_time, dur_short, best_match_ratio
+                        )
 
                     # Store in cache for future runs
                     self.db.store_verification_result(
@@ -591,14 +703,12 @@ class SubsequenceDetector:
                 is_subsequence = verification_result['accepted']
 
                 if is_subsequence:
-                    logger.info(f"✅ Subsequence VERIFIED: {os.path.basename(short_video)} "
+                    logger.info(f"✅ Subsequence VERIFIED ({self.phase2_method}): {os.path.basename(short_video)} "
                               f"in {os.path.basename(long_video)} "
                               f"(seq: {best_match_ratio*100:.1f}%, "
-                              f"scene: {verification_result['scene_cuts_score']:.1f}%, "
-                              f"dct: {verification_result['dct_score']:.1f}%, "
                               f"frame {best_start_idx}, refined={refined})")
                 else:
-                    logger.info(f"❌ Subsequence REJECTED by verification: {verification_result['rejection_reason']}")
+                    logger.info(f"❌ Subsequence REJECTED by {self.phase2_method}: {verification_result.get('rejection_reason', 'N/A')}")
             else:
                 # No verification - trust initial match
                 if is_subsequence:
@@ -623,10 +733,296 @@ class SubsequenceDetector:
             logger.error(f"Error in subsequence detection: {e}")
             return None
 
+    def _verify_strategy3(
+        self,
+        short_video: str,
+        long_video: str,
+        start_time: float,
+        duration: float,
+        match_ratio: float
+    ) -> Dict:
+        """Verify using Strategy 3 (Scene Cuts + DCT).
+
+        Args:
+            short_video: Path to short video
+            long_video: Path to long video
+            start_time: Start time in long video
+            duration: Duration of short video
+            match_ratio: Initial match ratio (0.0-1.0)
+
+        Returns:
+            Verification result dictionary
+        """
+        return self.verifier.verify_with_strategy3(
+            short_video=short_video,
+            long_video=long_video,
+            start_time=start_time,
+            duration=duration,
+            sequence_score=match_ratio * 100.0  # Convert to percentage
+        )
+
+    def _verify_dct_only(
+        self,
+        short_video: str,
+        long_video: str,
+        start_time: float,
+        duration: float,
+        match_ratio: float
+    ) -> Dict:
+        """Verify using DCT coefficients only.
+
+        Args:
+            short_video: Path to short video
+            long_video: Path to long video
+            start_time: Start time in long video
+            duration: Duration of short video
+            match_ratio: Initial match ratio (0.0-1.0)
+
+        Returns:
+            Verification result dictionary
+        """
+        # Use DCT verification from the verifier
+        dct_score = self.verifier._compute_dct_similarity(
+            short_video, long_video, start_time, duration
+        )
+
+        accepted = dct_score >= self.verification_dct_threshold
+        rejection_reason = None if accepted else f"DCT score {dct_score:.1f}% below threshold {self.verification_dct_threshold}%"
+
+        return {
+            'accepted': accepted,
+            'dct_score': dct_score,
+            'scene_cuts_score': None,  # Not used in DCT-only
+            'rejection_reason': rejection_reason,
+            'method': 'dct_only'
+        }
+
+    def _verify_frame_diff(
+        self,
+        short_video: str,
+        long_video: str,
+        start_time: float,
+        duration: float,
+        match_ratio: float
+    ) -> Dict:
+        """Verify using Frame Differences correlation.
+
+        Based on the method from find_subsequences_adaptive.py.
+
+        Args:
+            short_video: Path to short video
+            long_video: Path to long video
+            start_time: Start time in long video
+            duration: Duration of short video
+            match_ratio: Initial match ratio (0.0-1.0)
+
+        Returns:
+            Verification result dictionary
+        """
+        try:
+            # Adaptive verification duration
+            verification_duration = min(60, duration * 0.6)  # Use 60% of video or 60s max
+
+            # Extract frames for verification
+            ref_frames = []
+            cand_frames = []
+
+            sample_interval = 3  # Sample every 3 seconds
+            for offset in range(0, int(verification_duration), sample_interval):
+                ref_frame = self._extract_frame_at(short_video, offset)
+                cand_frame = self._extract_frame_at(long_video, start_time + offset)
+
+                if ref_frame is not None and cand_frame is not None:
+                    ref_frames.append(ref_frame)
+                    cand_frames.append(cand_frame)
+
+            if len(ref_frames) < 3:  # Need at least 3 frames
+                return {
+                    'accepted': False,
+                    'correlation_score': 0.0,
+                    'rejection_reason': f"Insufficient frames ({len(ref_frames)} < 3)",
+                    'method': 'frame_diff'
+                }
+
+            # Compute frame differences
+            ref_diffs = []
+            for i in range(len(ref_frames) - 1):
+                gray1 = cv2.cvtColor(ref_frames[i], cv2.COLOR_BGR2GRAY)
+                gray2 = cv2.cvtColor(ref_frames[i + 1], cv2.COLOR_BGR2GRAY)
+                diff = cv2.absdiff(gray1, gray2)
+                ref_diffs.append(np.mean(diff))
+
+            cand_diffs = []
+            for i in range(len(cand_frames) - 1):
+                gray1 = cv2.cvtColor(cand_frames[i], cv2.COLOR_BGR2GRAY)
+                gray2 = cv2.cvtColor(cand_frames[i + 1], cv2.COLOR_BGR2GRAY)
+                diff = cv2.absdiff(gray1, gray2)
+                cand_diffs.append(np.mean(diff))
+
+            # Normalize and compare
+            ref_arr = np.array(ref_diffs)
+            cand_arr = np.array(cand_diffs)
+
+            if ref_arr.std() == 0 or cand_arr.std() == 0:
+                return {
+                    'accepted': False,
+                    'correlation_score': 0.0,
+                    'rejection_reason': "Zero standard deviation in frame differences",
+                    'method': 'frame_diff'
+                }
+
+            ref_norm = (ref_arr - ref_arr.mean()) / ref_arr.std()
+            cand_norm = (cand_arr - cand_arr.mean()) / cand_arr.std()
+
+            correlation = np.corrcoef(ref_norm, cand_norm)[0, 1]
+
+            if np.isnan(correlation):
+                correlation = 0.0
+
+            correlation_score = max(0, min(100, correlation * 100))
+            accepted = correlation_score >= self.verification_correlation_threshold
+            rejection_reason = None if accepted else f"Correlation {correlation_score:.1f}% below threshold {self.verification_correlation_threshold}%"
+
+            return {
+                'accepted': accepted,
+                'correlation_score': correlation_score,
+                'rejection_reason': rejection_reason,
+                'method': 'frame_diff'
+            }
+
+        except Exception as e:
+            logger.error(f"Error in frame diff verification: {e}")
+            return {
+                'accepted': False,
+                'correlation_score': 0.0,
+                'rejection_reason': f"Error: {str(e)}",
+                'method': 'frame_diff'
+            }
+
+    def _verify_multipoint(
+        self,
+        short_video: str,
+        long_video: str,
+        start_time: float,
+        duration: float,
+        match_ratio: float
+    ) -> Dict:
+        """Verify using multi-point validation.
+
+        Based on the method from find_subsequences_validated.py.
+        Validates at multiple temporal points (beginning, middle, end).
+
+        Args:
+            short_video: Path to short video
+            long_video: Path to long video
+            start_time: Start time in long video
+            duration: Duration of short video
+            match_ratio: Initial match ratio (0.0-1.0)
+
+        Returns:
+            Verification result dictionary
+        """
+        try:
+            # Calculate validation points
+            num_points = self.verification_points
+            points = []
+            for i in range(num_points):
+                fraction = i / (num_points - 1) if num_points > 1 else 0.5
+                points.append(fraction * duration)
+
+            # Validate at each point
+            point_scores = []
+            for i, offset in enumerate(points):
+                ref_frame = self._extract_frame_at(short_video, offset)
+                cand_frame = self._extract_frame_at(long_video, start_time + offset)
+
+                if ref_frame is None or cand_frame is None:
+                    point_scores.append(0.0)
+                    continue
+
+                # Compute perceptual hash similarity
+                ref_hash = self.hasher.compute_frame_hash(ref_frame)
+                cand_hash = self.hasher.compute_frame_hash(cand_frame)
+
+                if ref_hash is None or cand_hash is None:
+                    point_scores.append(0.0)
+                    continue
+
+                # Calculate similarity
+                similarity = np.sum(ref_hash == cand_hash) / ref_hash.size * 100.0
+                point_scores.append(similarity)
+
+            # All points must pass threshold
+            min_point_threshold = 75.0
+            avg_score = np.mean(point_scores) if point_scores else 0.0
+            min_score = min(point_scores) if point_scores else 0.0
+
+            # Accept if all points are above threshold
+            accepted = min_score >= min_point_threshold and avg_score >= self.verification_dct_threshold
+            rejection_reason = None
+
+            if not accepted:
+                if min_score < min_point_threshold:
+                    rejection_reason = f"Point validation failed: min={min_score:.1f}% < {min_point_threshold}%"
+                else:
+                    rejection_reason = f"Average score {avg_score:.1f}% below threshold {self.verification_dct_threshold}%"
+
+            return {
+                'accepted': accepted,
+                'multipoint_avg_score': avg_score,
+                'multipoint_min_score': min_score,
+                'multipoint_scores': point_scores,
+                'rejection_reason': rejection_reason,
+                'method': 'multipoint'
+            }
+
+        except Exception as e:
+            logger.error(f"Error in multipoint verification: {e}")
+            return {
+                'accepted': False,
+                'multipoint_avg_score': 0.0,
+                'multipoint_min_score': 0.0,
+                'rejection_reason': f"Error: {str(e)}",
+                'method': 'multipoint'
+            }
+
+    def _extract_frame_at(self, video_path: str, time_sec: float) -> Optional[np.ndarray]:
+        """Extract a single frame at specific time.
+
+        Args:
+            video_path: Path to video file
+            time_sec: Time in seconds
+
+        Returns:
+            Frame as numpy array or None
+        """
+        try:
+            cv2.setLogLevel(0)
+            cap = cv2.VideoCapture(video_path)
+            if not cap.isOpened():
+                return None
+
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            frame_num = int(time_sec * fps)
+
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+            ret, frame = cap.read()
+            cap.release()
+            cv2.setLogLevel(1)
+
+            if ret:
+                return cv2.resize(frame, (320, 180))
+            return None
+
+        except Exception as e:
+            logger.error(f"Error extracting frame at {time_sec}s from {video_path}: {e}")
+            return None
+
     def detect_all_subsequences(
         self,
         video_files: List[str],
-        progress_callback=None
+        progress_callback=None,
+        hash_progress_callback=None
     ) -> List[Tuple[str, str, Dict]]:
         """Detect all subsequences in a list of videos.
 
@@ -635,7 +1031,8 @@ class SubsequenceDetector:
 
         Args:
             video_files: List of video file paths
-            progress_callback: Optional callback(current, total, message)
+            progress_callback: Optional callback(current, total, message) for comparison progress
+            hash_progress_callback: Optional callback(current, total, message) for hash extraction progress
 
         Returns:
             List of tuples: (short_video, long_video, detection_result)
@@ -686,7 +1083,38 @@ class SubsequenceDetector:
 
         logger.info(f"Checking {len(pairs)} potential subsequence pairs")
 
-        # Check each pair
+        # PHASE 1: Pre-compute dense hashes for all unique videos
+        unique_videos = set()
+        for short_video, long_video in pairs:
+            unique_videos.add(short_video)
+            unique_videos.add(long_video)
+
+        unique_videos = list(unique_videos)
+        total_videos = len(unique_videos)
+
+        if total_videos > 0:
+            logger.info(f"Phase 1: Extracting frames for {total_videos} videos")
+
+            for idx, video_path in enumerate(unique_videos):
+                # Check for cancellation
+                if self._cancelled:
+                    logger.info("Subsequence detection cancelled during frame extraction")
+                    return results
+
+                if hash_progress_callback:
+                    hash_progress_callback(
+                        idx + 1,
+                        total_videos,
+                        f"Extracting {os.path.basename(video_path)}"
+                    )
+
+                # Pre-compute dense hash (will be cached)
+                self.compute_dense_hash(video_path)
+
+            logger.info(f"Phase 1 complete: {total_videos} videos hashed")
+
+        # PHASE 2: Compare pairs
+        logger.info(f"Phase 2: Comparing {len(pairs)} pairs")
         total = len(pairs)
         matches_found = 0
         for idx, (short_video, long_video) in enumerate(pairs):

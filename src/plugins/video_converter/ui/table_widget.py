@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 from ..utils import format_size
 from src.core.logger import Logger
+from src.core.i18n import t
 
 if TYPE_CHECKING:
     from ..window import VideoConverterWindow
@@ -36,6 +37,8 @@ class FileTableManager:
             window: Parent VideoConverterWindow instance.
         """
         self.window = window
+        self._refresh_pending = False
+        self._refresh_timer = None
 
     def create_table(self, layout: QVBoxLayout) -> QTableWidget:
         """Create and configure the file table widget.
@@ -49,7 +52,13 @@ class FileTableManager:
         table = QTableWidget()
         table.setColumnCount(5)
 
-        headers = ["", "File", "State", "Size", "Actions"]
+        headers = [
+            "",
+            t("video_converter.table.file", "File"),
+            t("video_converter.table.state", "State"),
+            t("video_converter.table.size", "Size"),
+            t("video_converter.table.actions", "Actions")
+        ]
         table.setHorizontalHeaderLabels(headers)
 
         # Configure column sizing
@@ -72,12 +81,49 @@ class FileTableManager:
         layout.addWidget(table)
         return table
 
-    def refresh_table(self) -> None:
-        """Refresh the entire table with current file data."""
+    def refresh_table(self, throttle: bool = True) -> None:
+        """
+        Refresh the entire table with current file data.
+
+        Args:
+            throttle: If True, throttle rapid refresh requests to improve performance.
+                     Set to False for immediate refresh (e.g., on user actions).
+        """
+        if throttle:
+            # Throttle refresh to avoid excessive updates
+            if self._refresh_pending:
+                return  # Already scheduled
+
+            self._refresh_pending = True
+
+            # Cancel existing timer if any
+            if self._refresh_timer:
+                try:
+                    self._refresh_timer.stop()
+                except:
+                    pass
+
+            # Schedule refresh after short delay to batch updates
+            self._refresh_timer = QTimer()
+            self._refresh_timer.setSingleShot(True)
+            self._refresh_timer.timeout.connect(lambda: self._do_refresh())
+            self._refresh_timer.start(100)  # 100ms throttle
+        else:
+            self._do_refresh()
+
+    def _do_refresh(self) -> None:
+        """Actually perform the table refresh."""
+        self._refresh_pending = False
+
         with QMutexLocker(self.window.files_mutex):
             files_copy = dict(self.window.files_to_convert)
 
-        self.window.files_table.setRowCount(len(files_copy))
+        # Only update if row count changed to avoid flickering
+        current_row_count = self.window.files_table.rowCount()
+        new_row_count = len(files_copy)
+
+        if current_row_count != new_row_count:
+            self.window.files_table.setRowCount(new_row_count)
 
         total_selected = 0
         total_size = 0
@@ -116,19 +162,31 @@ class FileTableManager:
         self._render_actions(row, path, info)
 
     def _render_checkbox(self, row: int, path: Path, info: dict) -> None:
-        """Render the selection checkbox.
+        """Render the selection checkbox with widget reuse.
 
         Args:
             row: Row index.
             path: File path.
             info: File information dictionary.
         """
-        checkbox = QCheckBox()
+        # Try to reuse existing checkbox widget to reduce memory usage
+        existing_widget = self.window.files_table.cellWidget(row, 0)
+
+        if existing_widget and isinstance(existing_widget, QCheckBox):
+            checkbox = existing_widget
+            # Disconnect old signals to prevent memory leaks
+            try:
+                checkbox.stateChanged.disconnect()
+            except:
+                pass
+        else:
+            checkbox = QCheckBox()
+            self.window.files_table.setCellWidget(row, 0, checkbox)
+
         checkbox.setChecked(info.get('selected', True))
         checkbox.stateChanged.connect(
             lambda state, p=path: self.window.update_selection(p, state)
         )
-        self.window.files_table.setCellWidget(row, 0, checkbox)
 
     def _render_filename(self, row: int, path: Path, info: dict) -> None:
         """Render the filename with color coding.
@@ -179,30 +237,62 @@ class FileTableManager:
             self._render_state_text(row, info)
 
     def _render_progress_bar(self, row: int, progress: int, attempt: int) -> None:
-        """Render a progress bar for active conversion.
+        """Render a progress bar for active conversion with widget reuse.
 
         Args:
             row: Row index.
             progress: Progress percentage (0-100).
             attempt: Attempt number.
         """
-        progress_widget = QWidget()
-        progress_layout = QHBoxLayout(progress_widget)
-        progress_layout.setContentsMargins(2, 2, 2, 2)
+        # Try to reuse existing progress widget to reduce memory usage
+        existing_widget = self.window.files_table.cellWidget(row, 2)
+        progress_bar = None
 
-        progress_bar = QProgressBar()
-        progress_bar.setMinimum(0)
-        progress_bar.setMaximum(100)
+        if existing_widget and isinstance(existing_widget, QWidget):
+            # Try to find existing progress bar in the layout
+            layout = existing_widget.layout()
+            if layout and layout.count() > 0:
+                widget = layout.itemAt(0).widget()
+                if isinstance(widget, QProgressBar):
+                    progress_bar = widget
+                    progress_widget = existing_widget
+
+        if not progress_bar:
+            # Create new widgets
+            progress_widget = QWidget()
+            progress_layout = QHBoxLayout(progress_widget)
+            progress_layout.setContentsMargins(2, 2, 2, 2)
+
+            progress_bar = QProgressBar()
+            progress_bar.setMinimum(0)
+            progress_bar.setMaximum(100)
+            progress_bar.setTextVisible(True)
+            progress_layout.addWidget(progress_bar)
+            self.window.files_table.setCellWidget(row, 2, progress_widget)
+
+        # Update progress bar state
         progress_bar.setValue(max(0, min(100, progress)))
-        progress_bar.setTextVisible(True)
 
         # Progress text
         if progress == 0:
-            progress_text = f"Attempt {attempt} - Starting..."
+            progress_text = t(
+                "video_converter.table.progress_starting",
+                f"Attempt {attempt} - Starting...",
+                attempt=attempt
+            )
         elif progress >= 100:
-            progress_text = f"Attempt {attempt} - Finalizing..."
+            progress_text = t(
+                "video_converter.table.progress_finalizing",
+                f"Attempt {attempt} - Finalizing...",
+                attempt=attempt
+            )
         else:
-            progress_text = f"Attempt {attempt} - {progress}%"
+            progress_text = t(
+                "video_converter.table.progress_running",
+                f"Attempt {attempt} - {progress}%",
+                attempt=attempt,
+                progress=progress
+            )
 
         progress_bar.setFormat(progress_text)
 
@@ -230,9 +320,6 @@ class FileTableManager:
             }}
         """)
 
-        progress_layout.addWidget(progress_bar)
-        self.window.files_table.setCellWidget(row, 2, progress_widget)
-
     def _render_state_text(self, row: int, info: dict) -> None:
         """Render state as text.
 
@@ -248,20 +335,30 @@ class FileTableManager:
         if 'Completed:' in state:
             result_msg = state.replace('Completed:', '').strip()
             state_item.setForeground(QColor('#388e3c'))  # Green
-            state_item.setText(f"✅ {result_msg}")
+            state_item.setText(
+                t("video_converter.table.state_completed", f"✅ {result_msg}", message=result_msg)
+            )
         elif 'Failed:' in state or 'Error' in state:
             error_msg = state.replace('Failed:', '').replace('Error:', '').strip()
             state_item.setForeground(QColor('#d32f2f'))  # Red
-            state_item.setText(f"❌ {error_msg}")
+            state_item.setText(
+                t("video_converter.table.state_failed", f"❌ {error_msg}", message=error_msg)
+            )
         elif 'Pending' in state:
             if is_converted:
-                state_item.setText("⏳ Pending (converted)")
+                state_item.setText(
+                    t("video_converter.table.state_pending_converted", "⏳ Pending (converted)")
+                )
                 state_item.setForeground(QColor('#FF9800'))
             else:
-                state_item.setText("⏳ Pending")
+                state_item.setText(
+                    t("video_converter.table.state_pending", "⏳ Pending")
+                )
                 state_item.setForeground(QColor('#666'))
         elif 'Stopped' in state:
-            state_item.setText("⏹️ Stopped")
+            state_item.setText(
+                t("video_converter.table.state_stopped", "⏹️ Stopped")
+            )
             state_item.setForeground(QColor('#666'))
 
         self.window.files_table.setItem(row, 2, state_item)
@@ -298,7 +395,9 @@ class FileTableManager:
 
             delete_btn = QPushButton("🗑️")
             delete_btn.setMaximumSize(25, 25)
-            delete_btn.setToolTip("Remove from list")
+            delete_btn.setToolTip(
+                t("video_converter.table.remove_tooltip", "Remove from list")
+            )
             delete_btn.clicked.connect(
                 lambda checked, p=path: self.window.remove_file(p)
             )
@@ -310,7 +409,13 @@ class FileTableManager:
             attempt = info.get('attempt', 1)
             action_item = QTableWidgetItem("⚙️")
             action_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            action_item.setToolTip(f"Conversion in progress (attempt {attempt})")
+            action_item.setToolTip(
+                t(
+                    "video_converter.table.conversion_in_progress",
+                    f"Conversion in progress (attempt {attempt})",
+                    attempt=attempt
+                )
+            )
             self.window.files_table.setItem(row, 4, action_item)
 
     def _update_labels(
@@ -331,12 +436,19 @@ class FileTableManager:
             if info.get('is_converted', False)
         )
 
-        label_text = (
-            f"{len(files_copy)} files "
-            f"({total_selected} selected, {format_size(total_size)})"
+        label_text = t(
+            "video_converter.table.summary",
+            f"{len(files_copy)} files ({total_selected} selected, {format_size(total_size)})",
+            total=len(files_copy),
+            selected=total_selected,
+            size=format_size(total_size)
         )
         if converted_count > 0:
-            label_text += f" - {converted_count} already converted"
+            label_text += t(
+                "video_converter.table.summary_converted",
+                f" - {converted_count} already converted",
+                converted=converted_count
+            )
 
         if hasattr(self.window, 'file_count_label'):
             self.window.file_count_label.setText(label_text)

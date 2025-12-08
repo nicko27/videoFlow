@@ -1,0 +1,62 @@
+{
+  "High Similarity (>90%)": {
+    "min_similarity": 90.0,
+    "max_similarity": 100.0,
+    "min_size_diff": null,
+    "max_size_diff": null,
+    "size_diff_percent": null,
+    "min_duration_diff": null,
+    "max_duration_diff": null,
+    "duration_diff_percent": null,
+    "path_pattern": null,
+    "exclude_pattern": null,
+    "case_sensitive": false,
+    "enabled": true,
+    "name": "High Similarity (>90%)"
+  },
+  "Exact Duplicates": {
+    "min_similarity": 99.5,
+    "max_similarity": 100.0,
+    "min_size_diff": null,
+    "max_size_diff": 0,
+    "size_diff_percent": null,
+    "min_duration_diff": null,
+    "max_duration_diff": 0.1,
+    "duration_diff_percent": null,
+    "path_pattern": null,
+    "exclude_pattern": null,
+    "case_sensitive": false,
+    "enabled": true,
+    "name": "Exact Duplicates"
+  },
+  "Similar Size (<10% diff)": {
+    "min_similarity": 80.0,
+    "max_similarity": 100.0,
+    "min_size_diff": null,
+    "max_size_diff": null,
+    "size_diff_percent": 10.0,
+    "min_duration_diff": null,
+    "max_duration_diff": null,
+    "duration_diff_percent": null,
+    "path_pattern": null,
+    "exclude_pattern": null,
+    "case_sensitive": false,
+    "enabled": true,
+    "name": "Similar Size (<10% diff)"
+  },
+  "Different Size (>20% diff)": {
+    "min_similarity": 85.0,
+    "max_similarity": 100.0,
+    "min_size_diff": null,
+    "max_size_diff": null,
+    "size_diff_percent": 20.0,
+    "min_duration_diff": null,
+    "max_duration_diff": null,
+    "duration_diff_percent": null,
+    "path_pattern": null,
+    "exclude_pattern": null,
+    "case_sensitive": false,
+    "enabled": true,
+    "name": "Different Size (>20% diff)"
+  }
+}

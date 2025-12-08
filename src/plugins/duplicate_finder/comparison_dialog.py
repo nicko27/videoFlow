@@ -88,14 +88,14 @@ class ComparisonDialog(QDialog):
         QTimer.singleShot(500, self.show_initial_position)
 
     def arrange_files_by_name(self):
-        """Intelligently arrange files to place the best quality file on the left.
+        """Intelligently arrange files to place the smallest file on the left.
 
-        Uses a priority system to determine which file is "better":
-        1. File without numbering/copy patterns (e.g., "(1)", "_copy")
-        2. Smaller file size (likely compressed less, better quality)
+        Uses a priority system to determine file arrangement:
+        1. Smaller file size on the left (PRIMARY - always wins)
+        2. File without numbering/copy patterns (if sizes equal)
         3. Alphabetical order (as tie-breaker)
 
-        The better file is placed on the left side for easier "keep left" decision.
+        The smallest file is placed on the left side.
 
         Note:
             Modifies self.file1 and self.file2 in place by swapping if needed.
@@ -112,20 +112,23 @@ class ComparisonDialog(QDialog):
                 logger.warning(f"Impossible d'obtenir la taille des fichiers: {e}")
                 file1_size = file2_size = 0
 
-            # Numbering/copy patterns
-            patterns = [r'\(\d+\)', r'_\d+', r' - Copy', r'Copy of ', r'Copy de ', r'copie']
-
-            file1_has_pattern = any(re.search(pattern, file1_name, re.IGNORECASE) for pattern in patterns)
-            file2_has_pattern = any(re.search(pattern, file2_name, re.IGNORECASE) for pattern in patterns)
-
-            # Priority 1: File without numbering/copy pattern on the left
-            if file1_has_pattern and not file2_has_pattern:
-                self.file1, self.file2 = self.file2, self.file1
-            elif not file1_has_pattern and not file2_has_pattern:
-                # Priority 2: Lighter file on the left (if sizes are different)
-                if file1_size > 0 and file2_size > 0 and file1_size > file2_size:
+            # Priority 1: SMALLEST file on the left (if sizes are different)
+            if file1_size > 0 and file2_size > 0 and file1_size != file2_size:
+                if file1_size > file2_size:
                     self.file1, self.file2 = self.file2, self.file1
-                elif file1_size == file2_size:
+                    logger.info(f"Swapped: smaller file now on left")
+            else:
+                # Only use pattern/name logic if sizes are equal or unavailable
+                # Numbering/copy patterns
+                patterns = [r'\(\d+\)', r'_\d+', r' - Copy', r'Copy of ', r'Copy de ', r'copie']
+
+                file1_has_pattern = any(re.search(pattern, file1_name, re.IGNORECASE) for pattern in patterns)
+                file2_has_pattern = any(re.search(pattern, file2_name, re.IGNORECASE) for pattern in patterns)
+
+                # Priority 2: File without numbering/copy pattern on the left
+                if file1_has_pattern and not file2_has_pattern:
+                    self.file1, self.file2 = self.file2, self.file1
+                elif file1_has_pattern == file2_has_pattern:
                     # Priority 3: Alphabetical order
                     if file1_name > file2_name:
                         self.file1, self.file2 = self.file2, self.file1

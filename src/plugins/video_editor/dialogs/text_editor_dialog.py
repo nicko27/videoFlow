@@ -18,6 +18,7 @@ from ..text_overlay import (
     AnimationType, TextAlignment
 )
 from ..text_templates import TextTemplates
+from src.core.i18n import t
 
 
 class TextEditorDialog(QDialog):
@@ -70,7 +71,7 @@ class TextEditorDialog(QDialog):
 
     def setup_ui(self):
         """Set up the dialog UI."""
-        self.setWindowTitle("Éditeur de Texte")
+        self.setWindowTitle(t("video_editor.dialog.text_editor.title", "Text Editor"))
         self.setMinimumWidth(900)
         self.setMinimumHeight(700)
 
@@ -81,28 +82,28 @@ class TextEditorDialog(QDialog):
 
         # Template tab
         template_tab = self._create_template_tab()
-        tabs.addTab(template_tab, "📋 Templates")
+        tabs.addTab(template_tab, t("video_editor.dialog.text_editor.tab_templates", "📋 Templates"))
 
         # Text tab
         text_tab = self._create_text_tab()
-        tabs.addTab(text_tab, "📝 Texte")
+        tabs.addTab(text_tab, t("video_editor.dialog.text_editor.tab_text", "📝 Text"))
 
         # Style tab
         style_tab = self._create_style_tab()
-        tabs.addTab(style_tab, "🎨 Style")
+        tabs.addTab(style_tab, t("video_editor.dialog.text_editor.tab_style", "🎨 Style"))
 
         # Position tab
         position_tab = self._create_position_tab()
-        tabs.addTab(position_tab, "📍 Position")
+        tabs.addTab(position_tab, t("video_editor.dialog.text_editor.tab_position", "📍 Position"))
 
         # Animation tab
         animation_tab = self._create_animation_tab()
-        tabs.addTab(animation_tab, "⚡ Animation")
+        tabs.addTab(animation_tab, t("video_editor.dialog.text_editor.tab_animation", "⚡ Animation"))
 
         layout.addWidget(tabs)
 
         # Preview section
-        preview_group = QGroupBox("Aperçu")
+        preview_group = QGroupBox(t("video_editor.dialog.text_editor.preview", "Preview"))
         preview_layout = QVBoxLayout()
 
         self.preview_label = QLabel()
@@ -128,11 +129,14 @@ class TextEditorDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        cancel_btn = QPushButton("Annuler")
+        cancel_btn = QPushButton(t("video_editor.dialog.text_editor.cancel", "Cancel"))
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
 
-        create_btn = QPushButton("Créer" if not self.existing_overlay else "Mettre à jour")
+        create_btn = QPushButton(
+            t("video_editor.dialog.text_editor.create", "Create") if not self.existing_overlay
+            else t("video_editor.dialog.text_editor.update", "Update")
+        )
         create_btn.setDefault(True)
         create_btn.clicked.connect(self.create_overlay)
         button_layout.addWidget(create_btn)
@@ -151,7 +155,7 @@ class TextEditorDialog(QDialog):
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
-        layout.addWidget(QLabel("<b>Choisir un modèle prédéfini</b>"))
+        layout.addWidget(QLabel(t("video_editor.dialog.text_editor.choose_template", "<b>Choose a preset template</b>")))
 
         # Template list
         self.template_list = QListWidget()
@@ -195,25 +199,25 @@ class TextEditorDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # Text input
-        layout.addWidget(QLabel("<b>Contenu du texte</b>"))
+        layout.addWidget(QLabel(t("video_editor.dialog.text_editor.text_content", "<b>Text Content</b>")))
 
         self.text_edit = QTextEdit()
-        self.text_edit.setPlaceholderText("Entrez votre texte ici...\n(Utilisez Entrée pour les retours à la ligne)")
+        self.text_edit.setPlaceholderText(t("video_editor.dialog.text_editor.text_placeholder", "Enter your text here...\n(Use Enter for line breaks)"))
         self.text_edit.setMaximumHeight(150)
         self.text_edit.textChanged.connect(self.on_text_changed)
         layout.addWidget(self.text_edit)
 
         # Timing group
-        timing_group = QGroupBox("Timing")
+        timing_group = QGroupBox(t("video_editor.dialog.text_editor.timing", "Timing"))
         timing_layout = QGridLayout()
 
-        timing_layout.addWidget(QLabel("Frame de début:"), 0, 0)
+        timing_layout.addWidget(QLabel(t("video_editor.dialog.text_editor.start_frame", "Start Frame:")), 0, 0)
         self.start_frame_spin = QSpinBox()
         self.start_frame_spin.setRange(0, self.video_info['duration_frames'])
         self.start_frame_spin.setValue(0)
         timing_layout.addWidget(self.start_frame_spin, 0, 1)
 
-        timing_layout.addWidget(QLabel("Frame de fin:"), 1, 0)
+        timing_layout.addWidget(QLabel(t("video_editor.dialog.text_editor.end_frame", "End Frame:")), 1, 0)
         self.end_frame_spin = QSpinBox()
         self.end_frame_spin.setRange(0, self.video_info['duration_frames'])
         self.end_frame_spin.setValue(150)

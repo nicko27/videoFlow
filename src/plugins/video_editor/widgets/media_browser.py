@@ -15,6 +15,7 @@ from typing import List
 import json
 import cv2
 from src.core.logger import Logger
+from src.core.i18n import t
 
 logger = Logger.get_logger('VideoEditor.MediaBrowser')
 
@@ -46,7 +47,7 @@ class MediaBrowser(QWidget):
         layout.setSpacing(10)
 
         # Header
-        header = QLabel("📁 Mes Fichiers")
+        header = QLabel(t("video_editor.media_browser.title", "📁 My Files"))
         header.setStyleSheet("""
             QLabel {
                 font-size: 16px;
@@ -58,7 +59,7 @@ class MediaBrowser(QWidget):
         layout.addWidget(header)
 
         # Import button (BIG and obvious)
-        import_btn = QPushButton("📂 Ouvrir une Vidéo")
+        import_btn = QPushButton(t("video_editor.media_browser.open_video", "📂 Open a Video"))
         import_btn.setMinimumHeight(50)
         import_btn.setStyleSheet("""
             QPushButton {
@@ -84,7 +85,7 @@ class MediaBrowser(QWidget):
         layout.addWidget(separator)
 
         # Recent files label
-        recent_label = QLabel("Fichiers Récents:")
+        recent_label = QLabel(t("video_editor.media_browser.recent_files", "Recent Files:"))
         recent_label.setStyleSheet("color: #ccc; font-size: 12px; padding: 5px;")
         layout.addWidget(recent_label)
 
@@ -114,7 +115,7 @@ class MediaBrowser(QWidget):
         layout.addWidget(self.recent_list)
 
         # Clear history button (small)
-        clear_btn = QPushButton("🗑 Effacer l'historique")
+        clear_btn = QPushButton(t("video_editor.media_browser.clear_history", "🗑 Clear History"))
         clear_btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;

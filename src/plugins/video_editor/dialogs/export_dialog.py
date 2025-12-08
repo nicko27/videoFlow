@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from src.core.logger import Logger
+from src.core.i18n import t
 
 logger = Logger.get_logger('VideoEditor.ExportDialog')
 
@@ -44,7 +45,7 @@ class ExportWorker(QThread):
 
             for idx, segment in enumerate(self.segments):
                 if self._stop:
-                    self.finished.emit(False, "Export annulé par l'utilisateur")
+                    self.finished.emit(False, t("video_editor.dialog.export.cancelled", "Export cancelled by user"))
                     return
 
                 # Calculate timestamps
@@ -116,7 +117,7 @@ class ExportWorker(QThread):
                 self.progress.emit(idx + 1, total_segments)
 
             if not self._stop:
-                self.finished.emit(True, f"{total_segments} segments exportés avec succès")
+                self.finished.emit(True, t("video_editor.dialog.export.success", "{count} segments exported successfully", count=total_segments))
 
         except Exception as e:
             error_msg = f"Export error: {str(e)}"
@@ -134,7 +135,7 @@ class ExportDialog(QDialog):
         self.fps = fps
         self.worker = None
 
-        self.setWindowTitle("Exporter les segments")
+        self.setWindowTitle(t("video_editor.dialog.export.title", "Export Segments"))
         self.setMinimumWidth(500)
 
         self.init_ui()
@@ -145,12 +146,12 @@ class ExportDialog(QDialog):
 
         # Info label
         info_label = QLabel(
-            f"<b>{len(self.segments)} segment(s)</b> à exporter en fichiers vidéo séparés"
+            t("video_editor.dialog.export.info", "<b>{count} segment(s)</b> to export as separate video files", count=len(self.segments))
         )
         layout.addWidget(info_label)
 
         # Output directory selection
-        dir_group = QGroupBox("Dossier de destination")
+        dir_group = QGroupBox(t("video_editor.dialog.export.output_folder", "Output Folder"))
         dir_layout = QVBoxLayout()
 
         dir_row = QHBoxLayout()
@@ -162,7 +163,7 @@ class ExportDialog(QDialog):
         self.output_dir_edit.setText(default_dir)
         dir_row.addWidget(self.output_dir_edit)
 
-        browse_btn = QPushButton("Parcourir...")
+        browse_btn = QPushButton(t("video_editor.dialog.export.browse", "Browse..."))
         browse_btn.clicked.connect(self.browse_output_dir)
         dir_row.addWidget(browse_btn)
 
@@ -171,27 +172,27 @@ class ExportDialog(QDialog):
         layout.addWidget(dir_group)
 
         # Export settings
-        settings_group = QGroupBox("Paramètres d'export")
+        settings_group = QGroupBox(t("video_editor.dialog.export.settings", "Export Settings"))
         settings_layout = QVBoxLayout()
 
         # File pattern
         pattern_row = QHBoxLayout()
-        pattern_row.addWidget(QLabel("Nom de fichier:"))
+        pattern_row.addWidget(QLabel(t("video_editor.dialog.export.filename", "Filename:")))
         self.file_pattern_edit = QLineEdit("{name}.mp4")
         self.file_pattern_edit.setToolTip(
-            "Utilisez {index} pour le numéro et {name} pour le nom du segment"
+            t("video_editor.dialog.export.filename_tooltip", "Use {index} for number and {name} for segment name")
         )
         pattern_row.addWidget(self.file_pattern_edit)
         settings_layout.addLayout(pattern_row)
 
         # Codec selection
         codec_row = QHBoxLayout()
-        codec_row.addWidget(QLabel("Codec vidéo:"))
+        codec_row.addWidget(QLabel(t("video_editor.dialog.export.codec", "Video Codec:")))
         self.codec_combo = QComboBox()
         self.codec_combo.addItems([
-            "libx264 (H.264 - Recommandé)",
-            "libx265 (H.265 - Meilleure compression)",
-            "copy (Copie directe - Plus rapide)"
+            t("video_editor.dialog.export.codec_h264", "libx264 (H.264 - Recommended)"),
+            t("video_editor.dialog.export.codec_h265", "libx265 (H.265 - Better compression)"),
+            t("video_editor.dialog.export.codec_copy", "copy (Direct copy - Faster)")
         ])
         self.codec_combo.currentIndexChanged.connect(self.on_codec_changed)
         codec_row.addWidget(self.codec_combo)
@@ -199,15 +200,15 @@ class ExportDialog(QDialog):
 
         # Quality setting
         quality_row = QHBoxLayout()
-        quality_row.addWidget(QLabel("Qualité:"))
+        quality_row.addWidget(QLabel(t("video_editor.dialog.export.quality", "Quality:")))
         self.quality_combo = QComboBox()
         self.quality_combo.addItems([
-            "Très haute (CRF 18)",
-            "Haute (CRF 23)",
-            "Moyenne (CRF 28)",
-            "Basse (CRF 32)"
+            t("video_editor.dialog.export.quality_very_high", "Very High (CRF 18)"),
+            t("video_editor.dialog.export.quality_high", "High (CRF 23)"),
+            t("video_editor.dialog.export.quality_medium", "Medium (CRF 28)"),
+            t("video_editor.dialog.export.quality_low", "Low (CRF 32)")
         ])
-        self.quality_combo.setCurrentIndex(1)  # Haute par défaut
+        self.quality_combo.setCurrentIndex(1)  # High by default
         quality_row.addWidget(self.quality_combo)
         settings_layout.addLayout(quality_row)
 
@@ -218,12 +219,12 @@ class ExportDialog(QDialog):
         buttons_layout = QHBoxLayout()
         buttons_layout.addStretch()
 
-        export_btn = QPushButton("Exporter")
+        export_btn = QPushButton(t("video_editor.dialog.export.export_btn", "Export"))
         export_btn.clicked.connect(self.start_export)
         export_btn.setDefault(True)
         buttons_layout.addWidget(export_btn)
 
-        cancel_btn = QPushButton("Annuler")
+        cancel_btn = QPushButton(t("video_editor.dialog.export.cancel", "Cancel"))
         cancel_btn.clicked.connect(self.reject)
         buttons_layout.addWidget(cancel_btn)
 
@@ -234,7 +235,7 @@ class ExportDialog(QDialog):
         """Open directory browser."""
         directory = QFileDialog.getExistingDirectory(
             self,
-            "Sélectionner le dossier de destination",
+            t("video_editor.dialog.export.select_folder", "Select output folder"),
             self.output_dir_edit.text()
         )
         if directory:
@@ -271,8 +272,8 @@ class ExportDialog(QDialog):
         if not output_dir:
             QMessageBox.warning(
                 self,
-                "Dossier requis",
-                "Veuillez sélectionner un dossier de destination."
+                t("video_editor.dialog.export.folder_required", "Folder Required"),
+                t("video_editor.dialog.export.select_folder_msg", "Please select an output folder.")
             )
             return
 
@@ -282,13 +283,13 @@ class ExportDialog(QDialog):
 
         # Create progress dialog
         progress = QProgressDialog(
-            "Export des segments en cours...",
-            "Annuler",
+            t("video_editor.dialog.export.exporting", "Exporting segments..."),
+            t("video_editor.dialog.export.cancel", "Cancel"),
             0,
             len(self.segments),
             self
         )
-        progress.setWindowTitle("Export en cours")
+        progress.setWindowTitle(t("video_editor.dialog.export.export_progress", "Export in Progress"))
         progress.setWindowModality(Qt.WindowModality.WindowModal)
         progress.setMinimumDuration(0)
         progress.setValue(0)
@@ -306,15 +307,15 @@ class ExportDialog(QDialog):
 
         def on_progress(current, total):
             progress.setValue(current)
-            progress.setLabelText(f"Export segment {current}/{total}...")
+            progress.setLabelText(t("video_editor.dialog.export.progress_segment", "Exporting segment {current}/{total}...", current=current, total=total))
 
         def on_finished(success, message):
             progress.close()
             if success:
-                QMessageBox.information(self, "Export terminé", message)
+                QMessageBox.information(self, t("video_editor.dialog.export.complete", "Export Complete"), message)
                 self.accept()
             else:
-                QMessageBox.warning(self, "Export échoué", message)
+                QMessageBox.warning(self, t("video_editor.dialog.export.failed", "Export Failed"), message)
 
         def on_error(error_msg):
             logger.warning(f"Export error: {error_msg}")

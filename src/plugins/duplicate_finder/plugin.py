@@ -3,14 +3,15 @@
 from PyQt6.QtGui import QAction
 from src.core.plugin_interface import PluginInterface
 from src.core.logger import Logger
+from src.core.i18n import t
 
 logger = Logger.get_logger('DuplicateFinder.Plugin')
 
 class DuplicateFinderPlugin(PluginInterface):
     def __init__(self):
         super().__init__()
-        self.name = "Duplicate Finder"
-        self.description = "Find duplicate videos in your library"
+        self.name = t("plugin.duplicate_finder.name", "Duplicate Finder")
+        self.description = t("plugin.duplicate_finder.description", "Find duplicate videos in your library")
         self.version = "1.0.0"
         self.window = None
         logger.debug("DuplicateFinder plugin initialized")

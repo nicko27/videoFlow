@@ -116,45 +116,7 @@ class SettingsManager(QObject):
 
             self.settings.endGroup()
 
-            # Load scene detection settings
-            self.settings.beginGroup("scene_detection")
-
-            self._load_widget_value(
-                widgets, 'scene_min_match_spin', 'min_match_ratio', 85.0, float
-            )
-            self._load_widget_value(
-                widgets, 'scene_min_duration_spin', 'min_duration', 10, int
-            )
-            self._load_widget_value(
-                widgets, 'scene_cache_size_spin', 'cache_size', 500, int
-            )
-
-            # Load precision mode (combobox)
-            if 'scene_precision_combo' in widgets and widgets['scene_precision_combo'] is not None:
-                precision = self.settings.value('precision_mode', 'balanced', type=str)
-                combo = widgets['scene_precision_combo']
-                # Find and set by text since items were added with addItems()
-                index = combo.findText(precision)
-                if index >= 0:
-                    combo.setCurrentIndex(index)
-
-            # Load algorithm choice (combobox)
-            if 'scene_algorithm_combo' in widgets and widgets['scene_algorithm_combo'] is not None:
-                algorithm = self.settings.value('algorithm', 'hash_index', type=str)
-                combo = widgets['scene_algorithm_combo']
-                # Find and set by text since items were added with addItems()
-                index = combo.findText(algorithm)
-                if index >= 0:
-                    combo.setCurrentIndex(index)
-
-            # Load checkbox state
-            if 'enable_scene_check' in widgets and widgets['enable_scene_check'] is not None:
-                enabled = self.settings.value('enabled', False, type=bool)
-                widgets['enable_scene_check'].setChecked(enabled)
-
-            self.settings.endGroup()
-
-            # Load subsequence verification settings
+            # Load subsequence verification settings (= Scene detection with Strategy 3)
             self.settings.beginGroup("subsequence_verification")
 
             # Enable checkbox
@@ -225,29 +187,6 @@ class SettingsManager(QObject):
 
             self._save_widget_value(widgets, 'hash_timeout_spin', 'hash_timeout')
             self._save_widget_value(widgets, 'comparison_timeout_spin', 'comparison_timeout')
-
-            self.settings.endGroup()
-
-            # Scene detection settings
-            self.settings.beginGroup("scene_detection")
-
-            self._save_widget_value(widgets, 'scene_min_match_spin', 'min_match_ratio')
-            self._save_widget_value(widgets, 'scene_min_duration_spin', 'min_duration')
-            self._save_widget_value(widgets, 'scene_cache_size_spin', 'cache_size')
-
-            # Save precision mode (combobox)
-            if 'scene_precision_combo' in widgets and widgets['scene_precision_combo'] is not None:
-                precision = widgets['scene_precision_combo'].currentText()
-                self.settings.setValue('precision_mode', precision)
-
-            # Save algorithm choice (combobox)
-            if 'scene_algorithm_combo' in widgets and widgets['scene_algorithm_combo'] is not None:
-                algorithm = widgets['scene_algorithm_combo'].currentText()
-                self.settings.setValue('algorithm', algorithm)
-
-            # Save checkbox state
-            if 'enable_scene_check' in widgets and widgets['enable_scene_check'] is not None:
-                self.settings.setValue('enabled', widgets['enable_scene_check'].isChecked())
 
             self.settings.endGroup()
 
@@ -360,8 +299,6 @@ class SettingsManager(QObject):
         widget_names = [
             'threshold_spin', 'hash_workers_spin', 'comparison_workers_spin',
             'batch_size_spin', 'hash_timeout_spin', 'comparison_timeout_spin',
-            'scene_min_match_spin', 'scene_min_duration_spin',
-            'scene_cache_size_spin', 'scene_precision_combo', 'enable_scene_check',
             'enable_subseq_verification', 'subseq_dct_threshold_spin',
             'subseq_sequence_threshold_spin', 'subseq_verification_workers_spin'
         ]
@@ -474,43 +411,6 @@ class SettingsManager(QObject):
             algorithm = widgets['comparison_algorithm_combo'].currentData()
             if algorithm:
                 config['comparison_algorithm'] = algorithm
-
-        # Add scene detection config if widgets exist
-        if 'enable_scene_check' in widgets and widgets['enable_scene_check'] is not None:
-            # Get enabled status
-            enabled = widgets['enable_scene_check'].isChecked()
-
-            # Get actual widget values (with defaults matching UI)
-            min_match_ratio = 0.85  # Default 85% from UI
-            min_duration = 10  # Default 10 seconds from UI
-            cache_size = 500  # Default from UI
-            precision_mode = 'balanced'  # Default from UI
-            algorithm = 'hash_index'  # Default: Hash Index (fastest)
-
-            # Override with actual widget values if available
-            if 'scene_min_match_spin' in widgets and widgets['scene_min_match_spin'] is not None:
-                min_match_ratio = widgets['scene_min_match_spin'].value() / 100.0  # Convert percentage to ratio
-
-            if 'scene_min_duration_spin' in widgets and widgets['scene_min_duration_spin'] is not None:
-                min_duration = widgets['scene_min_duration_spin'].value()
-
-            if 'scene_cache_size_spin' in widgets and widgets['scene_cache_size_spin'] is not None:
-                cache_size = widgets['scene_cache_size_spin'].value()
-
-            if 'scene_precision_combo' in widgets and widgets['scene_precision_combo'] is not None:
-                precision_mode = widgets['scene_precision_combo'].currentData() or 'balanced'
-
-            if 'scene_algorithm_combo' in widgets and widgets['scene_algorithm_combo'] is not None:
-                algorithm = widgets['scene_algorithm_combo'].currentData() or 'hash_index'
-
-            config['scene_detection'] = {
-                'enabled': enabled,
-                'precision_mode': precision_mode,
-                'algorithm': algorithm,
-                'min_match_ratio': min_match_ratio,
-                'min_duration': min_duration,
-                'cache_size': cache_size
-            }
 
         return config
 

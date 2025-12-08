@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QThread
 from PyQt6.QtGui import QFont
 from src.core.logger import Logger
+from src.core.i18n import t
 
 logger = Logger.get_logger('DuplicateFinder.AdvancedProgressDialog')
 
@@ -86,7 +87,9 @@ class AdvancedProgressDialog(QDialog):
             parent: Parent widget
         """
         super().__init__(parent)
-        self.setWindowTitle("🎬 Détection de Scènes - Analyse en cours")
+        self.setWindowTitle(
+            t("duplicate_finder.progress.title", "🎬 Détection de Scènes - Analyse en cours")
+        )
         self.setMinimumWidth(600)
         self.setMinimumHeight(400)
         self.setModal(True)
@@ -107,15 +110,16 @@ class AdvancedProgressDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
 
         # Header
-        header = QLabel("🎬 Détection de Scènes")
+        header = QLabel(t("duplicate_finder.progress.header", "🎬 Détection de Scènes"))
         header.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(header)
 
         # Description
-        desc = QLabel(
+        desc = QLabel(t(
+            "duplicate_finder.progress.desc",
             "Analyse en 3 niveaux : Audio + Visual + Confirmation"
-        )
+        ))
         desc.setWordWrap(True)
         desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
         desc.setStyleSheet("color: #6C757D; font-size: 11px;")
@@ -129,30 +133,30 @@ class AdvancedProgressDialog(QDialog):
 
         # Level 1 Group
         self.level1_group = self.create_level_group(
-            "🔍 Niveau 1 - Audio Court",
-            "Filtrage rapide (30s)"
+            t("duplicate_finder.progress.level1", "🔍 Niveau 1 - Audio Court"),
+            t("duplicate_finder.progress.level1_desc", "Filtrage rapide (30s)")
         )
         layout.addWidget(self.level1_group)
 
         # Level 2 Group
         self.level2_group = self.create_level_group(
-            "🎵 Niveau 2 - Audio Long",
-            "Analyse approfondie (120s)"
+            t("duplicate_finder.progress.level2", "🎵 Niveau 2 - Audio Long"),
+            t("duplicate_finder.progress.level2_desc", "Analyse approfondie (120s)")
         )
         layout.addWidget(self.level2_group)
 
         # Level 3 Group
         self.level3_group = self.create_level_group(
-            "👁️ Niveau 3 - Visuel",
-            "Confirmation par images"
+            t("duplicate_finder.progress.level3", "👁️ Niveau 3 - Visuel"),
+            t("duplicate_finder.progress.level3_desc", "Confirmation par images")
         )
         layout.addWidget(self.level3_group)
 
         # Overall stats
-        stats_group = QGroupBox("📊 Statistiques")
+        stats_group = QGroupBox(t("duplicate_finder.progress.stats", "📊 Statistiques"))
         stats_layout = QVBoxLayout(stats_group)
 
-        self.stats_label = QLabel("En attente...")
+        self.stats_label = QLabel(t("duplicate_finder.progress.waiting", "En attente..."))
         self.stats_label.setStyleSheet("font-family: 'Courier New'; font-size: 10px;")
         stats_layout.addWidget(self.stats_label)
 
@@ -162,7 +166,7 @@ class AdvancedProgressDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.cancel_button = QPushButton("❌ Annuler")
+        self.cancel_button = QPushButton(t("duplicate_finder.progress.stop", "⏹️ Stop"))
         self.cancel_button.setMinimumWidth(120)
         self.cancel_button.setMinimumHeight(35)
         self.cancel_button.setStyleSheet("""
@@ -212,7 +216,7 @@ class AdvancedProgressDialog(QDialog):
         layout.addWidget(progress_bar)
 
         # Status label
-        status_label = QLabel("En attente...")
+        status_label = QLabel(t("duplicate_finder.progress.waiting", "En attente..."))
         status_label.setStyleSheet("color: #495057; font-size: 10px; font-style: italic;")
         layout.addWidget(status_label)
 
@@ -275,12 +279,18 @@ class AdvancedProgressDialog(QDialog):
         overall_pct = (completed_items / total_items * 100) if total_items > 0 else 0
 
         # Format stats
-        stats_text = (
+        stats_text = t(
+            "duplicate_finder.progress.stats_summary",
             f"Progression globale: {overall_pct:.1f}%\n"
             f"Temps écoulé: {elapsed:.1f}s\n"
             f"Niveau 1: {l1_current}/{l1_total}\n"
             f"Niveau 2: {l2_current}/{l2_total}\n"
-            f"Niveau 3: {l3_current}/{l3_total}"
+            f"Niveau 3: {l3_current}/{l3_total}",
+            overall=f"{overall_pct:.1f}%",
+            elapsed=f"{elapsed:.1f}s",
+            l1=f"{l1_current}/{l1_total}",
+            l2=f"{l2_current}/{l2_total}",
+            l3=f"{l3_current}/{l3_total}"
         )
 
         self.stats_label.setText(stats_text)
@@ -318,9 +328,11 @@ class AdvancedProgressDialog(QDialog):
 
         reply = QMessageBox.question(
             self,
-            "Confirmation",
-            "Voulez-vous vraiment annuler l'analyse en cours ?\n\n"
-            "Les résultats partiels seront perdus.",
+            t("duplicate_finder.progress.cancel_title", "Confirmation"),
+            t(
+                "duplicate_finder.progress.cancel_body",
+                "Voulez-vous vraiment annuler l'analyse en cours ?\n\nLes résultats partiels seront perdus."
+            ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
 
@@ -330,8 +342,12 @@ class AdvancedProgressDialog(QDialog):
             if self.analysis_thread and self.analysis_thread.isRunning():
                 self.analysis_thread.stop()
                 self.cancel_button.setEnabled(False)
-                self.cancel_button.setText("⏳ Annulation...")
-                self.stats_label.setText("Arrêt en cours...")
+                self.cancel_button.setText(
+                    t("duplicate_finder.progress.cancelling", "⏳ Annulation...")
+                )
+                self.stats_label.setText(
+                    t("duplicate_finder.progress.stopping", "Arrêt en cours...")
+                )
 
     def on_analysis_complete(self, report: dict):
         """
@@ -344,16 +360,24 @@ class AdvancedProgressDialog(QDialog):
 
         # Show completion
         self.stats_label.setText(
-            f"✅ ANALYSE TERMINÉE\n\n"
-            f"Duplicates confirmés: {report['confirmed_duplicates']}\n"
-            f"Temps total: {report['total_time']:.1f}s\n"
-            f"Confiance haute: {report['confidence_high']}\n"
-            f"Confiance moyenne: {report['confidence_medium']}\n"
-            f"Confiance basse: {report['confidence_low']}"
+            t(
+                "duplicate_finder.progress.complete_summary",
+                f"✅ ANALYSE TERMINÉE\n\n"
+                f"Duplicates confirmés: {report['confirmed_duplicates']}\n"
+                f"Temps total: {report['total_time']:.1f}s\n"
+                f"Confiance haute: {report['confidence_high']}\n"
+                f"Confiance moyenne: {report['confidence_medium']}\n"
+                f"Confiance basse: {report['confidence_low']}",
+                confirmed=report.get('confirmed_duplicates', 0),
+                total_time=f"{report.get('total_time', 0):.1f}s",
+                high=report.get('confidence_high', 0),
+                medium=report.get('confidence_medium', 0),
+                low=report.get('confidence_low', 0)
+            )
         )
 
         # Update button
-        self.cancel_button.setText("✓ Fermer")
+        self.cancel_button.setText(t("duplicate_finder.progress.close", "Close"))
         self.cancel_button.setStyleSheet("""
             QPushButton {
                 background-color: #28A745;
@@ -382,8 +406,12 @@ class AdvancedProgressDialog(QDialog):
 
         QMessageBox.critical(
             self,
-            "Erreur d'Analyse",
-            f"Une erreur s'est produite pendant l'analyse :\n\n{error_message}"
+            t("duplicate_finder.progress.error_title", "Erreur d'Analyse"),
+            t(
+                "duplicate_finder.progress.error_body",
+                f"Une erreur s'est produite pendant l'analyse :\n\n{error_message}",
+                error=error_message
+            )
         )
 
         self.reject()

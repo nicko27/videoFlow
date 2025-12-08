@@ -173,21 +173,21 @@ class VideoDatabase:
         logger.info(f"Database initialized with connection pool: {self.db_path}")
     
     def _ensure_database_exists(self):
-        """S'asone que la base de données et ses tables existent - UNE SEULE FOIS"""
+        """Ensure database and its tables exist - ONLY ONCE"""
         if self._initialized:
             return
-            
+
         try:
-            # Crée le répertoire parent si nécessaire
+            # Create parent directory if necessary
             db_dir = os.path.dirname(self.db_path)
             if db_dir and not os.path.exists(db_dir):
                 os.makedirs(db_dir, exist_ok=True)
-            
-            # Initialise la structure
+
+            # Initialize structure
             self.init_database()
             self._initialized = True
-            
-            # Marque toutes les tables comme existantes
+
+            # Mark all tables as existing
             self._tables_exist = {
                 'video_files': True,
                 'comparisons': True,
@@ -202,23 +202,23 @@ class VideoDatabase:
             }
                 
         except Exception as e:
-            logger.error(f"Error during l'initialization of the DB: {e}")
+            logger.error(f"Error during database initialization: {e}")
             raise
     
     def init_database(self):
-        """Initialise la structure of the base de données - AVEC MIGRATION CORRIGÉE"""
+        """Initialize database structure - WITH CORRECTED MIGRATION"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                
-                # Active les optimisations SQLite
+
+                # Enable SQLite optimizations
                 cursor.execute("PRAGMA journal_mode=WAL")
                 cursor.execute("PRAGMA synchronous=NORMAL")
                 cursor.execute("PRAGMA cache_size=10000")
                 cursor.execute("PRAGMA temp_store=MEMORY")
                 cursor.execute("PRAGMA foreign_keys=ON")
-                
-                # ÉTAPE 1: Crée les tables de base SANS ignore_type
+
+                # STEP 1: Create base tables WITHOUT ignore_type
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS video_files (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -252,8 +252,8 @@ class VideoDatabase:
                         UNIQUE(file1_id, file2_id)
                     )
                 ''')
-                
-                # ÉTAPE 2: Crée la table ignored_pairs SANS ignore_type d'abord
+
+                # STEP 2: Create ignored_pairs table WITHOUT ignore_type first
                 cursor.execute('''
                     CREATE TABLE IF NOT EXISTS ignored_pairs (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -311,6 +311,24 @@ class VideoDatabase:
                     )
                 ''')
 
+                # Table for dense hashes (frame-by-frame hashes for subsequence detection)
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS dense_hashes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        video_id INTEGER UNIQUE,
+                        dense_hash BLOB NOT NULL,
+                        sample_interval REAL NOT NULL,
+                        duration REAL NOT NULL,
+                        num_frames INTEGER NOT NULL,
+                        modification_time REAL NOT NULL,
+                        file_size INTEGER NOT NULL,
+                        params_hash TEXT,
+                        params_json TEXT,
+                        computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (video_id) REFERENCES video_files (id) ON DELETE CASCADE
+                    )
+                ''')
+
                 # ═══════════════════════════════════════════════════════════
                 # ADVANCED 3-LEVEL MODE TABLES
                 # ═══════════════════════════════════════════════════════════
@@ -324,6 +342,8 @@ class VideoDatabase:
                         signature_bands TEXT,
                         n_bands INTEGER,
                         n_rows INTEGER,
+                        params_hash TEXT,
+                        params_json TEXT,
                         computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         fingerprint_version INTEGER DEFAULT 1,
                         FOREIGN KEY (video_id) REFERENCES video_files (id) ON DELETE CASCADE
@@ -340,6 +360,8 @@ class VideoDatabase:
                         similarity_score REAL,
                         window_duration INTEGER,
                         window_start REAL,
+                        params_hash TEXT,
+                        params_json TEXT,
                         compared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (file1_id) REFERENCES video_files (id) ON DELETE CASCADE,
                         FOREIGN KEY (file2_id) REFERENCES video_files (id) ON DELETE CASCADE
@@ -358,6 +380,8 @@ class VideoDatabase:
                         frames_similar INTEGER,
                         similarity_rate REAL,
                         frame_indices TEXT,
+                        params_hash TEXT,
+                        params_json TEXT,
                         compared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (file1_id) REFERENCES video_files (id) ON DELETE CASCADE,
                         FOREIGN KEY (file2_id) REFERENCES video_files (id) ON DELETE CASCADE
@@ -381,6 +405,10 @@ class VideoDatabase:
                         start_time REAL NOT NULL,
                         duration REAL NOT NULL,
                         sequence_score REAL NOT NULL,
+                        config_hash TEXT,
+                        num_samples INTEGER,
+                        warmup_seconds REAL,
+                        execution_time REAL,
                         -- Verification results
                         accepted BOOLEAN NOT NULL,
                         scene_cuts_score REAL NOT NULL,
@@ -413,6 +441,97 @@ class VideoDatabase:
                     )
                 ''')
 
+                # ═══════════════════════════════════════════════════════════
+                # PIPELINE/METHOD CONFIGS & RUNS (for benchmarks/debug)
+                # ═══════════════════════════════════════════════════════════
+
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS pipeline_configs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        config_hash TEXT UNIQUE NOT NULL,
+                        mode TEXT,
+                        config_json TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS method_configs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        method_name TEXT NOT NULL,
+                        params_hash TEXT NOT NULL,
+                        params_json TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(method_name, params_hash)
+                    )
+                ''')
+
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS verification_runs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        pipeline_config_id INTEGER,
+                        short_video_id INTEGER NOT NULL,
+                        long_video_id INTEGER NOT NULL,
+                        start_time REAL NOT NULL,
+                        duration REAL NOT NULL,
+                        sequence_score REAL,
+                        accepted BOOLEAN,
+                        total_time REAL,
+                        run_label TEXT,
+                        debug_flag BOOLEAN DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (pipeline_config_id) REFERENCES pipeline_configs(id) ON DELETE SET NULL,
+                        FOREIGN KEY (short_video_id) REFERENCES video_files(id) ON DELETE CASCADE,
+                        FOREIGN KEY (long_video_id) REFERENCES video_files(id) ON DELETE CASCADE
+                    )
+                ''')
+
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS verification_method_results (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        run_id INTEGER NOT NULL,
+                        method_config_id INTEGER,
+                        method_name TEXT NOT NULL,
+                        accepted BOOLEAN,
+                        primary_score REAL,
+                        threshold REAL,
+                        execution_time REAL,
+                        extra_json TEXT,
+                        FOREIGN KEY (run_id) REFERENCES verification_runs(id) ON DELETE CASCADE,
+                        FOREIGN KEY (method_config_id) REFERENCES method_configs(id) ON DELETE SET NULL
+                    )
+                ''')
+
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS debug_labels (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        short_video_id INTEGER NOT NULL,
+                        long_video_id INTEGER NOT NULL,
+                        label TEXT NOT NULL,
+                        notes TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(short_video_id, long_video_id, label),
+                        FOREIGN KEY (short_video_id) REFERENCES video_files(id) ON DELETE CASCADE,
+                        FOREIGN KEY (long_video_id) REFERENCES video_files(id) ON DELETE CASCADE
+                    )
+                ''')
+
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS video_hashes (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        video_id INTEGER NOT NULL,
+                        method_name TEXT NOT NULL,
+                        params_hash TEXT NOT NULL,
+                        params_json TEXT NOT NULL,
+                        hash_blob BLOB NOT NULL,
+                        modification_time REAL NOT NULL,
+                        file_size INTEGER NOT NULL,
+                        computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (video_id) REFERENCES video_files(id) ON DELETE CASCADE,
+                        UNIQUE(video_id, method_name, params_hash)
+                    )
+                ''')
+
                 # STEP 3: Check and add ignore_type column if necessary (migration)
                 cursor.execute("PRAGMA table_info(ignored_pairs)")
                 columns = [column[1] for column in cursor.fetchall()]
@@ -434,8 +553,120 @@ class VideoDatabase:
                     logger.info("Adding audio_fingerprint column to video_files table")
                     cursor.execute("ALTER TABLE video_files ADD COLUMN audio_fingerprint BLOB")
                     logger.info("Audio fingerprint column added")
-                
-                # ÉTAPE 4: Crée les index
+
+                # STEP 5: verification_cache migrations (new columns)
+                cursor.execute("PRAGMA table_info(verification_cache)")
+                verification_cols = [column[1] for column in cursor.fetchall()]
+
+                if 'config_hash' not in verification_cols:
+                    cursor.execute("ALTER TABLE verification_cache ADD COLUMN config_hash TEXT")
+                if 'num_samples' not in verification_cols:
+                    cursor.execute("ALTER TABLE verification_cache ADD COLUMN num_samples INTEGER")
+                if 'warmup_seconds' not in verification_cols:
+                    cursor.execute("ALTER TABLE verification_cache ADD COLUMN warmup_seconds REAL")
+                if 'execution_time' not in verification_cols:
+                    cursor.execute("ALTER TABLE verification_cache ADD COLUMN execution_time REAL")
+
+                # STEP 6: add params_hash/params_json to caches if missing
+                cursor.execute("PRAGMA table_info(lsh_fingerprints)")
+                lsh_cols = [column[1] for column in cursor.fetchall()]
+                if 'params_hash' not in lsh_cols:
+                    cursor.execute("ALTER TABLE lsh_fingerprints ADD COLUMN params_hash TEXT")
+                if 'params_json' not in lsh_cols:
+                    cursor.execute("ALTER TABLE lsh_fingerprints ADD COLUMN params_json TEXT")
+
+                cursor.execute("PRAGMA table_info(dense_hashes)")
+                dense_cols = [column[1] for column in cursor.fetchall()]
+                if 'params_hash' not in dense_cols:
+                    cursor.execute("ALTER TABLE dense_hashes ADD COLUMN params_hash TEXT")
+                if 'params_json' not in dense_cols:
+                    cursor.execute("ALTER TABLE dense_hashes ADD COLUMN params_json TEXT")
+
+                cursor.execute("PRAGMA table_info(level2_long_audio)")
+                l2_cols = [column[1] for column in cursor.fetchall()]
+                if 'params_hash' not in l2_cols:
+                    cursor.execute("ALTER TABLE level2_long_audio ADD COLUMN params_hash TEXT")
+                if 'params_json' not in l2_cols:
+                    cursor.execute("ALTER TABLE level2_long_audio ADD COLUMN params_json TEXT")
+
+                cursor.execute("PRAGMA table_info(level3_phash)")
+                l3_cols = [column[1] for column in cursor.fetchall()]
+                if 'params_hash' not in l3_cols:
+                    cursor.execute("ALTER TABLE level3_phash ADD COLUMN params_hash TEXT")
+                if 'params_json' not in l3_cols:
+                    cursor.execute("ALTER TABLE level3_phash ADD COLUMN params_json TEXT")
+
+                # STEP 4: Benchmark system tables
+                # ═══════════════════════════════════════════════════════════
+                # BENCHMARK SYSTEM TABLES
+                # ═══════════════════════════════════════════════════════════
+
+                # Table for saved user pipelines
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS saved_pipelines (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT UNIQUE NOT NULL,
+                        description TEXT,
+                        mode TEXT NOT NULL,
+                        methods_json TEXT NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_used_at TIMESTAMP,
+                        use_count INTEGER DEFAULT 0
+                    )
+                ''')
+
+                # Table for test pairs (ground truth for benchmarking)
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS test_pairs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        video1_path TEXT NOT NULL,
+                        video2_path TEXT NOT NULL,
+                        expected TEXT NOT NULL CHECK(expected IN ('positive', 'negative', 'unknown')),
+                        start_time REAL DEFAULT 0.0,
+                        duration REAL,
+                        sequence_score REAL DEFAULT 100.0,
+                        notes TEXT,
+                        test_set_name TEXT DEFAULT 'default',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(video1_path, video2_path, test_set_name)
+                    )
+                ''')
+
+                # Table for benchmark runs (batch benchmarks)
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS benchmark_runs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        run_label TEXT NOT NULL,
+                        test_set_name TEXT NOT NULL,
+                        total_pairs INTEGER NOT NULL,
+                        pipelines_count INTEGER NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        completed_at TIMESTAMP,
+                        status TEXT DEFAULT 'running'
+                    )
+                ''')
+
+                # Table for benchmark results (per pipeline in a run)
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS benchmark_results (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        benchmark_run_id INTEGER NOT NULL,
+                        pipeline_name TEXT NOT NULL,
+                        pipeline_config_json TEXT NOT NULL,
+                        tp INTEGER DEFAULT 0,
+                        fp INTEGER DEFAULT 0,
+                        tn INTEGER DEFAULT 0,
+                        fn INTEGER DEFAULT 0,
+                        precision REAL,
+                        recall REAL,
+                        f1_score REAL,
+                        total_time REAL,
+                        per_pair_results_json TEXT,
+                        FOREIGN KEY (benchmark_run_id) REFERENCES benchmark_runs(id) ON DELETE CASCADE
+                    )
+                ''')
+
+                # STEP 5: Create indexes
                 index_commands = [
                     "CREATE INDEX IF NOT EXISTS idx_file_path ON video_files(file_path)",
                     "CREATE INDEX IF NOT EXISTS idx_file_size ON video_files(file_size)",
@@ -459,34 +690,50 @@ class VideoDatabase:
                     # Advanced 3-level mode indexes
                     "CREATE INDEX IF NOT EXISTS idx_lsh_video ON lsh_fingerprints(video_id)",
                     "CREATE INDEX IF NOT EXISTS idx_lsh_computed_at ON lsh_fingerprints(computed_at)",
+                    "CREATE INDEX IF NOT EXISTS idx_lsh_params ON lsh_fingerprints(params_hash)",
                     "CREATE INDEX IF NOT EXISTS idx_level2_pair ON level2_long_audio(pair_id)",
                     "CREATE INDEX IF NOT EXISTS idx_level2_files ON level2_long_audio(file1_id, file2_id)",
                     "CREATE INDEX IF NOT EXISTS idx_level2_similarity ON level2_long_audio(similarity_score)",
+                    "CREATE INDEX IF NOT EXISTS idx_level2_params ON level2_long_audio(params_hash)",
                     "CREATE INDEX IF NOT EXISTS idx_level3_pair ON level3_phash(pair_id)",
                     "CREATE INDEX IF NOT EXISTS idx_level3_files ON level3_phash(file1_id, file2_id)",
                     "CREATE INDEX IF NOT EXISTS idx_level3_similarity ON level3_phash(similarity_rate)",
+                    "CREATE INDEX IF NOT EXISTS idx_level3_params ON level3_phash(params_hash)",
                     "CREATE INDEX IF NOT EXISTS idx_advanced_dup_status ON advanced_duplicates(status)",
                     "CREATE INDEX IF NOT EXISTS idx_advanced_dup_pair ON advanced_duplicates(pair_id)",
-                    "CREATE INDEX IF NOT EXISTS idx_advanced_dup_confidence ON advanced_duplicates(confidence)"
+                    "CREATE INDEX IF NOT EXISTS idx_advanced_dup_confidence ON advanced_duplicates(confidence)",
+                    "CREATE INDEX IF NOT EXISTS idx_pipeline_config_hash ON pipeline_configs(config_hash)",
+                    "CREATE INDEX IF NOT EXISTS idx_method_config ON method_configs(method_name, params_hash)",
+                    "CREATE INDEX IF NOT EXISTS idx_verification_runs_videos ON verification_runs(short_video_id, long_video_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_verification_runs_pipeline ON verification_runs(pipeline_config_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_video_hashes ON video_hashes(video_id, method_name, params_hash)",
+                    # Benchmark system indexes
+                    "CREATE INDEX IF NOT EXISTS idx_saved_pipelines_name ON saved_pipelines(name)",
+                    "CREATE INDEX IF NOT EXISTS idx_test_pairs_set ON test_pairs(test_set_name)",
+                    "CREATE INDEX IF NOT EXISTS idx_test_pairs_expected ON test_pairs(expected)",
+                    "CREATE INDEX IF NOT EXISTS idx_benchmark_runs_label ON benchmark_runs(run_label)",
+                    "CREATE INDEX IF NOT EXISTS idx_benchmark_runs_status ON benchmark_runs(status)",
+                    "CREATE INDEX IF NOT EXISTS idx_benchmark_results_run ON benchmark_results(benchmark_run_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_benchmark_results_pipeline ON benchmark_results(pipeline_name)"
                 ]
-                
+
                 for cmd in index_commands:
                     cursor.execute(cmd)
-                
+
                 conn.commit()
-                logger.debug("Structure de base de données créée/vérifiée with migration")
+                logger.debug("Database structure created/verified with migration")
                 
         except Exception as e:
-            logger.error(f"Error during l'initialization of the base de données: {e}")
+            logger.error(f"Error during database initialization: {e}")
             raise
     
     def _table_exists(self, table_name):
-        """Checks si une table existe - AVEC CACHE"""
-        # Utilise le cache en first
+        """Check if a table exists - WITH CACHE"""
+        # Use cache first
         if table_name in self._tables_exist:
             return self._tables_exist[table_name]
-            
-        # Sinon vérifie une seule fois
+
+        # Otherwise check only once
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -526,33 +773,33 @@ class VideoDatabase:
         logger.info("Database connections closed")
     
     def file_needs_reanalysis(self, file_path):
-        """Checks si un file a été modifié - OPTIMISÉ"""
+        """Check if a file has been modified - OPTIMIZED"""
         if not os.path.exists(file_path):
             return True
-            
+
         try:
             current_mtime = os.path.getmtime(file_path)
             current_size = os.path.getsize(file_path)
-            
+
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    SELECT modification_time, file_size FROM video_files 
+                    SELECT modification_time, file_size FROM video_files
                     WHERE file_path = ?
                 ''', (file_path,))
-                
+
                 result = cursor.fetchone()
                 if not result:
-                    return True  # File pas en base
-                
+                    return True  # File not in database
+
                 stored_mtime, stored_size = result
-                
-                # Checks si modifié (tolérance de 1 seconde pour les systèmes de files)
-                return (abs(current_mtime - stored_mtime) > 1.0 or 
+
+                # Check if modified (1 second tolerance for file systems)
+                return (abs(current_mtime - stored_mtime) > 1.0 or
                        current_size != stored_size)
                 
         except Exception as e:
-            logger.error(f"Error vérification modification {file_path}: {e}")
+            logger.error(f"Error checking modification {file_path}: {e}")
             return True
     
     def store_video_hash(self, file_path, hash_data, duration, width=None, height=None,
@@ -762,12 +1009,12 @@ class VideoDatabase:
         return None
 
     def get_cached_comparison(self, file1_path, file2_path):
-        """Récupère un résultat de comparison - OPTIMISÉ"""
+        """Retrieve a comparison result - OPTIMIZED"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # Requête optimisée with index
+
+                # Optimized query with index
                 cursor.execute('''
                     SELECT c.similarity
                     FROM comparisons c
@@ -782,31 +1029,31 @@ class VideoDatabase:
                     return result[0]
                     
         except Exception as e:
-            logger.error(f"Error récupération comparison: {e}")
+            logger.error(f"Error retrieving comparison: {e}")
             
         return None
     
-    def store_comparison(self, file1_path, file2_path, similarity, 
+    def store_comparison(self, file1_path, file2_path, similarity,
                         comparison_method="optimized", is_early_exit=False, computation_time=0.0):
-        """Stocke un résultat de comparison - OPTIMISÉ with batch"""
+        """Store a comparison result - OPTIMIZED with batch"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # Récupère les IDs en une seule requête
+
+                # Retrieve IDs in a single query
                 cursor.execute('''
-                    SELECT 
+                    SELECT
                         (SELECT id FROM video_files WHERE file_path = ?) as id1,
                         (SELECT id FROM video_files WHERE file_path = ?) as id2
                 ''', (file1_path, file2_path))
-                
+
                 result = cursor.fetchone()
                 if not result or not result[0] or not result[1]:
                     return False
-                
+
                 file1_id, file2_id = result
-                
-                # Asone l'ordre pour éviter les doublons
+
+                # Ensure order to avoid duplicates
                 if file1_id > file2_id:
                     file1_id, file2_id = file2_id, file1_id
                 
@@ -820,17 +1067,17 @@ class VideoDatabase:
                 return True
                 
         except Exception as e:
-            logger.error(f"Error stockage comparison: {e}")
+            logger.error(f"Error storing comparison: {e}")
             return False
     
     def is_pair_ignored(self, file1_path, file2_path):
-        """Checks si une paire est ignorée - CORRIGÉ with ignore_type"""
+        """Check if a pair is ignored - CORRECTED with ignore_type"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # CORRECTION: Checks seulement les paires ignorées DÉFINITIVEMENT
-                # Utilise COALESCE pour gérer les anciennes entrées sans ignore_type
+
+                # CORRECTION: Check only PERMANENTLY ignored pairs
+                # Use COALESCE to handle old entries without ignore_type
                 cursor.execute('''
                     SELECT 1 FROM ignored_pairs ip
                     JOIN video_files v1 ON ip.file1_id = v1.id
@@ -844,7 +1091,7 @@ class VideoDatabase:
                 return cursor.fetchone() is not None
                 
         except Exception as e:
-            logger.error(f"Error vérification paire ignorée: {e}")
+            logger.error(f"Error checking ignored pair: {e}")
             
         return False
 
@@ -932,11 +1179,11 @@ class VideoDatabase:
 
                 result = cursor.fetchone()
                 files_count, comparisons_count, early_exits, ignored_perm, ignored_temp, ignored_total = result
-                
-                # Size of the base
+
+                # Database size
                 db_size = os.path.getsize(self.db_path) / 1024 if os.path.exists(self.db_path) else 0
-                
-                # Calcul du time économisé (estimé à 2s par comparison)
+
+                # Calculate time saved (estimated at 2s per comparison)
                 time_saved = comparisons_count * 2
                 
                 return {
@@ -952,7 +1199,7 @@ class VideoDatabase:
                 }
                 
         except Exception as e:
-            logger.error(f"Error récupération statistics: {e}")
+            logger.error(f"Error retrieving statistics: {e}")
             return {
                 'files_count': 0,
                 'comparisons_count': 0,
@@ -966,65 +1213,65 @@ class VideoDatabase:
             }
     
     def cleanup_missing_files(self):
-        """Nettoie la base des files qui n'existent plus"""
+        """Clean up database from files that no longer exist"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # Récupère tous les files
+
+                # Get all files
                 cursor.execute('SELECT id, file_path FROM video_files')
                 files = cursor.fetchall()
-                
+
                 missing_ids = []
                 for file_id, file_path in files:
                     if not os.path.exists(file_path):
                         missing_ids.append(file_id)
-                
+
                 if missing_ids:
-                    # Removes en une seule transaction
+                    # Remove in a single transaction
                     placeholders = ','.join('?' * len(missing_ids))
-                    
-                    # Removes les comparaisons
+
+                    # Remove comparisons
                     cursor.execute(f'''
-                        DELETE FROM comparisons 
+                        DELETE FROM comparisons
                         WHERE file1_id IN ({placeholders}) OR file2_id IN ({placeholders})
                     ''', missing_ids + missing_ids)
-                    
-                    # Removes les paires ignorées
+
+                    # Remove ignored pairs
                     cursor.execute(f'''
-                        DELETE FROM ignored_pairs 
+                        DELETE FROM ignored_pairs
                         WHERE file1_id IN ({placeholders}) OR file2_id IN ({placeholders})
                     ''', missing_ids + missing_ids)
-                    
-                    # Removes les doublons found
+
+                    # Remove found duplicates
                     cursor.execute(f'''
-                        DELETE FROM found_duplicates 
+                        DELETE FROM found_duplicates
                         WHERE file1_id IN ({placeholders}) OR file2_id IN ({placeholders})
                     ''', missing_ids + missing_ids)
-                    
-                    # Removes les files
+
+                    # Remove files
                     cursor.execute(f'DELETE FROM video_files WHERE id IN ({placeholders})', missing_ids)
                     
                     conn.commit()
-                    logger.info(f"Nettoyage base: {len(missing_ids)} files supprimés")
+                    logger.info(f"Database cleanup: {len(missing_ids)} files removed")
                     
                 return len(missing_ids)
                 
         except Exception as e:
-            logger.error(f"Error nettoyage base: {e}")
+            logger.error(f"Error cleaning database: {e}")
             return 0
     
     def auto_cleanup_on_access(self):
-        """Nettoie automatiquement lors des accès si nécessaire"""
-        # Nettoie seulement une fois par session
+        """Automatically clean up on access if necessary"""
+        # Clean up only once per session
         if not hasattr(self, '_cleaned_this_session'):
             self._cleaned_this_session = True
             removed = self.cleanup_missing_files()
             if removed > 0:
-                logger.info(f"Nettoyage automatique: {removed} files manquants supprimés")
-    
+                logger.info(f"Automatic cleanup: {removed} missing files removed")
+
     def clear_all_data(self):
-        """Vide complètement la base de données"""
+        """Completely empty the database"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -1041,11 +1288,11 @@ class VideoDatabase:
                 ''')
 
                 conn.commit()
-                logger.info("Base de données vidée et compactée")
+                logger.info("Database cleared and compacted")
                 return True
 
         except Exception as e:
-            logger.error(f"Error vidage base: {e}")
+            logger.error(f"Error clearing database: {e}")
             return False
     
     def mark_file_as_corrupted(self, file_path, error_message):
@@ -1062,7 +1309,7 @@ class VideoDatabase:
                 conn.commit()
                 
         except Exception as e:
-            logger.error(f"Error marquage file corrompu: {e}")
+            logger.error(f"Error marking corrupted file: {e}")
 
     def get_files_needing_analysis(self, file_paths):
         """Returns les files qui ont besoin d'être analysés - OPTIMISÉ"""
@@ -1075,25 +1322,25 @@ class VideoDatabase:
         with self.get_connection() as conn:
             cursor = conn.cursor()
             
-            # Récupère tous les files existants en une requête
+            # Retrieve all existing files in one query
             placeholders = ','.join('?' * len(file_paths))
             cursor.execute(f'''
-                SELECT file_path, modification_time, file_size 
-                FROM video_files 
+                SELECT file_path, modification_time, file_size
+                FROM video_files
                 WHERE file_path IN ({placeholders})
             ''', file_paths)
-            
+
             existing_files = {row[0]: (row[1], row[2]) for row in cursor.fetchall()}
-        
-        # Checks chaque file
+
+        # Check each file
         for file_path in file_paths:
             if not os.path.exists(file_path):
                 continue
-                
+
             if file_path not in existing_files:
                 files_to_analyze.append(file_path)
             else:
-                # Checks si modifié
+                # Check if modified
                 current_mtime = os.path.getmtime(file_path)
                 current_size = os.path.getsize(file_path)
                 stored_mtime, stored_size = existing_files[file_path]
@@ -1104,25 +1351,25 @@ class VideoDatabase:
         return files_to_analyze
     
     def store_found_duplicate(self, file1_path, file2_path, similarity):
-        """Stocke un doublon found pour récupération ultérieure"""
+        """Store a found duplicate for later retrieval"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # Récupère les IDs
+
+                # Retrieve IDs
                 cursor.execute('''
-                    SELECT 
+                    SELECT
                         (SELECT id FROM video_files WHERE file_path = ?) as id1,
                         (SELECT id FROM video_files WHERE file_path = ?) as id2
                 ''', (file1_path, file2_path))
-                
+
                 result = cursor.fetchone()
                 if not result or not result[0] or not result[1]:
                     return False
-                
+
                 file1_id, file2_id = result
-                
-                # Asone l'ordre
+
+                # Ensure order
                 if file1_id > file2_id:
                     file1_id, file2_id = file2_id, file1_id
                 
@@ -1136,7 +1383,7 @@ class VideoDatabase:
                 return True
                 
         except Exception as e:
-            logger.error(f"Error stockage doublon found: {e}")
+            logger.error(f"Error storing found duplicate: {e}")
             return False
     
     def get_pending_duplicates(self, limit: int = 1000, offset: int = 0):
@@ -1180,7 +1427,7 @@ class VideoDatabase:
             return []
     
     def update_duplicate_status(self, dup_id, status, action=None):
-        """Met à jour le statut d'un doublon"""
+        """Update duplicate status"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -1195,11 +1442,11 @@ class VideoDatabase:
                 return True
                 
         except Exception as e:
-            logger.error(f"Error mise à jour statut doublon: {e}")
+            logger.error(f"Error updating duplicate status: {e}")
             return False
     
     def clear_processed_duplicates(self):
-        """Removes les doublons déjà traités"""
+        """Remove already processed duplicates"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -1212,15 +1459,15 @@ class VideoDatabase:
                 deleted = cursor.rowcount
                 conn.commit()
                 
-                logger.info(f"Suppression de {deleted} doublons traités")
+                logger.info(f"Removed {deleted} processed duplicates")
                 return deleted
                 
         except Exception as e:
-            logger.error(f"Error suppression doublons traités: {e}")
+            logger.error(f"Error removing processed duplicates: {e}")
             return 0
     
     def get_duplicate_statistics(self):
-        """Récupère les statistics des doublons"""
+        """Retrieve duplicate statistics"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -1250,7 +1497,7 @@ class VideoDatabase:
                     }
                     
         except Exception as e:
-            logger.error(f"Error récupération stats doublons: {e}")
+            logger.error(f"Error retrieving duplicate stats: {e}")
             
         return {
             'total': 0,
@@ -1263,45 +1510,45 @@ class VideoDatabase:
         }
     
     def clear_temporary_ignores(self):
-        """Efface toutes les paires ignorées temporairement"""
+        """Clear all temporarily ignored pairs"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # Checks si ignore_type existe
+
+                # Check if ignore_type exists
                 cursor.execute("PRAGMA table_info(ignored_pairs)")
                 columns = [column[1] for column in cursor.fetchall()]
-                
+
                 if 'ignore_type' in columns:
                     cursor.execute('''
-                        DELETE FROM ignored_pairs 
+                        DELETE FROM ignored_pairs
                         WHERE ignore_type = 'temporary'
                     ''')
                 else:
-                    # Si pas de colonne ignore_type, ne fait rien (toutes sont permanentes)
+                    # If no ignore_type column, do nothing (all are permanent)
                     return 0
                 
                 deleted = cursor.rowcount
                 conn.commit()
                 
                 if deleted > 0:
-                    logger.info(f"Suppression de {deleted} paires ignorées temporairement")
+                    logger.info(f"Removed {deleted} temporarily ignored pairs")
                 
                 return deleted
                 
         except Exception as e:
-            logger.error(f"Error suppression ignores temporaires: {e}")
+            logger.error(f"Error removing temporary ignores: {e}")
             return 0
     
     def get_ignored_pairs_details(self):
-        """Récupère les details des paires ignorées"""
+        """Retrieve details of ignored pairs"""
         try:
             ignored_pairs = []
-            
+
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # Checks si ignore_type existe
+
+                # Check if ignore_type exists
                 cursor.execute("PRAGMA table_info(ignored_pairs)")
                 columns = [column[1] for column in cursor.fetchall()]
                 has_ignore_type = 'ignore_type' in columns
@@ -1338,7 +1585,7 @@ class VideoDatabase:
                 return ignored_pairs
                 
         except Exception as e:
-            logger.error(f"Error récupération details paires ignorées: {e}")
+            logger.error(f"Error retrieving ignored pairs details: {e}")
             return []
     
     def force_recreate_table(self, table_name):
@@ -1387,11 +1634,11 @@ class VideoDatabase:
                     cursor.execute("CREATE INDEX IF NOT EXISTS idx_ignored_type ON ignored_pairs(ignore_type)")
                     
                     conn.commit()
-                    logger.info(f"Table {table_name} recréée with success")
+                    logger.info(f"Table {table_name} recreated successfully")
                     return True
                     
         except Exception as e:
-            logger.error(f"Error recréation table {table_name}: {e}")
+            logger.error(f"Error recreating table {table_name}: {e}")
             return False
     
     def verify_database_integrity(self):
@@ -1405,7 +1652,7 @@ class VideoDatabase:
                 integrity_result = cursor.fetchone()
                 
                 if integrity_result[0] != "ok":
-                    logger.warning(f"Problème d'intégrité détecté: {integrity_result[0]}")
+                    logger.warning(f"Integrity problem detected: {integrity_result[0]}")
                     return False
                 
                 # Checks que toutes les tables existent
@@ -1415,7 +1662,7 @@ class VideoDatabase:
                 
                 missing_tables = [table for table in required_tables if table not in existing_tables]
                 if missing_tables:
-                    logger.warning(f"Tables manquantes: {missing_tables}")
+                    logger.warning(f"Missing tables: {missing_tables}")
                     return False
                 
                 # Checks la structure de ignored_pairs
@@ -1423,14 +1670,14 @@ class VideoDatabase:
                 columns = [column[1] for column in cursor.fetchall()]
                 
                 if 'ignore_type' not in columns:
-                    logger.info("Colonne ignore_type manquante - migration nécessaire")
+                    logger.info("Missing ignore_type column - migration required")
                     return False
-                
-                logger.info("Intégrité of the base de données vérifiée with success")
+
+                logger.info("Database integrity verified successfully")
                 return True
                 
         except Exception as e:
-            logger.error(f"Error vérification intégrité: {e}")
+            logger.error(f"Error checking integrity: {e}")
             return False
     
     def get_database_info(self):
@@ -1473,7 +1720,7 @@ class VideoDatabase:
             return info
 
         except Exception as e:
-            logger.error(f"Error récupération infos DB: {e}")
+            logger.error(f"Error retrieving DB info: {e}")
             return {'error': str(e)}
 
     # Subsequence detection methods
@@ -1708,13 +1955,18 @@ class VideoDatabase:
                         short_mtime, long_mtime,
                         short_size, long_size,
                         start_time, duration, sequence_score,
+                        config_hash, num_samples, warmup_seconds, execution_time,
                         accepted, scene_cuts_score, dct_score, rejection_reason
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     short_id, long_id,
                     short_stat.st_mtime, long_stat.st_mtime,
                     short_stat.st_size, long_stat.st_size,
                     start_time, duration, sequence_score,
+                    verification_result.get('config_hash'),
+                    verification_result.get('num_samples'),
+                    verification_result.get('warmup_seconds'),
+                    verification_result.get('execution_time'),
                     verification_result['accepted'],
                     verification_result['scene_cuts_score'],
                     verification_result['dct_score'],
@@ -1727,7 +1979,7 @@ class VideoDatabase:
         except Exception as e:
             logger.error(f"Error storing verification result: {e}")
 
-    def get_cached_verification(self, short_video_path, long_video_path, start_time, tolerance=0.5):
+    def get_cached_verification(self, short_video_path, long_video_path, start_time, tolerance=0.5, config_hash: str = None):
         """
         Get cached verification result if files haven't changed.
 
@@ -1769,7 +2021,8 @@ class VideoDatabase:
                         short_mtime, long_mtime,
                         short_size, long_size,
                         accepted, scene_cuts_score, dct_score,
-                        rejection_reason, sequence_score
+                        rejection_reason, sequence_score,
+                        config_hash, num_samples, warmup_seconds, execution_time
                     FROM verification_cache
                     WHERE short_video_id = ?
                       AND long_video_id = ?
@@ -1794,6 +2047,12 @@ class VideoDatabase:
                     logger.debug(f"Cache invalidated: files modified")
                     return None
 
+                # Invalidate if config hash provided and mismatching
+                cached_config_hash = result[9]
+                if config_hash and cached_config_hash and cached_config_hash != config_hash:
+                    logger.debug("Cache invalidated: config hash changed")
+                    return None
+
                 # Return cached result
                 return {
                     'accepted': bool(result[4]),
@@ -1801,6 +2060,10 @@ class VideoDatabase:
                     'dct_score': result[6],
                     'rejection_reason': result[7],
                     'sequence_score': result[8],
+                    'config_hash': cached_config_hash,
+                    'num_samples': result[10],
+                    'warmup_seconds': result[11],
+                    'execution_time': result[12],
                     'from_cache': True
                 }
 
@@ -1851,6 +2114,145 @@ class VideoDatabase:
             'avg_dct': 0.0,
             'avg_sequence': 0.0
         }
+
+    # ═══════════════════════════════════════════════════════════
+    # PIPELINE/METHOD CONFIGS & RUNS (for benchmarks/debug)
+    # ═══════════════════════════════════════════════════════════
+
+    def upsert_pipeline_config(self, config_hash: str, mode: str, config_json: str) -> int:
+        """Insert or get pipeline_config id."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id FROM pipeline_configs WHERE config_hash = ?",
+                (config_hash,)
+            )
+            row = cursor.fetchone()
+            if row:
+                return row[0]
+
+            cursor.execute(
+                "INSERT INTO pipeline_configs (config_hash, mode, config_json) VALUES (?, ?, ?)",
+                (config_hash, mode, config_json)
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def upsert_method_config(self, method_name: str, params_hash: str, params_json: str) -> int:
+        """Insert or get method_config id."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id FROM method_configs WHERE method_name = ? AND params_hash = ?",
+                (method_name, params_hash)
+            )
+            row = cursor.fetchone()
+            if row:
+                return row[0]
+
+            cursor.execute(
+                "INSERT INTO method_configs (method_name, params_hash, params_json) VALUES (?, ?, ?)",
+                (method_name, params_hash, params_json)
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def store_verification_run(self, pipeline_config_id: int, short_video_path: str, long_video_path: str,
+                               start_time: float, duration: float, sequence_score: float,
+                               accepted: bool, total_time: float, run_label: str = None,
+                               debug_flag: bool = False) -> int:
+        """Store a verification run (for benchmarks/debug)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            short_id = self._get_or_create_video_id(short_video_path, cursor)
+            long_id = self._get_or_create_video_id(long_video_path, cursor)
+
+            cursor.execute(
+                '''INSERT INTO verification_runs (
+                    pipeline_config_id, short_video_id, long_video_id,
+                    start_time, duration, sequence_score,
+                    accepted, total_time, run_label, debug_flag
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (
+                    pipeline_config_id, short_id, long_id,
+                    start_time, duration, sequence_score,
+                    accepted, total_time, run_label, int(debug_flag)
+                )
+            )
+            conn.commit()
+            return cursor.lastrowid
+
+    def store_verification_method_result(self, run_id: int, method_name: str, accepted: bool,
+                                         primary_score: float, threshold: float,
+                                         execution_time: float = None, extra_json: str = None,
+                                         method_config_id: int = None):
+        """Store a per-method result for a run."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                '''INSERT INTO verification_method_results (
+                    run_id, method_config_id, method_name, accepted,
+                    primary_score, threshold, execution_time, extra_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                (
+                    run_id, method_config_id, method_name, int(accepted),
+                    primary_score, threshold, execution_time, extra_json
+                )
+            )
+            conn.commit()
+
+    def upsert_debug_label(self, short_video_path: str, long_video_path: str, label: str, notes: str = None):
+        """Store or update a debug label (oracle)."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            short_id = self._get_or_create_video_id(short_video_path, cursor)
+            long_id = self._get_or_create_video_id(long_video_path, cursor)
+            cursor.execute(
+                '''INSERT OR REPLACE INTO debug_labels (short_video_id, long_video_id, label, notes)
+                   VALUES (?, ?, ?, ?)''',
+                (short_id, long_id, label, notes)
+            )
+            conn.commit()
+
+    def upsert_video_hash(self, video_path: str, method_name: str, params_hash: str,
+                          params_json: str, hash_blob: bytes):
+        """Store reusable video hash for a given algo/param combo."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            video_id = self._get_or_create_video_id(video_path, cursor)
+            stat = os.stat(video_path)
+            cursor.execute(
+                '''INSERT OR REPLACE INTO video_hashes (
+                    video_id, method_name, params_hash, params_json, hash_blob,
+                    modification_time, file_size
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (
+                    video_id, method_name, params_hash, params_json, hash_blob,
+                    stat.st_mtime, stat.st_size
+                )
+            )
+            conn.commit()
+
+    def get_video_hash(self, video_path: str, method_name: str, params_hash: str):
+        """Retrieve cached hash if file unchanged."""
+        if not os.path.exists(video_path):
+            return None
+        stat = os.stat(video_path)
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                '''SELECT hash_blob, modification_time, file_size
+                   FROM video_hashes
+                   WHERE method_name = ? AND params_hash = ?
+                     AND video_id = (SELECT id FROM video_files WHERE file_path = ?)''',
+                (method_name, params_hash, video_path)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            if abs(row[1] - stat.st_mtime) > 1.0 or row[2] != stat.st_size:
+                return None
+            return row[0]
 
     def clear_verification_cache(self):
         """Clear all verification cache entries."""
@@ -2231,3 +2633,133 @@ class VideoDatabase:
                 'medium_confidence': 0,
                 'low_confidence': 0
             }
+
+    # ═══════════════════════════════════════════════════════════
+    # DENSE HASH METHODS (for subsequence detection)
+    # ═══════════════════════════════════════════════════════════
+
+    def get_dense_hash(self, video_path: str, sample_interval: float):
+        """
+        Retrieve cached dense hash from database.
+
+        Args:
+            video_path: Path to video file
+            sample_interval: Sample interval used (e.g., 0.75)
+
+        Returns:
+            Tuple (dense_hash_array, duration) if found and valid, else (None, None)
+        """
+        try:
+            # Get current file metadata
+            if not os.path.exists(video_path):
+                return None, None
+
+            current_mtime = os.path.getmtime(video_path)
+            current_size = os.path.getsize(video_path)
+
+            with self.connection_pool.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Get video_id
+                cursor.execute('SELECT id FROM video_files WHERE file_path = ?', (video_path,))
+                row = cursor.fetchone()
+
+                if not row:
+                    return None, None
+
+                video_id = row[0]
+
+                # Get dense hash with metadata check
+                cursor.execute('''
+                    SELECT dense_hash, duration, modification_time, file_size, sample_interval
+                    FROM dense_hashes
+                    WHERE video_id = ?
+                ''', (video_id,))
+
+                row = cursor.fetchone()
+
+                if not row:
+                    return None, None
+
+                stored_hash_blob, duration, stored_mtime, stored_size, stored_interval = row
+
+                # Validate: file not modified and same sample interval
+                if (abs(stored_mtime - current_mtime) < 0.1 and
+                    stored_size == current_size and
+                    abs(stored_interval - sample_interval) < 0.01):
+
+                    # Deserialize numpy array
+                    dense_hash = pickle.loads(stored_hash_blob)
+                    logger.debug(f"Dense hash cache HIT: {os.path.basename(video_path)}")
+                    return dense_hash, duration
+                else:
+                    logger.debug(f"Dense hash cache INVALID (file modified or different interval): {os.path.basename(video_path)}")
+                    return None, None
+
+        except Exception as e:
+            logger.error(f"Error retrieving dense hash: {e}")
+            return None, None
+
+    def store_dense_hash(self, video_path: str, dense_hash: np.ndarray, duration: float, sample_interval: float):
+        """
+        Store dense hash in database.
+
+        Args:
+            video_path: Path to video file
+            dense_hash: Numpy array of frame hashes
+            duration: Video duration in seconds
+            sample_interval: Sample interval used (e.g., 0.75)
+        """
+        try:
+            if not os.path.exists(video_path):
+                logger.warning(f"Cannot store dense hash: file not found: {video_path}")
+                return
+
+            current_mtime = os.path.getmtime(video_path)
+            current_size = os.path.getsize(video_path)
+            num_frames = len(dense_hash)
+
+            # Serialize numpy array
+            hash_blob = pickle.dumps(dense_hash, protocol=pickle.HIGHEST_PROTOCOL)
+
+            with self.connection_pool.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Ensure video_files entry exists
+                cursor.execute('SELECT id FROM video_files WHERE file_path = ?', (video_path,))
+                row = cursor.fetchone()
+
+                if not row:
+                    # Create video_files entry
+                    cursor.execute('''
+                        INSERT INTO video_files (file_path, file_name, file_size, modification_time, duration)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (video_path, os.path.basename(video_path), current_size, current_mtime, duration))
+                    video_id = cursor.lastrowid
+                else:
+                    video_id = row[0]
+
+                # Insert or replace dense hash
+                cursor.execute('''
+                    INSERT OR REPLACE INTO dense_hashes
+                    (video_id, dense_hash, sample_interval, duration, num_frames, modification_time, file_size)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (video_id, hash_blob, sample_interval, duration, num_frames, current_mtime, current_size))
+
+                conn.commit()
+                logger.debug(f"Dense hash stored: {os.path.basename(video_path)} ({num_frames} frames)")
+
+        except Exception as e:
+            logger.error(f"Error storing dense hash: {e}")
+
+    def clear_dense_hashes(self):
+        """Clear all cached dense hashes from database."""
+        try:
+            with self.connection_pool.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM dense_hashes')
+                conn.commit()
+                count = cursor.rowcount
+                logger.info(f"Cleared {count} dense hash(es) from database")
+        except Exception as e:
+            logger.error(f"Error clearing dense hashes: {e}")

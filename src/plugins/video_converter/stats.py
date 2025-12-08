@@ -1,4 +1,4 @@
-"""Handling des statistics de conversion optimisée."""
+"""Optimized conversion statistics management."""
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
@@ -12,10 +12,10 @@ logger = Logger.get_logger('VideoConverter.Stats')
 
 @dataclass
 class ConversionStats:
-    """Statistics pour une conversion individuelle."""
+    """Statistics for individual conversion."""
     input_size: int
     output_size: int
-    duration: float  # en secondes
+    duration: float  # in seconds
     attempt_count: int
     params_used: Dict
     success: bool
@@ -24,8 +24,8 @@ class ConversionStats:
     output_file: str = ""
     
     def __post_init__(self):
-        """Validation des données après initialization."""
-        # Validation et correction des valeurs
+        """Data validation after initialization."""
+        # Validate and correct values
         self.input_size = max(0, int(self.input_size or 0))
         self.output_size = max(0, int(self.output_size or 0))
         self.duration = max(0.0, float(self.duration or 0.0))
@@ -39,32 +39,32 @@ class ConversionStats:
     
     @property
     def compression_ratio(self) -> float:
-        """Returnsr le ratio de compression (0.0 à 1.0)."""
+        """Returns compression ratio (0.0 to 1.0)."""
         if self.input_size > 0:
             return self.output_size / self.input_size
         return 1.0
     
     @property
     def compression_percentage(self) -> float:
-        """Returnsr le pourcentage de compression (négatif = réduction)."""
+        """Returns compression percentage (positive = size reduction)."""
         if self.input_size > 0:
-            return ((self.output_size - self.input_size) / self.input_size) * 100
+            return ((self.input_size - self.output_size) / self.input_size) * 100
         return 0.0
     
     @property
     def space_saved(self) -> int:
-        """Returnsr l'espace économisé en octets."""
+        """Returns space saved in bytes."""
         return max(0, self.input_size - self.output_size)
     
     @property
     def space_saved_percentage(self) -> float:
-        """Returnsr l'espace économisé en pourcentage."""
+        """Returns space saved as percentage."""
         if self.input_size > 0:
             return (self.space_saved / self.input_size) * 100
         return 0.0
     
     def to_dict(self) -> dict:
-        """Convertir en dictionnaire pour sérialisation JSON."""
+        """Convert to dictionary for JSON serialization."""
         return {
             'input_size': self.input_size,
             'output_size': self.output_size,
@@ -79,7 +79,7 @@ class ConversionStats:
     
     @classmethod
     def from_dict(cls, data: dict):
-        """Créer une instance depuis un dictionnaire."""
+        """Create instance from dictionary."""
         return cls(
             input_size=data.get('input_size', 0),
             output_size=data.get('output_size', 0),
@@ -93,13 +93,13 @@ class ConversionStats:
         )
 
 class StatsManager:
-    """Handlingnaire de statistics thread-safe et optimisé."""
+    """Thread-safe and optimized statistics manager."""
     
     _instance: Optional['StatsManager'] = None
     _lock = threading.Lock()
     
     def __new__(cls):
-        """Implémentation du pattern Singleton."""
+        """Singleton pattern implementation."""
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -107,33 +107,33 @@ class StatsManager:
         return cls._instance
     
     def __init__(self):
-        """Initialiser le gestionnaire de statistics."""
+        """Initialize statistics manager."""
         if hasattr(self, '_initialized'):
             return
             
         self._initialized = True
         self.stats_file = Path.home() / '.videoflow' / 'converter_stats.json'
-        self.stats_lock = threading.RLock()  # Verrou réentrant
+        self.stats_lock = threading.RLock()  # Reentrant lock
         self.stats: List[ConversionStats] = []
-        self.max_stats = 1000  # Limite pour éviter la croissance excessive
-        
-        # Cache pour les statistics calculées
+        self.max_stats = 1000  # Limit to avoid excessive growth
+
+        # Cache for calculated statistics
         self._summary_cache = None
         self._cache_timestamp = 0
-        
-        # S'asoner que le folder existe
+
+        # Ensure folder exists
         self.stats_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Load les statistics existantes
+
+        # Load existing statistics
         self.load_stats()
     
     def _invalidate_cache(self):
-        """Invalider le cache des statistics calculées."""
+        """Invalidate calculated statistics cache."""
         self._summary_cache = None
         self._cache_timestamp = 0
     
     def load_stats(self) -> bool:
-        """Load les statistics depuis le file."""
+        """Load statistics from file."""
         with self.stats_lock:
             try:
                 if self.stats_file.exists():
@@ -151,57 +151,57 @@ class StatsManager:
                                     self.stats.append(stat)
                                     valid_count += 1
                                 except Exception as e:
-                                    logger.warning(f"Statistique invalide ignorée: {e}")
-                        
-                        # Limiter le number de statistics
+                                    logger.warning(f"Invalid statistic ignored: {e}")
+
+                        # Limit number of statistics
                         if len(self.stats) > self.max_stats:
                             self.stats = self.stats[-self.max_stats:]
-                            logger.debug(f"Statistics limitées aux {self.max_stats} dernières entrées")
+                            logger.debug(f"Statistics limited to last {self.max_stats} entries")
                         
                         self._invalidate_cache()
-                        logger.debug(f"Chargé {valid_count} statistics valides")
+                        logger.debug(f"Loaded {valid_count} valid statistics")
                         return True
                     else:
-                        logger.warning("Format de file de statistics invalide")
+                        logger.warning("Invalid statistics file format")
                         return False
                 else:
-                    logger.debug("Aucun file de statistics found, démarrage à neuf")
+                    logger.debug("No statistics file found, starting fresh")
                     return True
                     
             except json.JSONDecodeError as e:
-                logger.error(f"JSON invalide in le file de statistics: {e}")
+                logger.error(f"Invalid JSON in statistics file: {e}")
                 return False
             except Exception as e:
-                logger.error(f"Error loading des statistics: {e}")
+                logger.error(f"Error loading statistics: {e}")
                 return False
     
     def save_stats(self) -> bool:
-        """Save les statistics in le file."""
+        """Save statistics to file."""
         with self.stats_lock:
             try:
-                # Créer une sauvegarde
+                # Create backup
                 backup_file = self.stats_file.with_suffix('.json.bak')
                 if self.stats_file.exists():
                     try:
                         import shutil
                         shutil.copy2(self.stats_file, backup_file)
                     except Exception as e:
-                        logger.warning(f"Cannot créer une sauvegarde: {e}")
-                
-                # Écrire in un file temporaire d'abord
+                        logger.warning(f"Cannot create backup: {e}")
+
+                # Write to temporary file first
                 temp_file = self.stats_file.with_suffix('.tmp')
                 with open(temp_file, 'w', encoding='utf-8') as f:
                     json.dump([stat.to_dict() for stat in self.stats], f, indent=2, ensure_ascii=False)
-                
-                # Déplacer le file temporaire
+
+                # Move temporary file
                 temp_file.replace(self.stats_file)
-                
-                logger.debug(f"Sauvegardé {len(self.stats)} statistics")
+
+                logger.debug(f"Saved {len(self.stats)} statistics")
                 return True
                 
             except Exception as e:
-                logger.error(f"Error saving des statistics: {e}")
-                # Nettoyer le file temporaire
+                logger.error(f"Error saving statistics: {e}")
+                # Clean up temporary file
                 temp_file = self.stats_file.with_suffix('.tmp')
                 if temp_file.exists():
                     try:
@@ -211,34 +211,34 @@ class StatsManager:
                 return False
     
     def add_stat(self, stat: ConversionStats) -> bool:
-        """Add une statistique."""
+        """Add statistic."""
         if not isinstance(stat, ConversionStats):
-            logger.error("Type de statistique invalide")
+            logger.error("Invalid statistic type")
             return False
             
         with self.stats_lock:
             try:
                 self.stats.append(stat)
-                
-                # Limiter le number d'entrées
+
+                # Limit number of entries
                 if len(self.stats) > self.max_stats:
                     self.stats = self.stats[-self.max_stats:]
-                    logger.debug(f"Statistics limitées aux {self.max_stats} dernières entrées")
+                    logger.debug(f"Statistics limited to last {self.max_stats} entries")
                 
                 self._invalidate_cache()
                 return self.save_stats()
-                
+
             except Exception as e:
-                logger.error(f"Error during l'ajout de statistique: {e}")
+                logger.error(f"Error adding statistic: {e}")
                 return False
     
     def get_stats_summary(self) -> Dict:
-        """Obtenir un résumé des statistics with cache."""
+        """Get statistics summary with cache."""
         with self.stats_lock:
-            # Checksr le cache
+            # Check cache
             current_time = datetime.now().timestamp()
-            if (self._summary_cache and 
-                current_time - self._cache_timestamp < 60):  # Cache valide 1 minute
+            if (self._summary_cache and
+                current_time - self._cache_timestamp < 60):  # Cache valid 1 minute
                 return self._summary_cache
             
             if not self.stats:
@@ -262,8 +262,8 @@ class StatsManager:
                 total_input_size = sum(stat.input_size for stat in self.stats)
                 total_output_size = sum(stat.output_size for stat in successful_stats)
                 total_space_saved = sum(stat.space_saved for stat in successful_stats)
-                
-                # Calculs de compression
+
+                # Compression calculations
                 compressions = [stat.space_saved_percentage for stat in successful_stats if stat.space_saved_percentage > 0]
                 best_compression = max(compressions) if compressions else 0.0
                 worst_compression = min(compressions) if compressions else 0.0
@@ -282,20 +282,20 @@ class StatsManager:
                     'best_compression': best_compression,
                     'worst_compression': worst_compression
                 }
-            
-            # Mettre à jour le cache
+
+            # Update cache
             self._summary_cache = summary
             self._cache_timestamp = current_time
             
             return summary
     
     def get_total_space_saved(self) -> int:
-        """Returnsr l'espace total économisé en octets."""
+        """Returns total space saved in bytes."""
         with self.stats_lock:
             return sum(stat.space_saved for stat in self.stats if stat.success)
     
     def get_average_compression_ratio(self) -> float:
-        """Returnsr le ratio de compression moyen."""
+        """Returns average compression ratio."""
         with self.stats_lock:
             successful_stats = [stat for stat in self.stats if stat.success and stat.input_size > 0]
             if not successful_stats:
@@ -303,7 +303,7 @@ class StatsManager:
             return sum(stat.compression_ratio for stat in successful_stats) / len(successful_stats)
     
     def get_success_rate(self) -> float:
-        """Returnsr le rate de réussite en pourcentage."""
+        """Returns success rate as percentage."""
         with self.stats_lock:
             if not self.stats:
                 return 0.0
@@ -311,42 +311,42 @@ class StatsManager:
             return (successful_count / len(self.stats)) * 100
     
     def get_average_attempts(self) -> float:
-        """Returnsr le number moyen de tentatives."""
+        """Returns average number of attempts."""
         with self.stats_lock:
             if not self.stats:
                 return 0.0
             return sum(stat.attempt_count for stat in self.stats) / len(self.stats)
     
     def get_recent_stats(self, days: int = 30) -> List[ConversionStats]:
-        """Obtenir les statistics des derniers jours."""
+        """Get statistics for recent days."""
         with self.stats_lock:
             cutoff_date = datetime.now() - timedelta(days=days)
-            
+
             recent_stats = []
             for stat in self.stats:
                 try:
-                    # Gérer les formats de date with et sans timezone
+                    # Handle date formats with and without timezone
                     date_str = stat.date.replace('Z', '+00:00') if stat.date.endswith('Z') else stat.date
                     stat_date = datetime.fromisoformat(date_str.replace('+00:00', ''))
                     
                     if stat_date >= cutoff_date:
                         recent_stats.append(stat)
                 except (ValueError, AttributeError):
-                    # Ignorer les statistics with des dates invalides
+                    # Ignore statistics with invalid dates
                     continue
             
             return recent_stats
     
     def get_stats_by_params(self) -> Dict[str, Dict]:
-        """Obtenir les statistics groupées par settings."""
+        """Get statistics grouped by settings."""
         with self.stats_lock:
             params_stats = {}
-            
+
             for stat in self.stats:
                 if not stat.success:
                     continue
-                
-                # Créer une clé basée on les settings principaux
+
+                # Create key based on main settings
                 crf = stat.params_used.get('crf', 'unknown')
                 preset = stat.params_used.get('preset', 'unknown')
                 key = f"CRF{crf}_{preset}"
@@ -363,8 +363,8 @@ class StatsManager:
                 params_stats[key]['total_compression'] += stat.space_saved_percentage
                 params_stats[key]['total_attempts'] += stat.attempt_count
                 params_stats[key]['total_space_saved'] += stat.space_saved
-            
-            # Calculatesr les moyennes
+
+            # Calculate averages
             for key, data in params_stats.items():
                 if data['count'] > 0:
                     data['avg_compression'] = data['total_compression'] / data['count']
@@ -376,7 +376,7 @@ class StatsManager:
             return params_stats
     
     def get_hourly_stats(self, hours: int = 24) -> List[Dict]:
-        """Obtenir les statistics par heure."""
+        """Get statistics by hour."""
         with self.stats_lock:
             cutoff_time = datetime.now() - timedelta(hours=hours)
             hourly_data = {}
@@ -411,14 +411,14 @@ class StatsManager:
             return sorted(hourly_data.values(), key=lambda x: x['hour'])
     
     def clear_stats(self) -> bool:
-        """Vider toutes les statistics."""
+        """Clear all statistics."""
         with self.stats_lock:
             self.stats.clear()
             self._invalidate_cache()
             return self.save_stats()
     
     def export_stats(self, file_path: Path) -> bool:
-        """Exporter les statistics vers un file."""
+        """Export statistics to file."""
         with self.stats_lock:
             try:
                 export_data = {
@@ -431,29 +431,29 @@ class StatsManager:
                 
                 with open(file_path, 'w', encoding='utf-8') as f:
                     json.dump(export_data, f, indent=2, ensure_ascii=False)
-                
-                logger.info(f"Statistics exportées vers {file_path}")
+
+                logger.info(f"Statistics exported to {file_path}")
                 return True
             except Exception as e:
-                logger.error(f"Error during l'exportation des statistics: {e}")
+                logger.error(f"Error exporting statistics: {e}")
                 return False
     
     def import_stats(self, file_path: Path, merge: bool = True) -> bool:
-        """Importer les statistics depuis un file."""
+        """Import statistics from file."""
         with self.stats_lock:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                
-                # Gérer différents formats d'export
+
+                # Handle different export formats
                 if 'stats' in data:
-                    # Nouveau format with métadonnées
+                    # New format with metadata
                     stats_data = data['stats']
                 elif isinstance(data, list):
-                    # Ancien format - liste directe
+                    # Old format - direct list
                     stats_data = data
                 else:
-                    logger.error("Format de file d'importation non reconnu")
+                    logger.error("Unrecognized import file format")
                     return False
                 
                 imported_stats = []
@@ -463,12 +463,12 @@ class StatsManager:
                             stat = ConversionStats.from_dict(stat_data)
                             imported_stats.append(stat)
                         except Exception as e:
-                            logger.warning(f"Statistique d'importation invalide ignorée: {e}")
+                            logger.warning(f"Invalid import statistic ignored: {e}")
                 
                 if merge:
                     self.stats.extend(imported_stats)
-                    
-                    # Remove les doublons basés on la date et le file
+
+                    # Remove duplicates based on date and file
                     seen = set()
                     unique_stats = []
                     for stat in self.stats:
@@ -480,24 +480,24 @@ class StatsManager:
                     self.stats = unique_stats
                 else:
                     self.stats = imported_stats
-                
-                # Limiter le number de statistics
+
+                # Limit number of statistics
                 if len(self.stats) > self.max_stats:
                     self.stats = sorted(self.stats, key=lambda x: x.date)[-self.max_stats:]
                 
                 self._invalidate_cache()
                 success = self.save_stats()
-                
+
                 if success:
-                    logger.info(f"Importé {len(imported_stats)} statistics depuis {file_path}")
+                    logger.info(f"Imported {len(imported_stats)} statistics from {file_path}")
                 return success
-                
+
             except Exception as e:
-                logger.error(f"Error during l'importation des statistics: {e}")
+                logger.error(f"Error importing statistics: {e}")
                 return False
     
     def cleanup_old_stats(self, days: int = 90) -> int:
-        """Nettoyer les statistics anciennes."""
+        """Clean up old statistics."""
         with self.stats_lock:
             cutoff_date = datetime.now() - timedelta(days=days)
             original_count = len(self.stats)
@@ -511,7 +511,7 @@ class StatsManager:
                     if stat_date >= cutoff_date:
                         filtered_stats.append(stat)
                 except (ValueError, AttributeError):
-                    # Garder les statistics with des dates invalides (récentes probablement)
+                    # Keep statistics with invalid dates (probably recent)
                     filtered_stats.append(stat)
             
             self.stats = filtered_stats
@@ -520,12 +520,12 @@ class StatsManager:
             if removed_count > 0:
                 self._invalidate_cache()
                 self.save_stats()
-                logger.info(f"Nettoyé {removed_count} anciennes statistics")
-            
+                logger.info(f"Cleaned {removed_count} old statistics")
+
             return removed_count
     
     def get_top_conversions(self, limit: int = 10, by: str = 'space_saved') -> List[ConversionStats]:
-        """Obtenir les meilleures conversions selon un critère."""
+        """Get best conversions by criterion."""
         with self.stats_lock:
             successful_stats = [stat for stat in self.stats if stat.success]
             
@@ -541,22 +541,22 @@ class StatsManager:
             return sorted_stats[:limit]
     
     def get_failure_analysis(self) -> Dict:
-        """Analyze les échecs de conversion."""
+        """Analyze conversion failures."""
         with self.stats_lock:
             failed_stats = [stat for stat in self.stats if not stat.success]
-            
+
             if not failed_stats:
                 return {'total_failures': 0}
-            
-            # Analyze par number de tentatives
+
+            # Analyze by number of attempts
             attempts_analysis = {}
             for stat in failed_stats:
                 attempts = stat.attempt_count
                 if attempts not in attempts_analysis:
                     attempts_analysis[attempts] = 0
                 attempts_analysis[attempts] += 1
-            
-            # Analyze par settings
+
+            # Analyze by settings
             params_analysis = {}
             for stat in failed_stats:
                 crf = stat.params_used.get('crf', 'unknown')
@@ -576,18 +576,18 @@ class StatsManager:
             }
     
     def optimize_settings_recommendation(self) -> Dict:
-        """Recommander des settings optimaux basés on les statistics."""
+        """Recommend optimal settings based on statistics."""
         with self.stats_lock:
             successful_stats = [stat for stat in self.stats if stat.success]
-            
-            if len(successful_stats) < 5:  # Pas assez de données
+
+            if len(successful_stats) < 5:  # Not enough data
                 return {
-                    'recommendation': 'Pas assez de données pour une recommandation',
+                    'recommendation': 'Not enough data for recommendation',
                     'min_data_needed': 5,
                     'current_data': len(successful_stats)
                 }
-            
-            # Analyze les meilleurs settings
+
+            # Analyze best settings
             params_performance = {}
             
             for stat in successful_stats:
@@ -607,18 +607,18 @@ class StatsManager:
                 params_performance[key]['compression_sum'] += stat.space_saved_percentage
                 params_performance[key]['attempts_sum'] += stat.attempt_count
                 params_performance[key]['count'] += 1
-            
-            # Calculatesr les performances moyennes
+
+            # Calculate average performance
             best_params = None
             best_score = 0
-            
+
             for key, data in params_performance.items():
-                if data['count'] >= 3:  # Minimum de données pour être fiable
+                if data['count'] >= 3:  # Minimum data to be reliable
                     avg_compression = data['compression_sum'] / data['count']
                     avg_attempts = data['attempts_sum'] / data['count']
-                    
-                    # Score basé on compression et efficacité (moins de tentatives = mieux)
-                    score = avg_compression - (avg_attempts - 1) * 5  # Pénalité pour les tentatives multiples
+
+                    # Score based on compression and efficiency (fewer attempts = better)
+                    score = avg_compression - (avg_attempts - 1) * 5  # Penalty for multiple attempts
                     
                     if score > best_score:
                         best_score = score
@@ -629,9 +629,9 @@ class StatsManager:
                             'avg_attempts': avg_attempts,
                             'sample_count': data['count']
                         }
-            
+
             return {
-                'recommendation': 'Settings optimaux found' if best_params else 'Pas de settings optimaux identifiés',
+                'recommendation': 'Optimal settings found' if best_params else 'No optimal settings identified',
                 'best_params': best_params,
                 'total_successful_conversions': len(successful_stats)
             }

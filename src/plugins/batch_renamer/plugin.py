@@ -3,6 +3,7 @@
 from PyQt6.QtGui import QAction
 from src.core.plugin_interface import PluginInterface
 from src.core.logger import Logger
+from src.core.i18n import t
 
 logger = Logger.get_logger('BatchRenamer.Plugin')
 
@@ -13,8 +14,8 @@ class BatchRenamerPlugin(PluginInterface):
     def __init__(self):
         """Initialize the plugin with minimal loading."""
         super().__init__()
-        self.name = "Batch Renamer"
-        self.description = "Rename multiple videos using patterns and metadata"
+        self.name = t("plugin.batch_renamer.name", "Batch Renamer")
+        self.description = t("plugin.batch_renamer.description", "Rename multiple videos using patterns and metadata")
         self.version = "1.0.0"
         self.window = None
         self.main_window = None

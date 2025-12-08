@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtGui import QFont, QIcon
+from src.core.i18n import t
 
 
 class ToolbarButton(QPushButton):
@@ -240,11 +241,11 @@ class ModernToolbar(QWidget):
         """)
 
         # File operations group
-        self.open_btn = PrimaryButton("📁", "Ouvrir", "Ouvrir une vidéo (Ctrl+O)")
+        self.open_btn = PrimaryButton("📁", t("video_editor.toolbar.open", "Open"), t("video_editor.toolbar.tooltip_open", "Open a video (Ctrl+O)"))
         self.open_btn.clicked.connect(self.open_video_clicked.emit)
         layout.addWidget(self.open_btn)
 
-        self.save_btn = ToolbarButton("💾", "Sauvegarder", "Sauvegarder le projet (Ctrl+S)")
+        self.save_btn = ToolbarButton("💾", t("video_editor.toolbar.save", "Save"), t("video_editor.toolbar.tooltip_save", "Save project (Ctrl+S)"))
         self.save_btn.clicked.connect(self.save_project_clicked.emit)
         self.save_btn.setEnabled(False)
         layout.addWidget(self.save_btn)
@@ -252,12 +253,12 @@ class ModernToolbar(QWidget):
         layout.addWidget(ToolbarSeparator())
 
         # Edit operations group
-        self.undo_btn = ToolbarButton("↶", "", "Annuler (Ctrl+Z)")
+        self.undo_btn = ToolbarButton("↶", "", t("video_editor.toolbar.tooltip_undo", "Undo (Ctrl+Z)"))
         self.undo_btn.clicked.connect(self.undo_clicked.emit)
         self.undo_btn.setEnabled(False)
         layout.addWidget(self.undo_btn)
 
-        self.redo_btn = ToolbarButton("↷", "", "Rétablir (Ctrl+Y)")
+        self.redo_btn = ToolbarButton("↷", "", t("video_editor.toolbar.tooltip_redo", "Redo (Ctrl+Y)"))
         self.redo_btn.clicked.connect(self.redo_clicked.emit)
         self.redo_btn.setEnabled(False)
         layout.addWidget(self.redo_btn)
@@ -265,17 +266,17 @@ class ModernToolbar(QWidget):
         layout.addWidget(ToolbarSeparator())
 
         # Marking group
-        self.mark_in_btn = ToolbarButton("⬇", "IN", "Marquer début (I)")
+        self.mark_in_btn = ToolbarButton("⬇", "IN", t("video_editor.toolbar.tooltip_mark_in", "Mark start (I)"))
         self.mark_in_btn.clicked.connect(self.mark_in_clicked.emit)
         self.mark_in_btn.setEnabled(False)
         layout.addWidget(self.mark_in_btn)
 
-        self.mark_out_btn = ToolbarButton("⬆", "OUT", "Marquer fin (O)")
+        self.mark_out_btn = ToolbarButton("⬆", "OUT", t("video_editor.toolbar.tooltip_mark_out", "Mark end (O)"))
         self.mark_out_btn.clicked.connect(self.mark_out_clicked.emit)
         self.mark_out_btn.setEnabled(False)
         layout.addWidget(self.mark_out_btn)
 
-        self.create_segment_btn = SuccessButton("✂", "Créer", "Créer segment (C)")
+        self.create_segment_btn = SuccessButton("✂", t("video_editor.toolbar.create", "Create"), t("video_editor.toolbar.tooltip_create_segment", "Create segment (C)"))
         self.create_segment_btn.clicked.connect(self.create_segment_clicked.emit)
         self.create_segment_btn.setEnabled(False)
         layout.addWidget(self.create_segment_btn)
@@ -283,12 +284,12 @@ class ModernToolbar(QWidget):
         layout.addWidget(ToolbarSeparator())
 
         # Segment operations
-        self.cut_btn = ToolbarButton("🔪", "Couper", "Couper au curseur (X)")
+        self.cut_btn = ToolbarButton("🔪", t("video_editor.toolbar.cut", "Cut"), t("video_editor.toolbar.tooltip_cut", "Cut at cursor (X)"))
         self.cut_btn.clicked.connect(self.cut_at_cursor_clicked.emit)
         self.cut_btn.setEnabled(False)
         layout.addWidget(self.cut_btn)
 
-        self.delete_btn = ToolbarButton("🗑", "Supprimer", "Supprimer segment (Delete)")
+        self.delete_btn = ToolbarButton("🗑", t("video_editor.toolbar.delete", "Delete"), t("video_editor.toolbar.tooltip_delete", "Delete segment (Delete)"))
         self.delete_btn.clicked.connect(self.delete_segment_clicked.emit)
         self.delete_btn.setEnabled(False)
         layout.addWidget(self.delete_btn)
@@ -296,18 +297,18 @@ class ModernToolbar(QWidget):
         layout.addStretch()
 
         # Export and settings
-        self.export_btn = WarningButton("💾", "Exporter", "Exporter segments (Ctrl+E)")
+        self.export_btn = WarningButton("💾", t("video_editor.toolbar.export", "Export"), t("video_editor.toolbar.tooltip_export", "Export segments (Ctrl+E)"))
         self.export_btn.clicked.connect(self.export_clicked.emit)
         self.export_btn.setEnabled(False)
         layout.addWidget(self.export_btn)
 
         layout.addWidget(ToolbarSeparator())
 
-        self.prefs_btn = ToolbarButton("⚙", "", "Préférences (Ctrl+,)")
+        self.prefs_btn = ToolbarButton("⚙", "", t("video_editor.toolbar.tooltip_prefs", "Preferences (Ctrl+,)"))
         self.prefs_btn.clicked.connect(self.preferences_clicked.emit)
         layout.addWidget(self.prefs_btn)
 
-        self.help_btn = ToolbarButton("❓", "", "Aide (F1)")
+        self.help_btn = ToolbarButton("❓", "", t("video_editor.toolbar.tooltip_help", "Help (F1)"))
         self.help_btn.clicked.connect(self.help_clicked.emit)
         layout.addWidget(self.help_btn)
 
@@ -376,7 +377,7 @@ class StatusBar(QWidget):
         """)
 
         # Status message
-        self.status_label = QLabel("Prêt")
+        self.status_label = QLabel(t("video_editor.toolbar.status_ready", "Ready"))
         self.status_label.setStyleSheet("""
             color: #ccc;
             font-size: 12px;
@@ -424,7 +425,7 @@ class StatusBar(QWidget):
 
         if duration > 0:
             from PyQt6.QtCore import QTimer
-            QTimer.singleShot(duration, lambda: self.status_label.setText("Prêt"))
+            QTimer.singleShot(duration, lambda: self.status_label.setText(t("video_editor.toolbar.status_ready", "Ready")))
 
     def set_error(self, message: str, duration: int = 5000):
         """Set error message.
@@ -442,7 +443,7 @@ class StatusBar(QWidget):
 
         if duration > 0:
             from PyQt6.QtCore import QTimer
-            QTimer.singleShot(duration, lambda: self.status_label.setText("Prêt"))
+            QTimer.singleShot(duration, lambda: self.status_label.setText(t("video_editor.toolbar.status_ready", "Ready")))
 
     def set_success(self, message: str, duration: int = 3000):
         """Set success message.
@@ -460,7 +461,7 @@ class StatusBar(QWidget):
 
         if duration > 0:
             from PyQt6.QtCore import QTimer
-            QTimer.singleShot(duration, lambda: self.status_label.setText("Prêt"))
+            QTimer.singleShot(duration, lambda: self.status_label.setText(t("video_editor.toolbar.status_ready", "Ready")))
 
     def set_video_info(self, width: int, height: int, fps: float, duration: str):
         """Set video information display.

@@ -1,4 +1,4 @@
-"""Main window module de l'éditeur vidéo"""
+"""Main window module for the video editor"""
 
 import os
 import subprocess  # CRITICAL FIX: Missing import for export_segments()
@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap, QColor, QShortcut, QKeySequence, QAction
 from src.core.logger import Logger
+from src.core.i18n import t
 # Timeline imports - using EnhancedTimeline for all modes now
 from .data_manager import DataManager
 from .history_manager import HistoryManager, HistoryAction
@@ -38,11 +39,11 @@ import copy
 logger = Logger.get_logger('VideoEditor.Window')
 
 class VideoEditorWindow(QMainWindow):
-    """Main window for l'éditeur vidéo"""
+    """Main window for the video editor"""
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Video Editor")
+        self.setWindowTitle(t("video_editor.window.title", "Video Editor"))
         self.setMinimumSize(1200, 800)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
 
@@ -50,7 +51,7 @@ class VideoEditorWindow(QMainWindow):
         self.theme_manager = ThemeManager()
         self.theme_manager.apply_theme(app=QApplication.instance())
 
-        # Variables d'état
+        # State variables
         self.video_path = None
         self.cap = None
         self.current_frame = 0
@@ -103,7 +104,7 @@ class VideoEditorWindow(QMainWindow):
 
         # Panel layout preferences - no longer needed with tabs
 
-        # Timer for the lecture
+        # Timer for playback
         self.play_timer = QTimer()
         self.play_timer.timeout.connect(self.next_frame)
 
@@ -139,7 +140,7 @@ class VideoEditorWindow(QMainWindow):
             # Show editor by default
             self.stacked_widget.setCurrentWidget(self.editor_widget)
 
-        logger.debug("Window VideoEditor initialisée")
+        logger.debug("VideoEditor Window initialized")
 
     def init_davinci_ui(self):
         """Initialize DaVinci-style simplified UI.
@@ -213,7 +214,7 @@ class VideoEditorWindow(QMainWindow):
         self.media_browser = MediaBrowser()
         self.media_browser.import_clicked.connect(self.open_video_dialog)
         self.media_browser.file_selected.connect(self.open_video)
-        self.side_tabs.addTab(self.media_browser, "📁 Médias")
+        self.side_tabs.addTab(self.media_browser, t("video_editor.window.tab_media", "📁 Media"))
 
         # Inspector Panel tab
         self.inspector_panel = InspectorPanel()
@@ -221,7 +222,7 @@ class VideoEditorWindow(QMainWindow):
         self.inspector_panel.text_overlay_clicked.connect(self.on_inspector_text_overlay_clicked)
         self.inspector_panel.audio_clicked.connect(self.on_inspector_audio_clicked)
         self.inspector_panel.delete_clicked.connect(self.delete_selected_segments)
-        self.side_tabs.addTab(self.inspector_panel, "⚙️ Propriétés")
+        self.side_tabs.addTab(self.inspector_panel, t("video_editor.window.tab_properties", "⚙️ Properties"))
 
         self.middle_splitter.addWidget(self.side_tabs)
 
@@ -247,7 +248,14 @@ class VideoEditorWindow(QMainWindow):
         # Many methods depend on segments_table, so we create it but hide it
         self.segments_table = QTableWidget()
         self.segments_table.setColumnCount(6)
-        self.segments_table.setHorizontalHeaderLabels(["Début", "Fin", "Durée", "Nom", "Transition", "Texte"])
+        self.segments_table.setHorizontalHeaderLabels([
+            t("video_editor.window.table_start", "Start"),
+            t("video_editor.window.table_end", "End"),
+            t("video_editor.window.table_duration", "Duration"),
+            t("video_editor.window.table_name", "Name"),
+            t("video_editor.window.table_transition", "Transition"),
+            t("video_editor.window.table_text", "Text")
+        ])
         self.segments_table.setVisible(False)  # Hidden in DaVinci mode
 
         # ===== BOTTOM: Dual Timeline System (35% of height) =====
@@ -264,13 +272,13 @@ class VideoEditorWindow(QMainWindow):
         source_header_layout.setContentsMargins(10, 5, 10, 5)
         source_header_layout.setSpacing(10)
 
-        source_title = QLabel("📹 Vidéos Sources")
+        source_title = QLabel(t("video_editor.window.source_videos_title", "📹 Source Videos"))
         source_title.setStyleSheet("QLabel { font-size: 12px; font-weight: bold; color: #333; border: none; }")
         source_header_layout.addWidget(source_title)
 
         source_header_layout.addStretch()
 
-        add_source_btn = QPushButton("+ Ajouter Source")
+        add_source_btn = QPushButton(t("video_editor.window.add_source_btn", "+ Add Source"))
         add_source_btn.setStyleSheet("""
             QPushButton {
                 background-color: #0066cc;
@@ -311,7 +319,7 @@ class VideoEditorWindow(QMainWindow):
         timeline_layout.addWidget(sources_scroll)
 
         # Editing Timeline (for segments)
-        edit_header = QLabel("✂️ Timeline de Montage")
+        edit_header = QLabel(t("video_editor.window.editing_timeline_title", "✂️ Editing Timeline"))
         edit_header.setStyleSheet("""
             QLabel {
                 background-color: #ffffff;
@@ -336,9 +344,9 @@ class VideoEditorWindow(QMainWindow):
         main_layout.addWidget(timeline_container, stretch=35)  # 35% of height
 
         # ===== STATUS BAR =====
-        self.statusBar().showMessage("✅ Video Editor Pro - Layout DaVinci")
+        self.statusBar().showMessage(t("video_editor.window.status_davinci", "✅ Video Editor Pro - DaVinci Layout"))
 
-        logger.info("Interface DaVinci initialisée")
+        logger.info("DaVinci interface initialized")
 
     def _create_simple_toolbar(self) -> QWidget:
         """Create modern, professional toolbar with light theme.
@@ -382,17 +390,17 @@ class VideoEditorWindow(QMainWindow):
         file_layout.setContentsMargins(0, 0, 0, 0)
         file_layout.setSpacing(5)
 
-        self.open_btn = QPushButton("📁 Ouvrir")
+        self.open_btn = QPushButton(t("video_editor.window.open_btn", "📁 Open"))
         self.open_btn.setMinimumHeight(35)
         self.open_btn.setStyleSheet(self._get_button_style('#0078d4', '#005a9e'))
-        self.open_btn.setToolTip("Ouvrir une vidéo (Ctrl+O)")
+        self.open_btn.setToolTip(t("video_editor.window.tooltip_open", "Open a video (Ctrl+O)"))
         self.open_btn.clicked.connect(self.open_video_dialog)
         file_layout.addWidget(self.open_btn)
 
-        save_btn = QPushButton("💾 Sauvegarder")
+        save_btn = QPushButton(t("video_editor.window.save_btn", "💾 Save"))
         save_btn.setMinimumHeight(35)
         save_btn.setStyleSheet(self._get_button_style('#2a2a2a', '#353535'))
-        save_btn.setToolTip("Sauvegarder le projet (Ctrl+S)")
+        save_btn.setToolTip(t("video_editor.window.tooltip_save", "Save project (Ctrl+S)"))
         file_layout.addWidget(save_btn)
 
         toolbar.addWidget(file_group)
@@ -406,13 +414,13 @@ class VideoEditorWindow(QMainWindow):
 
         undo_btn = QPushButton("↶")
         undo_btn.setStyleSheet(self._get_icon_button_style())
-        undo_btn.setToolTip("Annuler (Ctrl+Z)")
+        undo_btn.setToolTip(t("video_editor.window.tooltip_undo", "Undo (Ctrl+Z)"))
         undo_btn.clicked.connect(self.undo)
         edit_layout.addWidget(undo_btn)
 
         redo_btn = QPushButton("↷")
         redo_btn.setStyleSheet(self._get_icon_button_style())
-        redo_btn.setToolTip("Rétablir (Ctrl+Y)")
+        redo_btn.setToolTip(t("video_editor.window.tooltip_redo", "Redo (Ctrl+Y)"))
         redo_btn.clicked.connect(self.redo)
         edit_layout.addWidget(redo_btn)
 
@@ -424,26 +432,26 @@ class VideoEditorWindow(QMainWindow):
         mark_layout.setContentsMargins(0, 0, 0, 0)
         mark_layout.setSpacing(5)
 
-        self.start_cut_btn = QPushButton("📍 Point de Début")
+        self.start_cut_btn = QPushButton(t("video_editor.window.start_point_btn", "📍 Start Point"))
         self.start_cut_btn.setMinimumHeight(35)
         self.start_cut_btn.setStyleSheet(self._get_button_style('#28a745', '#218838'))
-        self.start_cut_btn.setToolTip("Marquer le point de début du segment (Touche I)")
+        self.start_cut_btn.setToolTip(t("video_editor.window.tooltip_mark_in", "Mark segment start point (I key)"))
         self.start_cut_btn.clicked.connect(self.mark_in)
         self.start_cut_btn.setEnabled(False)
         mark_layout.addWidget(self.start_cut_btn)
 
-        self.end_cut_btn = QPushButton("🏁 Point de Fin")
+        self.end_cut_btn = QPushButton(t("video_editor.window.end_point_btn", "🏁 End Point"))
         self.end_cut_btn.setMinimumHeight(35)
         self.end_cut_btn.setStyleSheet(self._get_button_style('#dc3545', '#c82333'))
-        self.end_cut_btn.setToolTip("Marquer le point de fin du segment (Touche O)")
+        self.end_cut_btn.setToolTip(t("video_editor.window.tooltip_mark_out", "Mark segment end point (O key)"))
         self.end_cut_btn.clicked.connect(self.mark_out)
         self.end_cut_btn.setEnabled(False)
         mark_layout.addWidget(self.end_cut_btn)
 
-        self.create_segment_btn = QPushButton("✂️ Créer Segment")
+        self.create_segment_btn = QPushButton(t("video_editor.window.create_segment_btn", "✂️ Create Segment"))
         self.create_segment_btn.setMinimumHeight(35)
         self.create_segment_btn.setStyleSheet(self._get_button_style('#6c63ff', '#5a52d5'))
-        self.create_segment_btn.setToolTip("Créer un segment entre les points de début et de fin (Touche C)")
+        self.create_segment_btn.setToolTip(t("video_editor.window.tooltip_create_segment", "Create segment between start and end points (C key)"))
         self.create_segment_btn.clicked.connect(self.create_segment_from_io)
         self.create_segment_btn.setEnabled(False)
         mark_layout.addWidget(self.create_segment_btn)
@@ -459,9 +467,9 @@ class VideoEditorWindow(QMainWindow):
         export_layout.setContentsMargins(0, 0, 0, 0)
         export_layout.setSpacing(8)
 
-        self.export_btn = QPushButton("💾 Exporter")
+        self.export_btn = QPushButton(t("video_editor.window.export_btn", "💾 Export"))
         self.export_btn.setStyleSheet(self._get_button_style('#ffc107', '#e0a800', text_color='#000'))
-        self.export_btn.setToolTip("Exporter segments (Ctrl+E)")
+        self.export_btn.setToolTip(t("video_editor.window.tooltip_export", "Export segments (Ctrl+E)"))
         self.export_btn.clicked.connect(self.export_segments)
         self.export_btn.setEnabled(False)
         export_layout.addWidget(self.export_btn)
@@ -473,13 +481,13 @@ class VideoEditorWindow(QMainWindow):
 
         prefs_btn = QPushButton("⚙")
         prefs_btn.setStyleSheet(self._get_icon_button_style())
-        prefs_btn.setToolTip("Préférences (Ctrl+,)")
+        prefs_btn.setToolTip(t("video_editor.window.tooltip_preferences", "Preferences (Ctrl+,)"))
         prefs_btn.clicked.connect(self.open_preferences)
         export_layout.addWidget(prefs_btn)
 
         help_btn = QPushButton("❓")
         help_btn.setStyleSheet(self._get_icon_button_style())
-        help_btn.setToolTip("Aide (F1)")
+        help_btn.setToolTip(t("video_editor.window.tooltip_help", "Help (F1)"))
         help_btn.clicked.connect(self.show_shortcuts_help)
         export_layout.addWidget(help_btn)
 
@@ -589,8 +597,8 @@ class VideoEditorWindow(QMainWindow):
         else:
             QMessageBox.warning(
                 self,
-                "Aucun segment",
-                "Veuillez sélectionner un segment dans la timeline."
+                t("video_editor.window.dialog_no_segment", "No Segment"),
+                t("video_editor.window.msg_select_segment", "Please select a segment in the timeline.")
             )
 
     def on_inspector_text_overlay_clicked(self):
@@ -603,8 +611,8 @@ class VideoEditorWindow(QMainWindow):
         else:
             QMessageBox.warning(
                 self,
-                "Aucun segment",
-                "Veuillez sélectionner un segment dans la timeline."
+                t("video_editor.window.dialog_no_segment", "No Segment"),
+                t("video_editor.window.msg_select_segment", "Please select a segment in the timeline.")
             )
 
     def on_inspector_audio_clicked(self):
@@ -616,19 +624,18 @@ class VideoEditorWindow(QMainWindow):
             # For now, show a message. Could open AudioPanel dialog in future
             QMessageBox.information(
                 self,
-                "Réglages Audio",
-                f"Réglages audio pour le segment {self.selected_segment_index + 1}.\n\n"
-                "Cette fonctionnalité sera disponible dans une future mise à jour."
+                t("video_editor.window.dialog_audio_settings", "Audio Settings"),
+                t("video_editor.window.msg_audio_future", "Audio settings for segment {index}.\n\nThis feature will be available in a future update.", index=self.selected_segment_index + 1)
             )
         else:
             QMessageBox.warning(
                 self,
-                "Aucun segment",
-                "Veuillez sélectionner un segment dans la timeline."
+                t("video_editor.window.dialog_no_segment", "No Segment"),
+                t("video_editor.window.msg_select_segment", "Please select a segment in the timeline.")
             )
 
     def init_ui(self):
-        """Initialise l'interface utilisateur - Version Pro avec layout amélioré"""
+        """Initialize user interface - Pro version with improved layout"""
         # Use self.editor_widget as the container
         main_layout = QVBoxLayout(self.editor_widget)
         main_layout.setContentsMargins(5, 5, 5, 5)
@@ -820,7 +827,7 @@ class VideoEditorWindow(QMainWindow):
         # ===== STATUS BAR =====
         self.statusBar().showMessage("✅ Video Editor Pro chargé - Appuyez sur F1 pour aide")
 
-        logger.info("Interface VideoEditor Pro initialisée avec nouveau layout")
+        logger.info("VideoEditor Pro interface initialized with new layout")
     
     def show_dashboard(self):
         """Show the welcome dashboard."""
@@ -849,7 +856,7 @@ class VideoEditorWindow(QMainWindow):
         logger.debug("Dashboard hidden, editor restored")
 
     def open_video_dialog(self):
-        """Opens a dialog to select une vidéo"""
+        """Open a dialog to select a video"""
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open une vidéo",
@@ -861,7 +868,7 @@ class VideoEditorWindow(QMainWindow):
             self.open_video(file_path)
     
     def open_video(self, file_path):
-        """Opens une vidéo"""
+        """Open a video"""
         # Hide dashboard if showing
         self.hide_dashboard()
 
@@ -964,7 +971,7 @@ class VideoEditorWindow(QMainWindow):
             # Show la première frame
             self.show_frame(0)
 
-            logger.info(f"Vidéo ouverte: {video_name} ({width}x{height}, {self.fps:.2f} fps)")
+            logger.info(f"Video opened: {video_name} ({width}x{height}, {self.fps:.2f} fps)")
 
         except Exception as e:
             logger.error(f"Error opening video : {str(e)}")
@@ -997,7 +1004,7 @@ class VideoEditorWindow(QMainWindow):
                 # Add to sources list
                 self._add_source_to_list(file_path, cap, fps, total_frames)
 
-                logger.info(f"Source vidéo ajoutée: {os.path.basename(file_path)}")
+                logger.info(f"Video source added: {os.path.basename(file_path)}")
                 self.statusBar().showMessage(f"✅ Source ajoutée: {os.path.basename(file_path)}", 3000)
 
             except Exception as e:
@@ -1114,20 +1121,20 @@ class VideoEditorWindow(QMainWindow):
             self.show_frame(frame)
 
     def show_frame(self, frame_num):
-        """Affiche une frame spécifique"""
+        """Display a specific frame"""
         if not self.cap or self._updating_frame:
             return
-            
+
         try:
             self._updating_frame = True
-            
-            # Lire the frame
+
+            # Read the frame
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
             ret, frame = self.cap.read()
             if not ret:
                 return
-                
-            # Convertir en QImage pour l'affichage
+
+            # Convert to QImage for display
             height, width = frame.shape[:2]
             bytes_per_line = 3 * width
             qt_image = QImage(
@@ -1137,38 +1144,38 @@ class VideoEditorWindow(QMainWindow):
                 bytes_per_line,
                 QImage.Format.Format_BGR888
             )
-            
-            # Redimensionner pour l'affichage
+
+            # Resize for display
             scaled_pixmap = QPixmap.fromImage(qt_image).scaled(
                 self.preview.size(),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
-            
-            # Show l'image
+
+            # Show the image
             self.preview.setPixmap(scaled_pixmap)
 
-            # Mettre à jour all source timelines and main timeline
+            # Update all source timelines and main timeline
             for source in self.source_videos:
                 if 'timeline' in source:
                     source['timeline'].set_current_frame(frame_num)
             self.timeline.set_current_frame(frame_num)
 
-            # Mettre à jour le time
+            # Update the time
             if self.fps > 0:
                 current_time = frame_num / self.fps
                 total_time = self.total_frames / self.fps
                 self.time_label.setText(f"{self.timecode.seconds_to_timecode(current_time)} / {self.timecode.seconds_to_timecode(total_time)}")
             else:
                 self.time_label.setText("--:-- / --:--")
-            
+
             self.current_frame = frame_num
             
         finally:
             self._updating_frame = False
     
     def load_segments(self):
-        """Loads the segments in la table"""
+        """Load the segments in the table"""
         if not self.data_manager:
             return
             
@@ -1212,7 +1219,7 @@ class VideoEditorWindow(QMainWindow):
         self.segments_table.resizeColumnsToContents()
     
     def preview_segment(self, segment_index):
-        """Prévisualise un segment"""
+        """Preview a segment"""
         if not self.data_manager:
             return
             
@@ -1239,10 +1246,10 @@ class VideoEditorWindow(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             self.data_manager.remove_segment(segment_index)
             self.load_segments()
-            logger.debug(f"Segment {segment_index} supprimé")
+            logger.debug(f"Segment {segment_index} removed")
     
     def save_video(self):
-        """Saves the video éditée"""
+        """Save the edited video"""
         if not self.data_manager or not self.video_path:
             return
             
@@ -1313,7 +1320,7 @@ class VideoEditorWindow(QMainWindow):
                     "Success",
                     "Vidéo sauvegardée with success !"
                 )
-                logger.debug(f"Vidéo sauvegardée : {output_file}")
+                logger.debug(f"Video saved: {output_file}")
                 
             except Exception as e:
                 QMessageBox.critical(
@@ -1327,7 +1334,7 @@ class VideoEditorWindow(QMainWindow):
                 self.progress_bar.setVisible(False)
     
     def toggle_play(self):
-        """Démarre ou arrête la lecture"""
+        """Start or stop playback"""
         if self.playing:
             self.play_timer.stop()
             if hasattr(self, 'play_btn'):
@@ -1341,7 +1348,7 @@ class VideoEditorWindow(QMainWindow):
         self.playing = not self.playing
     
     def next_frame(self):
-        """Passe à the frame suivante"""
+        """Go to the next frame"""
         if self.cap is None:
             return
         
@@ -1356,7 +1363,7 @@ class VideoEditorWindow(QMainWindow):
             self.play_btn.setText("▶️ Lecture")
     
     def prev_frame(self):
-        """Revient à the frame précédente"""
+        """Go back to the previous frame"""
         if self.cap is None:
             return
         
@@ -1365,11 +1372,11 @@ class VideoEditorWindow(QMainWindow):
             self.show_frame(current_frame - 1)
     
     def on_timeline_position_changed(self, frame):
-        """Appelé quand the position in the timeline change"""
+        """Called when the position in the timeline changes"""
         self.show_frame(frame)
     
     def start_cut(self):
-        """Commence une découpe"""
+        """Start a cut"""
         if not self.cap:
             return
         
@@ -1397,7 +1404,7 @@ class VideoEditorWindow(QMainWindow):
         self.export_btn.setEnabled(False)
 
     def end_cut(self):
-        """Finishes une découpe"""
+        """Finish a cut"""
         if not self.cap:
             return
         
@@ -1437,7 +1444,7 @@ class VideoEditorWindow(QMainWindow):
             self.export_btn.setEnabled(True)
     
     def cancel_cut(self):
-        """Cancels la découpe in progress"""
+        """Cancel the cut in progress"""
         self.timeline.cancel_current_segment()
         
         # Remove la dernière ligne du tableau
@@ -1452,7 +1459,7 @@ class VideoEditorWindow(QMainWindow):
         self.export_btn.setEnabled(self.segments_table.rowCount() > 0)
     
     def export_segments(self):
-        """Exporte the segments en files vidéo séparés en utilisant ffmpeg"""
+        """Export the segments as separate video files using ffmpeg"""
         if not self.video_path or self.segments_table.rowCount() == 0:
             return
 
@@ -1522,7 +1529,7 @@ class VideoEditorWindow(QMainWindow):
     # ===== Close Event =====
 
     def closeEvent(self, event):
-        """Appelé quand the window est fermée"""
+        """Called when the window is closed"""
         # Stop playback timer
         if hasattr(self, 'play_timer') and self.play_timer is not None:
             self.play_timer.stop()
@@ -1566,7 +1573,7 @@ class VideoEditorWindow(QMainWindow):
         super().closeEvent(event)
     
     def on_segment_created(self, segment):
-        """Appelé quand un segment est créé"""
+        """Called when a segment is created"""
         row = self.segments_table.rowCount()
         self.segments_table.insertRow(row)
         
@@ -1580,7 +1587,7 @@ class VideoEditorWindow(QMainWindow):
         self.segments_table.setItem(row, 2, QTableWidgetItem(f"Segment {row + 1}"))
     
     def on_segment_deleted(self, index):
-        """Appelé quand un segment est supprimé depuis the timeline"""
+        """Called when a segment is deleted from the timeline"""
         # Remove la ligne correspondante in le tableau
         self.segments_table.removeRow(index)
         
@@ -1590,7 +1597,7 @@ class VideoEditorWindow(QMainWindow):
 
 
     def add_segment_to_table(self, segment):
-        """Adds un segment à la table"""
+        """Add a segment to the table"""
         if not hasattr(self, 'segments_table'):
             return
             
@@ -3326,4 +3333,3 @@ class ExportDialog(QDialog):
                 "Export partiel",
                 f"Seulement {success_count}/{len(self.segments)} segment(s) exporté(s)"
             )
-

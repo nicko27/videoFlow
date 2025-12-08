@@ -20,7 +20,8 @@ class SubsequenceDetectionWorker(QThread):
     by comparing all pairs where duration difference suggests a potential match.
 
     Signals:
-        progress (int, int, str): Emits (current, total, message) for progress updates.
+        hash_progress (int, int, str): Emits (current, total, message) for frame extraction progress.
+        progress (int, int, str): Emits (current, total, message) for comparison progress.
         finished (list): Emits list of detected subsequences when complete.
         subsequence_found (str, str, dict): Emits (short_video, long_video, result) for each found.
         error (str): Emits error messages.
@@ -28,7 +29,8 @@ class SubsequenceDetectionWorker(QThread):
     """
 
     # Signal definitions
-    progress = pyqtSignal(int, int, str)  # current, total, message
+    hash_progress = pyqtSignal(int, int, str)  # current, total, message (FRAME EXTRACTION)
+    progress = pyqtSignal(int, int, str)  # current, total, message (COMPARISON)
     finished = pyqtSignal(list)  # List of subsequences
     subsequence_found = pyqtSignal(str, str, dict)  # short_video, long_video, result
     error = pyqtSignal(str)  # Error message
@@ -59,20 +61,29 @@ class SubsequenceDetectionWorker(QThread):
             logger.info(f"Starting subsequence detection on {len(self.files)} files")
             self.status_update.emit(f"Analyzing {len(self.files)} videos...")
 
-            # Progress callback for detector
-            def progress_callback(current: int, total: int, message: str):
-                """Forward progress updates to UI."""
+            # Progress callback for frame extraction (PHASE 1)
+            def hash_progress_callback(current: int, total: int, message: str):
+                """Forward hash extraction progress to UI (file_progress bar)."""
                 if self._stop:
-                    # Stop detection if requested
+                    self.subsequence_detector.cancel()
+                    return
+
+                self.hash_progress.emit(current, total, message)
+
+            # Progress callback for comparison (PHASE 2)
+            def progress_callback(current: int, total: int, message: str):
+                """Forward comparison progress to UI (duplicate_progress bar)."""
+                if self._stop:
                     self.subsequence_detector.cancel()
                     return
 
                 self.progress.emit(current, total, message)
 
-            # Run detection (can be cancelled via progress_callback)
+            # Run detection (can be cancelled via callbacks)
             subsequences = self.subsequence_detector.detect_all_subsequences(
                 self.files,
-                progress_callback=progress_callback
+                progress_callback=progress_callback,
+                hash_progress_callback=hash_progress_callback
             )
 
             # Check if cancelled

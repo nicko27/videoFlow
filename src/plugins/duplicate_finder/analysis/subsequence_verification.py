@@ -38,29 +38,37 @@ class SubsequenceVerificationMethods:
 
     def __init__(
         self,
-        scene_cuts_threshold: float = 50.0,
+        scene_threshold: float = 50.0,
         dct_threshold: float = 75.0,
         sequence_threshold: float = 95.0,
+        num_samples: int = 10,
+        warmup_seconds: float = 0.0,
         max_workers: int = 2
     ):
         """
         Initialize verification methods.
 
         Args:
-            scene_cuts_threshold: Threshold for scene cut detection (default: 50.0)
+            scene_threshold: Threshold for scene cut detection (default: 50.0)
             dct_threshold: DCT similarity threshold (default: 75.0%)
             sequence_threshold: Sequence match threshold (default: 95.0%)
+            num_samples: Number of frames to sample for DCT (default: 10)
+            warmup_seconds: Skip this duration at start when checking scene cuts (default: 0.0)
             max_workers: Maximum parallel workers for verification (default: 2)
         """
-        self.scene_cuts_threshold = scene_cuts_threshold
+        self.scene_cuts_threshold = scene_threshold
         self.dct_threshold = dct_threshold
         self.sequence_threshold = sequence_threshold
+        self.num_samples = max(3, int(num_samples))
+        self.warmup_seconds = max(0.0, float(warmup_seconds))
         self.max_workers = max_workers
 
         logger.info(f"Subsequence verification initialized: "
-                   f"scene_threshold={scene_cuts_threshold}, "
+                   f"scene_threshold={scene_threshold}, "
                    f"dct_threshold={dct_threshold}%, "
                    f"seq_threshold={sequence_threshold}%, "
+                   f"samples={self.num_samples}, "
+                   f"warmup={self.warmup_seconds}s, "
                    f"workers={max_workers}")
 
     def _detect_scene_cuts(
@@ -375,7 +383,7 @@ class SubsequenceVerificationMethods:
             }
 
         # Step 1: Detect scene cuts in short video
-        scene_score = self._detect_scene_cuts(short_video, 0.0, duration)
+        scene_score = self._detect_scene_cuts(short_video, self.warmup_seconds, duration)
 
         # Check stop flag after scene detection
         if stop_flag and stop_flag.is_set():
@@ -402,10 +410,10 @@ class SubsequenceVerificationMethods:
         # Step 3: Compute DCT similarity
         dct_score = self._compute_dct_similarity(
             short_video, long_video,
-            start_time1=0.0,
-            start_time2=start_time,
+            start_time1=self.warmup_seconds,
+            start_time2=start_time + self.warmup_seconds,
             duration=duration,
-            num_samples=10
+            num_samples=self.num_samples
         )
 
         # Check stop flag after DCT computation
@@ -453,7 +461,9 @@ class SubsequenceVerificationMethods:
             'scene_cuts_score': scene_score,
             'dct_score': dct_score,
             'sequence_score': sequence_score,
-            'rejection_reason': None
+            'rejection_reason': None,
+            'num_samples': self.num_samples,
+            'warmup_seconds': self.warmup_seconds
         }
 
     def verify_batch(

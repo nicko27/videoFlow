@@ -16,6 +16,7 @@ except ImportError:
     from design_system import Colors, Spacing, Typography, Styles, get_status_colors, get_current_theme
 
 from src.core.logger import Logger
+from src.core.i18n import t
 
 logger = Logger.get_logger('DuplicateFinder.ProgressWidgets')
 
@@ -82,7 +83,7 @@ class ModernProgressWidget(QWidget):
             bold=True
         ))
 
-        self.status_label = QLabel("En attente...")
+        self.status_label = QLabel(t("duplicate_finder.progress.waiting", "Waiting..."))
         self.status_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
         self.status_label.setStyleSheet(Styles.label(
             color=Colors.BLACK,
@@ -243,17 +244,17 @@ class ModernProgressWidget(QWidget):
         """
         if seconds > 0:
             if seconds < 60:
-                self.time_label.setText(f"Restant: {int(seconds)}s")
+                self.time_label.setText(t("duplicate_finder.progress.time_seconds", "Remaining: {seconds}s", seconds=int(seconds)))
             elif seconds < 3600:
                 minutes = int(seconds // 60)
                 secs = int(seconds % 60)
-                self.time_label.setText(f"Restant: {minutes}:{secs:02d}")
+                self.time_label.setText(t("duplicate_finder.progress.time_minutes", "Remaining: {minutes}:{seconds:02d}", minutes=minutes, seconds=secs))
             else:
                 hours = int(seconds // 3600)
                 minutes = int((seconds % 3600) // 60)
-                self.time_label.setText(f"Restant: {hours}h{minutes:02d}")
+                self.time_label.setText(t("duplicate_finder.progress.time_hours", "Remaining: {hours}h{minutes:02d}", hours=hours, minutes=minutes))
         else:
-            self.time_label.setText("Temps : --:--")
+            self.time_label.setText(t("duplicate_finder.progress.time_unknown", "Time: --:--"))
             
     def set_speed(self, items_per_second):
         """Update the processing speed display.
@@ -337,7 +338,7 @@ class FileListWidget(QWidget):
         # En-tête
         header_layout = QHBoxLayout()
 
-        title = QLabel("📁 Fichiers vidéo")
+        title = QLabel(t("duplicate_finder.progress.video_files", "📁 Video Files"))
         title.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD, QFont.Weight.Bold))
         title.setStyleSheet(Styles.label(
             color=Colors.BLACK,
@@ -346,7 +347,7 @@ class FileListWidget(QWidget):
             bg_color=Colors.WHITE
         ) + f"padding: {Spacing.XXS}px;")
 
-        self.file_count_label = QLabel("0 fichier")
+        self.file_count_label = QLabel(t("duplicate_finder.progress.file_count_zero", "0 files"))
         self.file_count_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS))
         self.file_count_label.setStyleSheet(Styles.label(
             color=Colors.BLACK,
@@ -381,7 +382,7 @@ class FileListWidget(QWidget):
         self.files_layout.setSpacing(Spacing.XS)
 
         # Message par défaut
-        self.empty_label = QLabel("Aucun fichier ajouté")
+        self.empty_label = QLabel(t("duplicate_finder.progress.no_files", "No files added"))
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_MD))
         self.empty_label.setStyleSheet(f"""
@@ -448,8 +449,6 @@ class FileListWidget(QWidget):
         Note:
             The returned status_label is stored in self.file_items for updates.
         """
-        import os
-
         # Frame with bordure visible - HAUTEUR PLUS GÉNÉREUSE
         item_frame = QFrame()
         item_frame.setMinimumHeight(Spacing.FILE_ITEM_HEIGHT)
@@ -495,7 +494,7 @@ class FileListWidget(QWidget):
         size_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         # STATUT - NOIR FORCÉ with PLUS DE PLACE
-        status_label = QLabel("⏳ À analyser")
+        status_label = QLabel(t("duplicate_finder.status.to_analyze", "⏳ To analyze"))
         status_label.setFont(QFont(Typography.FONT_FAMILY, Typography.FONT_XS, QFont.Weight.Bold))
         status_label.setFixedWidth(120)
         status_label.setMinimumHeight(Spacing.INPUT_HEIGHT)
@@ -636,9 +635,9 @@ class FileListWidget(QWidget):
         """
         count = len(self.files)
         if count == 0:
-            self.file_count_label.setText("Aucun fichier")
+            self.file_count_label.setText(t("duplicate_finder.progress.file_count_zero", "0 files"))
         elif count == 1:
-            self.file_count_label.setText("1 fichier")
+            self.file_count_label.setText(t("duplicate_finder.progress.file_count_one", "1 file"))
         else:
             self.file_count_label.setText(f"{count} files")
             
@@ -876,7 +875,7 @@ class HashDebugger(QFrame):
         # File selection area
         file_selection_layout = QHBoxLayout()
 
-        self.select_btn = QPushButton("📁 Sélectionner une/des vidéo(s)")
+        self.select_btn = QPushButton(t("duplicate_finder.progress.select_videos", "📁 Select Video(s)"))
         self.select_btn.setMinimumHeight(32)
         self.select_btn.clicked.connect(self._select_files)
         self.select_btn.setStyleSheet("""
@@ -894,7 +893,7 @@ class HashDebugger(QFrame):
         """)
         file_selection_layout.addWidget(self.select_btn)
 
-        self.clear_btn = QPushButton("🗑️ Effacer")
+        self.clear_btn = QPushButton(t("duplicate_finder.progress.clear", "🗑️ Clear"))
         self.clear_btn.setMinimumHeight(32)
         self.clear_btn.clicked.connect(self._clear_files)
         self.clear_btn.setStyleSheet("""
@@ -919,7 +918,7 @@ class HashDebugger(QFrame):
         self.files_text = QTextEdit()
         self.files_text.setReadOnly(True)
         self.files_text.setMaximumHeight(80)
-        self.files_text.setPlaceholderText("Aucun fichier sélectionné")
+        self.files_text.setPlaceholderText(t("duplicate_finder.progress.no_file_selected", "No file selected"))
         self.files_text.setStyleSheet("""
             QTextEdit {
                 background-color: white;
@@ -933,7 +932,7 @@ class HashDebugger(QFrame):
         layout.addWidget(self.files_text)
 
         # Calculate button
-        self.calculate_btn = QPushButton("⚡ Calculer les hashs")
+        self.calculate_btn = QPushButton(t("duplicate_finder.progress.calculate_hashes", "⚡ Calculate Hashes"))
         self.calculate_btn.setMinimumHeight(36)
         self.calculate_btn.clicked.connect(self._calculate_hashes)
         self.calculate_btn.setEnabled(False)
@@ -1146,7 +1145,7 @@ class FrameSelectorDialog(QDialog):
         self.total_frames = 0
         self.fps = 0
 
-        self.setWindowTitle(f"Sélectionner l'image de départ - {os.path.basename(video_path)}")
+        self.setWindowTitle(t("duplicate_finder.progress.select_frame_title", "Select starting frame - {filename}", filename=os.path.basename(video_path)))
         self.setModal(True)
         self.resize(900, 700)
 
@@ -1208,7 +1207,7 @@ class FrameSelectorDialog(QDialog):
         # Control buttons
         controls_layout = QHBoxLayout()
 
-        self.play_btn = QPushButton("▶ Lire")
+        self.play_btn = QPushButton(t("duplicate_finder.progress.play", "▶ Play"))
         self.play_btn.setMinimumHeight(36)
         self.play_btn.clicked.connect(self._toggle_play)
         self.play_btn.setStyleSheet("""
@@ -1225,7 +1224,7 @@ class FrameSelectorDialog(QDialog):
             }
         """)
 
-        prev_btn = QPushButton("◀ Précédent")
+        prev_btn = QPushButton(t("duplicate_finder.progress.previous", "◀ Previous"))
         prev_btn.setMinimumHeight(36)
         prev_btn.clicked.connect(self._prev_frame)
         prev_btn.setStyleSheet("""
@@ -1241,7 +1240,7 @@ class FrameSelectorDialog(QDialog):
             }
         """)
 
-        next_btn = QPushButton("Suivant ▶")
+        next_btn = QPushButton(t("duplicate_finder.progress.next", "Next ▶"))
         next_btn.setMinimumHeight(36)
         next_btn.clicked.connect(self._next_frame)
         next_btn.setStyleSheet("""
@@ -1399,7 +1398,7 @@ class ResultsDialog(QDialog):
         super().__init__(parent)
         self.results_text = results_text
 
-        self.setWindowTitle("Résultats du débogage de hash")
+        self.setWindowTitle(t("duplicate_finder.progress.debug_results_title", "Hash Debug Results"))
         self.setModal(False)  # Allow interaction with main window
         self.resize(1000, 700)
 
@@ -2182,7 +2181,6 @@ class AudioFingerprintDebugger(QFrame):
         for path in file_paths:
             if path not in [v['path'] for v in self.videos]:
                 self.videos.append({'path': path, 'fingerprint': None, 'duration': 0.0})
-                import os
                 self.video_list.addItem(f"⏳ {os.path.basename(path)}")
 
         self.extract_btn.setEnabled(len(self.videos) >= 1)
@@ -2198,7 +2196,7 @@ class AudioFingerprintDebugger(QFrame):
     def _extract_fingerprints(self):
         """Extract audio fingerprints from all videos."""
         from PyQt6.QtWidgets import QMessageBox, QProgressDialog
-        from ..audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
+        from .audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
 
         # Get precision mode
         precision_mode_name = self.precision_combo.currentData()
@@ -2243,12 +2241,10 @@ class AudioFingerprintDebugger(QFrame):
             if fp:
                 video['fingerprint'] = fp
                 video['duration'] = duration
-                import os
                 self.video_list.item(i).setText(
                     f"✅ {os.path.basename(video['path'])} ({duration:.1f}s, {len(fp)} chars)"
                 )
             else:
-                import os
                 self.video_list.item(i).setText(f"❌ {os.path.basename(video['path'])} (failed)")
 
         progress.setValue(len(self.videos))
@@ -2266,7 +2262,6 @@ class AudioFingerprintDebugger(QFrame):
     def _compare_fingerprints(self):
         """Compare all fingerprints and show results."""
         from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton
-        import os
 
         # Build comparison table
         results = []
@@ -2332,7 +2327,7 @@ class AudioFingerprintDebugger(QFrame):
 
         # Show results dialog
         dialog = QDialog(self)
-        dialog.setWindowTitle("Résultats de comparaison d'empreinte audio")
+        dialog.setWindowTitle(t("duplicate_finder.progress.audio_comparison_results", "Audio Fingerprint Comparison Results"))
         dialog.setMinimumSize(900, 600)
 
         layout = QVBoxLayout(dialog)

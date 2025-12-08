@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon
 
 from ..transitions import Transition, TransitionType, TransitionPreset
+from src.core.i18n import t
 
 
 class TransitionDialog(QDialog):
@@ -36,18 +37,18 @@ class TransitionDialog(QDialog):
 
     def setup_ui(self):
         """Set up the dialog UI."""
-        self.setWindowTitle("Configure Transition")
+        self.setWindowTitle(t("video_editor.dialog.transition.title", "Configure Transition"))
         self.setMinimumWidth(500)
         self.setMinimumHeight(400)
 
         layout = QVBoxLayout(self)
 
         # Preset section
-        preset_group = QGroupBox("Quick Presets")
+        preset_group = QGroupBox(t("video_editor.dialog.transition.quick_presets", "Quick Presets"))
         preset_layout = QVBoxLayout()
 
         self.preset_combo = QComboBox()
-        self.preset_combo.addItem("-- Select Preset --", None)
+        self.preset_combo.addItem(t("video_editor.dialog.transition.select_preset", "-- Select Preset --"), None)
         for preset_name in TransitionPreset.get_preset_names():
             self.preset_combo.addItem(preset_name, preset_name)
         self.preset_combo.currentIndexChanged.connect(self.on_preset_selected)
@@ -57,11 +58,11 @@ class TransitionDialog(QDialog):
         layout.addWidget(preset_group)
 
         # Custom transition section
-        custom_group = QGroupBox("Custom Transition")
+        custom_group = QGroupBox(t("video_editor.dialog.transition.custom_transition", "Custom Transition"))
         custom_layout = QGridLayout()
 
         # Transition type
-        custom_layout.addWidget(QLabel("Type:"), 0, 0)
+        custom_layout.addWidget(QLabel(t("video_editor.dialog.transition.type", "Type:")), 0, 0)
         self.type_combo = QComboBox()
         for trans_type in TransitionType:
             display_name = trans_type.value.replace('_', ' ').title()
@@ -70,7 +71,7 @@ class TransitionDialog(QDialog):
         custom_layout.addWidget(self.type_combo, 0, 1)
 
         # Duration
-        custom_layout.addWidget(QLabel("Duration (seconds):"), 1, 0)
+        custom_layout.addWidget(QLabel(t("video_editor.dialog.transition.duration", "Duration (seconds):")), 1, 0)
         self.duration_spin = QDoubleSpinBox()
         self.duration_spin.setRange(0.1, 5.0)
         self.duration_spin.setSingleStep(0.1)
@@ -80,7 +81,7 @@ class TransitionDialog(QDialog):
         custom_layout.addWidget(self.duration_spin, 1, 1)
 
         # Easing
-        custom_layout.addWidget(QLabel("Easing:"), 2, 0)
+        custom_layout.addWidget(QLabel(t("video_editor.dialog.transition.easing", "Easing:")), 2, 0)
         self.easing_combo = QComboBox()
         self.easing_combo.addItems(["linear", "ease-in", "ease-out", "ease-in-out"])
         self.easing_combo.currentIndexChanged.connect(self.on_custom_changed)
@@ -90,7 +91,7 @@ class TransitionDialog(QDialog):
         layout.addWidget(custom_group)
 
         # Preview section
-        preview_group = QGroupBox("Preview")
+        preview_group = QGroupBox(t("video_editor.dialog.transition.preview", "Preview"))
         preview_layout = QVBoxLayout()
 
         self.preview_label = QLabel()
@@ -120,15 +121,15 @@ class TransitionDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.clear_btn = QPushButton("No Transition")
+        self.clear_btn = QPushButton(t("video_editor.dialog.transition.no_transition", "No Transition"))
         self.clear_btn.clicked.connect(self.on_clear)
         button_layout.addWidget(self.clear_btn)
 
-        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn = QPushButton(t("video_editor.dialog.transition.cancel", "Cancel"))
         self.cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_btn)
 
-        self.apply_btn = QPushButton("Apply")
+        self.apply_btn = QPushButton(t("video_editor.dialog.transition.apply", "Apply"))
         self.apply_btn.setDefault(True)
         self.apply_btn.clicked.connect(self.on_apply)
         button_layout.addWidget(self.apply_btn)
@@ -212,20 +213,29 @@ class TransitionDialog(QDialog):
 
         # Create visual preview
         if transition.type == TransitionType.NONE:
-            preview_text = "┌─────┐  ┌─────┐\n│  A  │  │  B  │\n└─────┘  └─────┘\n\nNo transition - direct cut"
+            preview_text = t("video_editor.dialog.transition.preview_none",
+                "┌─────┐  ┌─────┐\n│  A  │  │  B  │\n└─────┘  └─────┘\n\nNo transition - direct cut")
         elif transition.type == TransitionType.FADE:
-            preview_text = f"┌─────┐     ┌─────┐\n│  A  │ ▓▒░ │  B  │\n└─────┘     └─────┘\n\nFade ({transition.duration}s)"
+            preview_text = t("video_editor.dialog.transition.preview_fade",
+                "┌─────┐     ┌─────┐\n│  A  │ ▓▒░ │  B  │\n└─────┘     └─────┘\n\nFade ({duration}s)",
+                duration=transition.duration)
         elif "WIPE" in transition.type.value.upper():
             direction = transition.type.value.split('_')[1]
             arrow = {"left": "←", "right": "→", "up": "↑", "down": "↓"}.get(direction, "→")
-            preview_text = f"┌─────┐ {arrow}  ┌─────┐\n│  A  │ {arrow}  │  B  │\n└─────┘ {arrow}  └─────┘\n\nWipe {direction.title()} ({transition.duration}s)"
+            preview_text = t("video_editor.dialog.transition.preview_wipe",
+                "┌─────┐ {arrow}  ┌─────┐\n│  A  │ {arrow}  │  B  │\n└─────┘ {arrow}  └─────┘\n\nWipe {direction} ({duration}s)",
+                arrow=arrow, direction=direction.title(), duration=transition.duration)
         elif "SLIDE" in transition.type.value.upper():
             direction = transition.type.value.split('_')[1]
-            preview_text = f"┌─────┐═══→┌─────┐\n│  A  │    │  B  │\n└─────┘    └─────┘\n\nSlide {direction.title()} ({transition.duration}s)"
+            preview_text = t("video_editor.dialog.transition.preview_slide",
+                "┌─────┐═══→┌─────┐\n│  A  │    │  B  │\n└─────┘    └─────┘\n\nSlide {direction} ({duration}s)",
+                direction=direction.title(), duration=transition.duration)
         elif "ZOOM" in transition.type.value.upper():
             zoom_type = "in" if "IN" in transition.type.value.upper() else "out"
             symbol = "⊕" if zoom_type == "in" else "⊖"
-            preview_text = f"┌─────┐  {symbol}  ┌─────┐\n│  A  │     │  B  │\n└─────┘     └─────┘\n\nZoom {zoom_type.title()} ({transition.duration}s)"
+            preview_text = t("video_editor.dialog.transition.preview_zoom",
+                "┌─────┐  {symbol}  ┌─────┐\n│  A  │     │  B  │\n└─────┘     └─────┘\n\nZoom {type} ({duration}s)",
+                symbol=symbol, type=zoom_type.title(), duration=transition.duration)
         else:
             preview_text = f"┌─────┐ ≈≈≈ ┌─────┐\n│  A  │     │  B  │\n└─────┘     └─────┘\n\n{transition}"
 
@@ -233,17 +243,17 @@ class TransitionDialog(QDialog):
 
         # Update description
         descriptions = {
-            TransitionType.NONE: "No transition effect. Direct cut between segments.",
-            TransitionType.FADE: "Smooth cross-fade between segments. Classic and professional.",
-            TransitionType.WIPE_LEFT: "Second segment wipes in from right to left.",
-            TransitionType.WIPE_RIGHT: "Second segment wipes in from left to right.",
-            TransitionType.WIPE_UP: "Second segment wipes in from bottom to top.",
-            TransitionType.WIPE_DOWN: "Second segment wipes in from top to bottom.",
-            TransitionType.SLIDE_LEFT: "Second segment slides in from right, pushing first segment left.",
-            TransitionType.SLIDE_RIGHT: "Second segment slides in from left, pushing first segment right.",
-            TransitionType.ZOOM_IN: "Fade transition with zoom in effect.",
-            TransitionType.ZOOM_OUT: "Fade transition with zoom out effect.",
-            TransitionType.DISSOLVE: "Smooth dissolve between segments."
+            TransitionType.NONE: t("video_editor.dialog.transition.desc_none", "No transition effect. Direct cut between segments."),
+            TransitionType.FADE: t("video_editor.dialog.transition.desc_fade", "Smooth cross-fade between segments. Classic and professional."),
+            TransitionType.WIPE_LEFT: t("video_editor.dialog.transition.desc_wipe_left", "Second segment wipes in from right to left."),
+            TransitionType.WIPE_RIGHT: t("video_editor.dialog.transition.desc_wipe_right", "Second segment wipes in from left to right."),
+            TransitionType.WIPE_UP: t("video_editor.dialog.transition.desc_wipe_up", "Second segment wipes in from bottom to top."),
+            TransitionType.WIPE_DOWN: t("video_editor.dialog.transition.desc_wipe_down", "Second segment wipes in from top to bottom."),
+            TransitionType.SLIDE_LEFT: t("video_editor.dialog.transition.desc_slide_left", "Second segment slides in from right, pushing first segment left."),
+            TransitionType.SLIDE_RIGHT: t("video_editor.dialog.transition.desc_slide_right", "Second segment slides in from left, pushing first segment right."),
+            TransitionType.ZOOM_IN: t("video_editor.dialog.transition.desc_zoom_in", "Fade transition with zoom in effect."),
+            TransitionType.ZOOM_OUT: t("video_editor.dialog.transition.desc_zoom_out", "Fade transition with zoom out effect."),
+            TransitionType.DISSOLVE: t("video_editor.dialog.transition.desc_dissolve", "Smooth dissolve between segments.")
         }
 
         desc = descriptions.get(transition.type, "")

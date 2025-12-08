@@ -8,6 +8,7 @@ cutting, and scene detection.
 from PyQt6.QtGui import QAction
 from src.core.plugin_interface import PluginInterface
 from src.core.logger import Logger
+from src.core.i18n import t
 
 logger = Logger.get_logger('VideoEditor.Plugin')
 
@@ -33,8 +34,8 @@ class VideoEditorPlugin(PluginInterface):
         with the main application.
         """
         super().__init__()
-        self.name = "Video Editor"
-        self.description = "Édite et découpe des vidéos"
+        self.name = t("plugin.video_editor.name", "Video Editor")
+        self.description = t("plugin.video_editor.description", "Édite et découpe des vidéos")
         self.version = "1.0.0"
         self.window = None
         logger.debug("Plugin VideoEditor initialisé")

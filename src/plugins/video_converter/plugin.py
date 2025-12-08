@@ -3,6 +3,7 @@
 from PyQt6.QtGui import QAction
 from src.core.plugin_interface import PluginInterface
 from src.core.logger import Logger
+from src.core.i18n import t
 
 logger = Logger.get_logger('VideoConverter.Plugin')
 
@@ -12,8 +13,8 @@ class VideoConverterPlugin(PluginInterface):
     def __init__(self):
         """Initialise the plugin with chargement minimal."""
         super().__init__()
-        self.name = "Video Converter"
-        self.description = "Converts les files vidéo with ffmpeg"
+        self.name = t("plugin.video_converter.name", "Video Converter")
+        self.description = t("plugin.video_converter.description", "Convert video files with ffmpeg")
         self.version = "1.0.1"
         self.window = None
         self.main_window = None

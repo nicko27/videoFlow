@@ -1,0 +1,9 @@
+{
+  "mode": "filtering",
+  "methods": [
+    {"name": "motion_analysis", "enabled": true, "parameters": {"correlation_threshold": 85.0, "sample_interval": 2}, "weight": 1.0},
+    {"name": "dct_coefficients", "enabled": true, "parameters": {"threshold": 78.0, "num_coeffs": 18}, "weight": 1.0},
+    {"name": "feature_matching", "enabled": true, "parameters": {"detector": "ORB", "threshold": 70.0}, "weight": 1.0},
+    {"name": "strategy3", "enabled": true, "parameters": {"scene_threshold": 55.0, "dct_threshold": 78.0, "sequence_threshold": 96.0, "num_samples": 14, "warmup_seconds": 0.5, "max_workers": 8}, "weight": 1.5}
+  ]
+}
