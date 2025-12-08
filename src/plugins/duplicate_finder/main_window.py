@@ -237,6 +237,9 @@ class DuplicateFinderWindow(QMainWindow):
         # Setup keyboard shortcuts
         self._setup_shortcuts()
 
+        # Setup tooltips
+        self._setup_tooltips()
+
         logger.info("Main window initialized successfully")
 
     def setup_ui(self) -> None:
@@ -2690,6 +2693,210 @@ class DuplicateFinderWindow(QMainWindow):
         """
 
         QMessageBox.information(self, "Keyboard Shortcuts", shortcuts_text)
+
+    def _setup_tooltips(self):
+        """Setup informative tooltips for all UI widgets."""
+        # Main tabs
+        if hasattr(self, 'main_tabs') and self.main_tabs:
+            self.main_tabs.setTabToolTip(0, "View dashboard with statistics and quick actions")
+            self.main_tabs.setTabToolTip(1, "Configure and run duplicate analysis")
+            self.main_tabs.setTabToolTip(2, "Filter and manage detected duplicates")
+            self.main_tabs.setTabToolTip(3, "Queue and manage batch processing jobs")
+
+        # Main action buttons
+        if self.analyze_btn:
+            self.analyze_btn.setToolTip("Start duplicate detection analysis (F5 or Ctrl+P)")
+
+        if self.stop_btn:
+            self.stop_btn.setToolTip("Stop the current analysis operation (Escape or Ctrl+.)")
+
+        if self.reload_last_folder_btn:
+            self.reload_last_folder_btn.setToolTip("Reload files from the last analyzed folder")
+
+        # Video comparison parameters
+        if self.threshold_spin:
+            self.threshold_spin.setToolTip(
+                "Similarity threshold (0-100): Lower values = stricter matching, "
+                "Higher values = more lenient matching"
+            )
+
+        if self.hash_method_combo:
+            self.hash_method_combo.setToolTip(
+                "Hash algorithm for video comparison:\n"
+                "• pHash: Perceptual hash (recommended for most cases)\n"
+                "• dHash: Difference hash (faster, less accurate)\n"
+                "• aHash: Average hash (fastest, least accurate)\n"
+                "• wHash: Wavelet hash (best for transformations)"
+            )
+
+        if self.hash_workers_spin:
+            self.hash_workers_spin.setToolTip(
+                "Number of parallel workers for hash computation. "
+                "More workers = faster processing but higher CPU usage"
+            )
+
+        if self.comparison_workers_spin:
+            self.comparison_workers_spin.setToolTip(
+                "Number of parallel workers for video comparison. "
+                "More workers = faster processing but higher CPU/memory usage"
+            )
+
+        if self.batch_size_spin:
+            self.batch_size_spin.setToolTip(
+                "Number of frames to process per batch. "
+                "Larger batches = better performance but more memory usage"
+            )
+
+        if self.hash_timeout_spin:
+            self.hash_timeout_spin.setToolTip(
+                "Maximum time (seconds) allowed for hashing a single video file. "
+                "Prevents hanging on corrupted files"
+            )
+
+        if self.comparison_timeout_spin:
+            self.comparison_timeout_spin.setToolTip(
+                "Maximum time (seconds) allowed for comparing two videos. "
+                "Prevents hanging on problematic comparisons"
+            )
+
+        # Audio-First parameters
+        if self.audio_threshold_spin:
+            self.audio_threshold_spin.setToolTip(
+                "Audio similarity threshold (0-100): Lower = stricter audio matching"
+            )
+
+        if self.audio_precision_combo:
+            self.audio_precision_combo.setToolTip(
+                "Audio fingerprint precision mode:\n"
+                "• Low: Fast but less accurate\n"
+                "• Medium: Balanced speed and accuracy (recommended)\n"
+                "• High: Slow but most accurate"
+            )
+
+        if self.audio_workers_spin:
+            self.audio_workers_spin.setToolTip(
+                "Number of parallel workers for audio processing"
+            )
+
+        if self.audio_cache_size_spin:
+            self.audio_cache_size_spin.setToolTip(
+                "Audio fingerprint cache size (MB). "
+                "Larger cache = faster repeated analyses"
+            )
+
+        if self.enable_no_audio_fallback:
+            self.enable_no_audio_fallback.setToolTip(
+                "Automatically fall back to video comparison for files without audio"
+            )
+
+        # LSH (Locality-Sensitive Hashing) parameters
+        if self.enable_lsh_check:
+            self.enable_lsh_check.setToolTip(
+                "Enable LSH optimization for faster approximate matching on large datasets"
+            )
+
+        if self.lsh_bands_spin:
+            self.lsh_bands_spin.setToolTip(
+                "Number of LSH bands. More bands = higher recall but more false positives"
+            )
+
+        if self.lsh_rows_spin:
+            self.lsh_rows_spin.setToolTip(
+                "Number of rows per LSH band. More rows = higher precision but lower recall"
+            )
+
+        if self.enable_lsh_no_audio:
+            self.enable_lsh_no_audio.setToolTip(
+                "Apply LSH optimization even to videos without audio tracks"
+            )
+
+        # Multi-Resolution parameters
+        if self.enable_mr_check:
+            self.enable_mr_check.setToolTip(
+                "Enable multi-resolution comparison for better accuracy with different video qualities"
+            )
+
+        if self.mr_coarse_duration_spin:
+            self.mr_coarse_duration_spin.setToolTip(
+                "Duration (seconds) for coarse-level sampling in multi-resolution analysis"
+            )
+
+        if self.mr_coarse_threshold_spin:
+            self.mr_coarse_threshold_spin.setToolTip(
+                "Similarity threshold for coarse-level comparison"
+            )
+
+        if self.mr_medium_duration_spin:
+            self.mr_medium_duration_spin.setToolTip(
+                "Duration (seconds) for medium-level sampling in multi-resolution analysis"
+            )
+
+        if self.mr_medium_threshold_spin:
+            self.mr_medium_threshold_spin.setToolTip(
+                "Similarity threshold for medium-level comparison"
+            )
+
+        # Metadata filter parameters
+        if self.enable_metadata_check:
+            self.enable_metadata_check.setToolTip(
+                "Pre-filter candidates using metadata (duration, file size) before comparison"
+            )
+
+        if self.metadata_duration_tolerance_spin:
+            self.metadata_duration_tolerance_spin.setToolTip(
+                "Maximum duration difference (seconds) for videos to be considered potential duplicates"
+            )
+
+        if self.metadata_size_ratio_spin:
+            self.metadata_size_ratio_spin.setToolTip(
+                "Maximum file size ratio difference (e.g., 2.0 = one file can be 2x larger)"
+            )
+
+        # Cache parameters
+        if self.video_cache_size_spin:
+            self.video_cache_size_spin.setToolTip(
+                "Video frame cache size (MB). Larger cache = faster processing but more memory usage"
+            )
+
+        if self.comparison_cache_size_spin:
+            self.comparison_cache_size_spin.setToolTip(
+                "Comparison result cache size (entries). Caches recent comparison results"
+            )
+
+        # Detection options
+        if self.enable_flip_detection:
+            self.enable_flip_detection.setToolTip(
+                "Detect horizontally/vertically flipped duplicates (slower but more thorough)"
+            )
+
+        # Progress widgets
+        if self.file_progress:
+            self.file_progress.setToolTip(
+                "Progress of file hashing operation"
+            )
+
+        if self.duplicate_progress:
+            self.duplicate_progress.setToolTip(
+                "Progress of duplicate comparison operation"
+            )
+
+        if self.audio_progress:
+            self.audio_progress.setToolTip(
+                "Progress of audio fingerprint extraction and comparison"
+            )
+
+        if self.verification_progress:
+            self.verification_progress.setToolTip(
+                "Progress of subsequence verification for partial duplicates"
+            )
+
+        # File list widget
+        if self.file_list_widget:
+            self.file_list_widget.setToolTip(
+                "List of video files to analyze. Drag & drop files or use 'Add Files' button"
+            )
+
+        logger.info("Tooltips configured for all UI widgets")
 
     def _apply_theme(self, theme_type: ThemeType):
         """
