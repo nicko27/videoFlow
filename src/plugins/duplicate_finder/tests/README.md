@@ -13,14 +13,30 @@ Tests for core manager components:
 - **ProgressManager**: Progress widget coordination
 - **WidgetRegistry**: Widget registration and retrieval
 
-### Integration Tests (TODO)
-- Full analysis workflow
-- Benchmark workflow
-- Settings persistence
-- Import/export functionality
+### Integration Tests (`test_integration.py`)
+Tests for complete end-to-end workflows:
+- **TestAnalysisWorkflow**: Full analysis workflow with different configurations
+  - Complete analysis from configuration to results storage
+  - Audio fingerprinting integration
+  - LSH optimization integration
+- **TestBenchmarkWorkflow**: Benchmark creation and execution
+  - Test set creation and management
+  - Pipeline creation for benchmarks
+  - Benchmark results storage
+- **TestSettingsPersistence**: Settings save/load functionality
+  - Settings persistence across sessions
+  - Default value handling
+  - UnifiedConfigManager integration
+- **TestImportExport**: Import/export functionality
+  - Pipeline export/import via JSON
+  - Test set export/import
+  - Settings export/import
+- **TestEndToEndWorkflows**: Complete user workflows
+  - Full benchmark workflow (configure -> test set -> pipeline -> benchmark)
+  - Settings and pipeline integration
 
 ### Functional Tests (`test_functional.py`)
-End-to-end functionality tests.
+End-to-end functionality tests (TODO).
 
 ## Running Tests
 
@@ -32,7 +48,11 @@ python3 -m pytest src/plugins/duplicate_finder/tests/ -v
 
 ### Run specific test file:
 ```bash
+# Unit tests only
 python3 -m pytest src/plugins/duplicate_finder/tests/test_core_managers.py -v
+
+# Integration tests only
+python3 -m pytest src/plugins/duplicate_finder/tests/test_integration.py -v
 ```
 
 ### Run with coverage:
@@ -55,8 +75,9 @@ python3 -m pytest src/plugins/duplicate_finder/tests/ --cov=src/plugins/duplicat
 
 ## Future Improvements
 
-1. Add integration tests for complete workflows
+1. ✅ ~~Add integration tests for complete workflows~~ (COMPLETED)
 2. Add performance benchmarks
 3. Add regression tests for known bugs
 4. Add GUI interaction tests using pytest-qt
 5. Increase code coverage to 90%+
+6. Resolve module import issues for test execution
