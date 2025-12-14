@@ -23,65 +23,61 @@ from PyQt6.QtGui import QFont, QShortcut, QKeySequence
 
 # Import local modules
 try:
-    from .video_hasher import VideoHasher
-    from .comparison_dialog import ComparisonDialog
-    from .subsequence_comparison_dialog import SubsequenceComparisonDialog
-    from .progress_widgets import FileListWidget
+    from .detection.video import VideoHasher
+    from .ui.dialogs.comparison_dialog import ComparisonDialog
+    from .ui.dialogs.subsequence_comparison_dialog import SubsequenceComparisonDialog
+    from .ui.widgets.progress_widgets import FileListWidget
     from .ui.panels import UIPanels
     from .ui.widget_registry import WidgetRegistry, get_widget_registry
     from .ui.settings_dialog import SettingsDialog
-    from .ui.dashboard_view import DashboardView
     from .ui.batch_queue_widget import BatchQueueWidget
     from .ui.cluster_view_dialog import ClusterViewDialog
-    from .ui.smart_filters import SmartFiltersWidget
     from .ui.report_dialog import ReportDialog
     from .ui.themes import Theme, ThemeType
     from .controllers.batch_controller import BatchController, get_batch_controller
     from .analysis.cluster_detector import detect_clusters_from_db
-    from .managers.settings_manager import SettingsManager
-    from .managers.unified_config_manager import UnifiedConfigManager
-    from .managers.progress_manager import ProgressManager, get_progress_manager
+    from .infrastructure.config.settings_manager import SettingsManager
+    from .orchestration.unified_config_manager import UnifiedConfigManager
+    from .orchestration.progress_manager import ProgressManager, get_progress_manager
     from .controllers.workflow_controller import WorkflowController, WorkflowState, get_workflow_controller
     from .handlers.file_handler import FileHandler
     from .handlers.analysis_handler import AnalysisHandler
     from .handlers.duplicate_handler import DuplicateHandler
     from .handlers.audio_first_handler import AudioFirstHandler
-    from .audio_config import AudioFirstConfig
-    from .design_system import get_current_theme
-    from .layouts import LayoutManager, LayoutType
-    from .audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
-    from .advanced_progress_dialog import AdvancedProgressDialog
-    from .analysis import AdvancedDuplicatePipeline
+    from .infrastructure.config.audio_config import AudioFirstConfig
+    from .infrastructure.config.design_system import get_current_theme
+    from .infrastructure.config.layouts import LayoutManager, LayoutType
+    from .detection.audio import AudioFingerprintDetector, PrecisionMode
+    from .ui.dialogs.advanced_progress_dialog import AdvancedProgressDialog
+    from .detection.hybrid.advanced_pipeline import AdvancedDuplicatePipeline
 except ImportError:
     # Fallback for direct imports
-    from video_hasher import VideoHasher
-    from comparison_dialog import ComparisonDialog
-    from subsequence_comparison_dialog import SubsequenceComparisonDialog
-    from progress_widgets import FileListWidget
-    from ui.panels import UIPanels
-    from ui.widget_registry import WidgetRegistry, get_widget_registry
-    from ui.settings_dialog import SettingsDialog
-    from ui.dashboard_view import DashboardView
-    from ui.batch_queue_widget import BatchQueueWidget
-    from ui.cluster_view_dialog import ClusterViewDialog
-    from ui.smart_filters import SmartFiltersWidget
-    from ui.report_dialog import ReportDialog
-    from controllers.batch_controller import BatchController, get_batch_controller
-    from analysis.cluster_detector import detect_clusters_from_db
-    from managers.settings_manager import SettingsManager
-    from managers.unified_config_manager import UnifiedConfigManager
-    from managers.progress_manager import ProgressManager, get_progress_manager
-    from controllers.workflow_controller import WorkflowController, WorkflowState, get_workflow_controller
-    from handlers.file_handler import FileHandler
-    from handlers.analysis_handler import AnalysisHandler
-    from handlers.duplicate_handler import DuplicateHandler
-    from handlers.audio_first_handler import AudioFirstHandler
-    from audio_config import AudioFirstConfig
-    from design_system import get_current_theme
-    from layouts import LayoutManager, LayoutType
-    from audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
-    from advanced_progress_dialog import AdvancedProgressDialog
-    from analysis import AdvancedDuplicatePipeline
+    from .detection.video import VideoHasher
+    from .ui.dialogs.comparison_dialog import ComparisonDialog
+    from .ui.dialogs.subsequence_comparison_dialog import SubsequenceComparisonDialog
+    from .ui.widgets.progress_widgets import FileListWidget
+    from .ui.panels import UIPanels
+    from .ui.widget_registry import WidgetRegistry, get_widget_registry
+    from .ui.settings_dialog import SettingsDialog
+    from .ui.batch_queue_widget import BatchQueueWidget
+    from .ui.cluster_view_dialog import ClusterViewDialog
+    from .ui.report_dialog import ReportDialog
+    from .controllers.batch_controller import BatchController, get_batch_controller
+    from .analysis.cluster_detector import detect_clusters_from_db
+    from .infrastructure.config.settings_manager import SettingsManager
+    from .orchestration.unified_config_manager import UnifiedConfigManager
+    from .orchestration.progress_manager import ProgressManager, get_progress_manager
+    from .controllers.workflow_controller import WorkflowController, WorkflowState, get_workflow_controller
+    from .handlers.file_handler import FileHandler
+    from .handlers.analysis_handler import AnalysisHandler
+    from .handlers.duplicate_handler import DuplicateHandler
+    from .handlers.audio_first_handler import AudioFirstHandler
+    from .infrastructure.config.audio_config import AudioFirstConfig
+    from .infrastructure.config.design_system import get_current_theme
+    from .infrastructure.config.layouts import LayoutManager, LayoutType
+    from .detection.audio import AudioFingerprintDetector, PrecisionMode
+    from .ui.dialogs.advanced_progress_dialog import AdvancedProgressDialog
+    from .detection.hybrid.advanced_pipeline import AdvancedDuplicatePipeline
 
 from src.core.logger import Logger
 from src.core.i18n import t
@@ -105,6 +101,7 @@ class DuplicateFinderWindow(QMainWindow):
 
     Attributes:
         closed (pyqtSignal): Signal emitted when the window is closed.
+        stop_all_benchmarks (pyqtSignal): Signal to stop all running benchmarks.
 
     Example:
         ```python
@@ -114,6 +111,7 @@ class DuplicateFinderWindow(QMainWindow):
     """
 
     closed = pyqtSignal()
+    stop_all_benchmarks = pyqtSignal()  # Signal global pour arrêter tous les benchmarks
 
     def __init__(self) -> None:
         """
@@ -148,6 +146,12 @@ class DuplicateFinderWindow(QMainWindow):
         self.analyze_btn = None
         self.stop_btn = None
         self.reload_last_folder_btn = None
+        self.benchmark_widget = None
+        self.benchmark_live_group = None
+        self.benchmark_live_table = None
+        self.benchmark_live_pipelines = {}  # Track live metrics per pipeline
+        self.benchmark_results_group = None
+        self.benchmark_results_table = None
 
         # Initialize parameter widgets (will be set in setup_ui)
         self.threshold_spin = None
@@ -270,24 +274,6 @@ class DuplicateFinderWindow(QMainWindow):
         title_bar = self._create_title_bar()
         main_layout.addWidget(title_bar)
 
-        # Create main tab widget
-        self.main_tabs = QTabWidget()
-        self.main_tabs.setObjectName("main_tabs")
-
-        # ===== DASHBOARD TAB =====
-        self.dashboard_view = DashboardView(self.video_hasher.db)
-        self.dashboard_view.add_files_requested.connect(self.add_files)
-        self.dashboard_view.add_folder_requested.connect(self.add_folder)
-        self.dashboard_view.start_analysis_requested.connect(self.start_analysis)
-        self.dashboard_view.view_results_requested.connect(self._show_results_tab)
-        self.main_tabs.addTab(self.dashboard_view, "📊 Dashboard")
-
-        # ===== ANALYSIS TAB =====
-        analysis_widget = QWidget()
-        analysis_layout = QVBoxLayout(analysis_widget)
-        analysis_layout.setContentsMargins(0, 0, 0, 0)
-        analysis_layout.setSpacing(0)
-
         # Create file list widget (needed for both panels)
         self.file_list_widget = FileListWidget()
 
@@ -302,6 +288,8 @@ class DuplicateFinderWindow(QMainWindow):
         self.duplicate_progress = right_widgets['duplicate_progress']
         self.audio_progress = right_widgets.get('audio_progress')  # New audio hash progress
         self.verification_progress = right_widgets.get('verification_progress')  # Subsequence verification progress
+        self.benchmark_results_group = right_widgets.get('benchmark_results_group')  # Benchmark results display
+        self.benchmark_results_table = right_widgets.get('benchmark_results_table')  # Benchmark results table
 
         # Register progress widgets with ProgressManager
         self.progress_manager.register_widget('file_progress', self.file_progress)
@@ -311,7 +299,7 @@ class DuplicateFinderWindow(QMainWindow):
         if self.verification_progress:
             self.progress_manager.register_widget('verification_progress', self.verification_progress)
 
-        # Use LayoutManager to create the Dashboard layout
+        # Use LayoutManager to create the main layout (Analysis content directly)
         layout_container = self.layout_manager.create_layout(
             self.current_layout,
             left_panel,
@@ -319,23 +307,7 @@ class DuplicateFinderWindow(QMainWindow):
             None  # No header widget needed
         )
 
-        analysis_layout.addWidget(layout_container)
-        self.main_tabs.addTab(analysis_widget, "🔍 Analysis")
-
-        # ===== FILTERS TAB =====
-        self.smart_filters_widget = SmartFiltersWidget()
-        self.smart_filters_widget.filter_changed.connect(self._on_filter_changed)
-        self.main_tabs.addTab(self.smart_filters_widget, "🎛️ Filters")
-
-        # ===== BATCH QUEUE TAB =====
-        self.batch_queue_widget = BatchQueueWidget(
-            batch_controller=self.batch_controller,
-            config_manager=self.unified_config_manager
-        )
-        self.batch_queue_widget.execute_job_requested.connect(self._execute_batch_job)
-        self.main_tabs.addTab(self.batch_queue_widget, "📋 Batch Queue")
-
-        main_layout.addWidget(self.main_tabs)
+        main_layout.addWidget(layout_container)
         # CRITIQUE: Définir le stretch factor pour que le container s'étende et remplisse tout l'espace disponible
         main_layout.setStretch(1, 1)  # Index 1 = layout_container (index 0 = title_bar)
 
@@ -534,7 +506,7 @@ class DuplicateFinderWindow(QMainWindow):
         # Find the QTabWidget first
         from PyQt6.QtWidgets import QTabWidget
         config_tabs = panel.findChild(QTabWidget)
-        self.config_tabs = config_tabs
+        self.config_tabs = config_tabs  # Store reference for later use
 
         # Get tabs by objectName (safer than hardcoded indices)
         params_tab = None
@@ -542,6 +514,8 @@ class DuplicateFinderWindow(QMainWindow):
         if config_tabs:
             params_tab = self._find_tab_by_name(config_tabs, "params_tab")
             debug_tab = self._find_tab_by_name(config_tabs, "debug_tab")
+
+        self.params_tab = params_tab  # Store reference for later use
 
         # Register all widgets with WidgetRegistry
         if params_tab:
@@ -601,8 +575,20 @@ class DuplicateFinderWindow(QMainWindow):
         else:
             logger.error("params_tab is None! Cannot extract widget references")
 
-        if debug_tab:
-            self.hash_debugger_v2 = debug_tab.hash_debugger_v2
+        # Get Batch Queue tab and set config_manager
+        batch_queue_tab = self._find_tab_by_name(config_tabs, "batch_queue_tab")
+        if batch_queue_tab:
+            batch_queue_tab.config_manager = self.unified_config_manager
+            batch_queue_tab.execute_job_requested.connect(self._execute_batch_job)
+            logger.info("Batch Queue tab configured in left panel")
+
+        # Get Benchmark tab and connect signal
+        if hasattr(config_tabs, 'benchmark_widget') and config_tabs.benchmark_widget:
+            self.benchmark_widget = config_tabs.benchmark_widget
+            self.benchmark_widget.benchmark_results_ready.connect(self._display_benchmark_results_in_right_panel)
+            logger.info("Benchmark widget connected to right panel display")
+        else:
+            self.benchmark_widget = None
 
         # Extract button references
         for child in panel.findChildren(QWidget):
@@ -1099,15 +1085,18 @@ class DuplicateFinderWindow(QMainWindow):
                 full_config = params_tab.pipeline_config_widget.get_pipeline_config()
                 mode = full_config.get('mode', 'filtering')
                 methods_config = full_config.get('methods', [])
+                global_threshold = full_config.get('global_threshold')
 
                 if methods_config:  # Only create pipeline if methods are configured
-                    from .verification_pipeline import VerificationPipeline
+                    from .verification import VerificationPipeline
                     verification_pipeline = VerificationPipeline(
                         db_manager=self.video_hasher.db,
                         max_workers=8,
                         enable_caching=True,
                         mode=mode
                     )
+                    if global_threshold is not None:
+                        verification_pipeline.global_threshold = float(global_threshold)
                     verification_pipeline.load_config(methods_config)
                     logger.info(f"Pipeline configuré pour audio-first: mode={mode}, {len(methods_config)} méthodes")
             except Exception as e:
@@ -1142,6 +1131,8 @@ class DuplicateFinderWindow(QMainWindow):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
+            logger.info("🛑 Arrêt de toutes les analyses en cours...")
+
             self.duplicate_handler.processing_stopped = True
 
             # Stop hash and comparison workers
@@ -1170,6 +1161,11 @@ class DuplicateFinderWindow(QMainWindow):
                     logger.warning("Verification worker did not stop gracefully, forcing termination")
                     self.verification_worker.terminate()
                 self.verification_worker = None
+
+            # NOUVEAU : Arrêter tous les benchmarks en cours
+            logger.info("Arrêt des benchmarks en cours...")
+            if self.benchmark_widget and hasattr(self.benchmark_widget, 'stop_benchmark'):
+                self.benchmark_widget.stop_benchmark()
 
             # Stop duplicate processing
             self.duplicate_handler.stop_processing()
@@ -1492,9 +1488,9 @@ class DuplicateFinderWindow(QMainWindow):
         This is the same approach used in the test scripts for maximum effectiveness.
         """
         try:
-            from .workers.subsequence_worker import SubsequenceDetectionWorker
-            from .subsequence_detector import SubsequenceDetector
-            from .verification_pipeline import VerificationPipeline
+            from .processing.workers.subsequence_worker import SubsequenceDetectionWorker
+            from .detection.subsequence import SubsequenceDetector
+            from .verification import VerificationPipeline
 
             # Get parameters tab with all configuration widgets
             params_tab = self._get_params_tab()
@@ -1519,6 +1515,7 @@ class DuplicateFinderWindow(QMainWindow):
 
                 mode = full_config.get('mode', 'filtering')
                 methods_config = full_config.get('methods', [])
+                global_threshold = full_config.get('global_threshold')
                 pipeline_debug_flag = full_config.get('debug_flag', False)
                 pipeline_run_label = full_config.get('run_label')
 
@@ -1532,6 +1529,8 @@ class DuplicateFinderWindow(QMainWindow):
 
                 # Load methods configuration into pipeline
                 if methods_config:
+                    if global_threshold is not None:
+                        verification_pipeline.global_threshold = float(global_threshold)
                     verification_pipeline.load_config(methods_config)
                     mode_str = {'filtering': 'Filtering', 'weighting': 'Weighting', 'hybrid': 'Hybrid'}.get(mode, mode)
                     logger.info(f"Verification pipeline configured: mode={mode_str}, "
@@ -1733,7 +1732,7 @@ class DuplicateFinderWindow(QMainWindow):
             scenes: List of scene detection results to verify
         """
         try:
-            from .workers.verification_worker import VerificationWorker
+            from .processing.workers.verification_worker import VerificationWorker
             from .analysis.subsequence_verification import SubsequenceVerificationMethods
 
             # Get verification parameters from config
@@ -2252,9 +2251,11 @@ class DuplicateFinderWindow(QMainWindow):
         Automatically clean up database of missing files.
         """
         try:
-            removed = self.video_hasher.db.cleanup_missing_files()
-            if removed > 0:
-                logger.info(f"Auto cleanup: {removed} missing files removed")
+            # TODO: Réimplémenter cleanup_missing_files dans DatabaseManager
+            # removed = self.video_hasher.db.cleanup_missing_files()
+            # if removed > 0:
+            #     logger.info(f"Auto cleanup: {removed} missing files removed")
+            pass
         except Exception as e:
             logger.error(f"Error in auto cleanup: {e}")
 
@@ -2455,43 +2456,6 @@ class DuplicateFinderWindow(QMainWindow):
             "The file list will be refreshed."
         )
 
-    def _show_results_tab(self):
-        """Switch to the Analysis tab to view results."""
-        self.main_tabs.setCurrentIndex(1)  # Index 1 = Analysis tab
-        logger.info("Switched to Analysis tab")
-
-    def _on_filter_changed(self, criteria):
-        """
-        Handle filter criteria changes from SmartFiltersWidget.
-
-        Args:
-            criteria: FilterCriteria object with current filter settings
-
-        Note:
-            This method is called when the user applies a filter.
-            In the future, this could trigger:
-            - Re-filtering of displayed duplicate results
-            - Updating result counts
-            - Highlighting filtered items in the UI
-        """
-        from .managers.filter_manager import FilterCriteria
-
-        logger.info(f"Filter changed: enabled={criteria.enabled}, "
-                   f"similarity={criteria.min_similarity:.0f}-{criteria.max_similarity:.0f}%")
-
-        # TODO: Apply filter to displayed results
-        # For now, just log the filter change
-        # Future implementation:
-        # - Get current duplicate results
-        # - Apply filter using filter_manager.apply_filter()
-        # - Update results display
-        # - Update status/counts
-
-        status_msg = "Filter applied" if criteria.enabled else "Filter disabled"
-        if hasattr(self, 'status_indicator'):
-            # Update status indicator if available
-            pass
-
     def _generate_report(self):
         """
         Show report generation dialog.
@@ -2658,6 +2622,210 @@ class DuplicateFinderWindow(QMainWindow):
             logger.error(f"Error executing batch job {job_id}: {e}")
             self.batch_controller.fail_job(job_id, str(e))
 
+    def _display_benchmark_results_in_right_panel(self, results: list):
+        """
+        Deprecated: résultats désormais affichés dans la matrice dédiée.
+        On masque le panneau droit pour éviter la redondance.
+        """
+        logger.info("Skipping right panel benchmark results (handled by matrix dialog)")
+        if self.benchmark_results_group:
+            self.benchmark_results_group.setVisible(False)
+
+        # Open matches matrix automatically
+        self._open_matches_matrix(results)
+
+    def _open_matches_matrix(self, results: list):
+        """
+        Open the matches matrix dialog.
+
+        Args:
+            results: List of benchmark results dictionaries
+        """
+        from .ui.benchmark_matches_matrix import BenchmarkMatchesMatrixDialog
+
+        dialog = BenchmarkMatchesMatrixDialog(results, self)
+        dialog.exec()
+
+    def _display_detailed_matches_OLD(self, results: list):
+        """
+        Display detailed matches table showing which files matched with timing info.
+
+        Args:
+            results: List of benchmark results dictionaries
+        """
+        if not self.benchmark_matches_table:
+            return
+
+        from PyQt6.QtWidgets import QTableWidgetItem
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtGui import QColor
+        import os
+
+        # Collect all accepted matches from all pipelines
+        all_matches = []
+        for result in results:
+            pipeline_name = result['pipeline_name']
+            per_pair_results = result.get('per_pair_results', [])
+
+            for pair_result in per_pair_results:
+                if pair_result.get('accepted', False):
+                    # Extract filename from path
+                    video1_path = pair_result.get('video1', '')
+                    video2_path = pair_result.get('video2', '')
+                    video1_name = os.path.basename(video1_path)
+                    video2_name = os.path.basename(video2_path)
+
+                    # Get timing and score info
+                    weighted_score = pair_result.get('weighted_score', 0)
+                    start_time = pair_result.get('start_time', 0.0)
+                    duration = pair_result.get('duration', 0.0)
+
+                    all_matches.append({
+                        'pipeline': pipeline_name,
+                        'video1': video1_name,
+                        'video2': video2_name,
+                        'video1_path': video1_path,
+                        'video2_path': video2_path,
+                        'score': weighted_score,
+                        'start_time': start_time,
+                        'duration': duration
+                    })
+
+        # Setup table
+        self.benchmark_matches_table.clear()
+        self.benchmark_matches_table.setRowCount(len(all_matches))
+        self.benchmark_matches_table.setColumnCount(6)
+        self.benchmark_matches_table.setHorizontalHeaderLabels([
+            "Pipeline", "Vidéo Courte", "Vidéo Longue", "Start Time", "Duration", "Score"
+        ])
+
+        # Fill table
+        for row, match in enumerate(all_matches):
+            # Pipeline
+            pipeline_item = QTableWidgetItem(match['pipeline'])
+            pipeline_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.benchmark_matches_table.setItem(row, 0, pipeline_item)
+
+            # Video 1 (short)
+            video1_item = QTableWidgetItem(match['video1'])
+            video1_item.setToolTip(match['video1_path'])  # Full path in tooltip
+            self.benchmark_matches_table.setItem(row, 1, video1_item)
+
+            # Video 2 (long)
+            video2_item = QTableWidgetItem(match['video2'])
+            video2_item.setToolTip(match['video2_path'])  # Full path in tooltip
+            self.benchmark_matches_table.setItem(row, 2, video2_item)
+
+            # Start Time (format as MM:SS)
+            start_time = match['start_time']
+            if start_time > 0:
+                minutes = int(start_time // 60)
+                seconds = int(start_time % 60)
+                start_time_item = QTableWidgetItem(f"{minutes}:{seconds:02d}")
+            else:
+                start_time_item = QTableWidgetItem("0:00")
+            start_time_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.benchmark_matches_table.setItem(row, 3, start_time_item)
+
+            # Duration (format as MM:SS)
+            duration = match['duration']
+            if duration > 0:
+                minutes = int(duration // 60)
+                seconds = int(duration % 60)
+                duration_item = QTableWidgetItem(f"{minutes}:{seconds:02d}")
+            else:
+                duration_item = QTableWidgetItem("N/A")
+            duration_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.benchmark_matches_table.setItem(row, 4, duration_item)
+
+            # Score
+            score = match['score']
+            if score is not None:
+                score_item = QTableWidgetItem(f"{score:.1f}%")
+            else:
+                score_item = QTableWidgetItem("N/A")
+            score_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            # Color code by score
+            if score is not None:
+                if score >= 90.0:
+                    score_item.setBackground(QColor("#C8E6C9"))  # Green
+                elif score >= 75.0:
+                    score_item.setBackground(QColor("#FFF9C4"))  # Yellow
+                elif score >= 60.0:
+                    score_item.setBackground(QColor("#FFE0B2"))  # Orange
+                else:
+                    score_item.setBackground(QColor("#FFCDD2"))  # Red
+
+            self.benchmark_matches_table.setItem(row, 5, score_item)
+
+        # Auto-resize columns
+        from PyQt6.QtWidgets import QHeaderView
+        self.benchmark_matches_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # Pipeline
+        self.benchmark_matches_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)  # Video 1
+        self.benchmark_matches_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)  # Video 2
+        self.benchmark_matches_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Start Time
+        self.benchmark_matches_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Duration
+        self.benchmark_matches_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Score
+
+        logger.info(f"Displayed {len(all_matches)} matches across {len(results)} pipelines")
+
+    def load_pipeline_to_editor(self, pipeline_data: dict, is_copy: bool = False):
+        """
+        Load a pipeline into the parameters tab editor.
+
+        Args:
+            pipeline_data: Pipeline configuration dict
+            is_copy: If True, this is a copy of a default pipeline (user should save with new name)
+        """
+        if not self.params_tab or not hasattr(self.params_tab, 'pipeline_config_widget'):
+            QMessageBox.warning(
+                self,
+                "Erreur",
+                "L'éditeur de pipeline n'est pas disponible."
+            )
+            return
+
+        try:
+            # Switch to parameters tab
+            if self.config_tabs:
+                for i in range(self.config_tabs.count()):
+                    if self.config_tabs.widget(i) == self.params_tab:
+                        self.config_tabs.setCurrentIndex(i)
+                        break
+
+            # Load pipeline config into the widget
+            self.params_tab.pipeline_config_widget.load_pipeline_config(pipeline_data)
+
+            # Show message
+            if is_copy:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self,
+                    "Pipeline Chargé",
+                    f"📋 Pipeline '{pipeline_data['name']}' chargé en mode copie.\n\n"
+                    f"Vous pouvez maintenant le modifier et le sauvegarder avec un nouveau nom."
+                )
+            else:
+                from PyQt6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self,
+                    "Pipeline Chargé",
+                    f"✏️ Pipeline '{pipeline_data['name']}' chargé dans l'éditeur.\n\n"
+                    f"Modifiez-le et sauvegardez vos changements."
+                )
+
+            logger.info(f"Pipeline '{pipeline_data['name']}' loaded into editor (is_copy={is_copy})")
+
+        except Exception as e:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(
+                self,
+                "Erreur",
+                f"❌ Erreur lors du chargement du pipeline:\n{e}"
+            )
+            logger.error(f"Failed to load pipeline to editor: {e}", exc_info=True)
+
     def _setup_shortcuts(self):
         """Setup global keyboard shortcuts for the application."""
         # File operations
@@ -2670,14 +2838,7 @@ class DuplicateFinderWindow(QMainWindow):
         QShortcut(QKeySequence("Escape"), self).activated.connect(self.stop_analysis)
         QShortcut(QKeySequence("Ctrl+."), self).activated.connect(self.stop_analysis)  # Alternative
 
-        # Tab navigation
-        QShortcut(QKeySequence("Ctrl+1"), self).activated.connect(lambda: self.main_tabs.setCurrentIndex(0))
-        QShortcut(QKeySequence("Ctrl+2"), self).activated.connect(lambda: self.main_tabs.setCurrentIndex(1))
-        QShortcut(QKeySequence("Ctrl+3"), self).activated.connect(lambda: self.main_tabs.setCurrentIndex(2))
-        QShortcut(QKeySequence("Ctrl+4"), self).activated.connect(lambda: self.main_tabs.setCurrentIndex(3))
-
         # Quick actions
-        QShortcut(QKeySequence("Ctrl+D"), self).activated.connect(lambda: self.main_tabs.setCurrentIndex(0))  # Dashboard
         QShortcut(QKeySequence("F1"), self).activated.connect(self._show_shortcuts_help)
 
         logger.info("Keyboard shortcuts configured")
@@ -2722,7 +2883,8 @@ class DuplicateFinderWindow(QMainWindow):
         </table>
         """
 
-        QMessageBox.information(self, "Keyboard Shortcuts", shortcuts_text)
+        # CORRECTION BUG #8: Translate to French
+        QMessageBox.information(self, "Raccourcis clavier", shortcuts_text)
 
     def _setup_tooltips(self):
         """Setup informative tooltips for all UI widgets."""

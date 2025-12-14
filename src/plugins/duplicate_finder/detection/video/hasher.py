@@ -65,10 +65,34 @@ class HashCache:
         self.max_items = max_items
         logger.info(f"HashCache initialized with limit of {max_items} videos")
 
-    def get(self, key: str, default=None):
-        """Get cache entry or default if not found."""
+    def get(self, key: str, default=None, mtime: float = None):
+        """
+        Get cache entry or default if not found.
+
+        CORRECTION BUG #11: Added mtime validation for cache invalidation.
+
+        Args:
+            key: Cache key (usually video path)
+            default: Default value if not found
+            mtime: File modification time for validation (optional)
+
+        Returns:
+            Cached value if valid, default otherwise
+        """
         value = self._cache.get(key)
-        return value if value is not None else default
+        if value is None:
+            return default
+
+        # CORRECTION BUG #11: Validate modification time
+        if mtime is not None and isinstance(value, dict):
+            cached_mtime = value.get('mtime')
+            if cached_mtime is not None and abs(mtime - cached_mtime) >= 1:
+                # File modified, invalidate cache
+                logger.debug(f"Hash cache invalidated (mtime changed): {key}")
+                self._cache.delete(key)
+                return default
+
+        return value
 
     def __getitem__(self, key: str):
         """Dict-like access."""
@@ -78,7 +102,17 @@ class HashCache:
         return value
 
     def __setitem__(self, key: str, value: dict):
-        """Dict-like assignment."""
+        """
+        Dict-like assignment.
+
+        CORRECTION BUG #11: Automatically add mtime if not present.
+        """
+        # Add mtime if it's a file path and mtime not already in value
+        if isinstance(value, dict) and 'mtime' not in value and os.path.exists(key):
+            try:
+                value['mtime'] = os.path.getmtime(key)
+            except OSError:
+                pass  # If can't get mtime, just store without it
         self._cache.set(key, value)
 
     def __contains__(self, key: str) -> bool:

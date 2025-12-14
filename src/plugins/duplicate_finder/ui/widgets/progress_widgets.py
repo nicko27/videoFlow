@@ -1872,7 +1872,8 @@ class HashDebuggerV2(QFrame):
         """Start the interactive debug session."""
         if not self.video_hasher:
             from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.warning(self, "Error", "No video hasher available")
+            # CORRECTION BUG #8: Translate to French
+            QMessageBox.warning(self, "Erreur", "Aucun hasheur vidéo disponible")
             return
 
         if not self.video_data:

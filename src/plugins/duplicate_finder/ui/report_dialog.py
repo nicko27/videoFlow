@@ -324,10 +324,12 @@ class ReportDialog(QDialog):
         self.generate_btn.setEnabled(True)
 
         if success:
-            QMessageBox.information(self, "Success", message)
+            # CORRECTION BUG #8: Translate to French
+            QMessageBox.information(self, "Succès", message)
             self.accept()  # Close dialog
         else:
-            QMessageBox.critical(self, "Error", message)
+            # CORRECTION BUG #8: Translate to French
+            QMessageBox.critical(self, "Erreur", message)
 
         logger.info(f"Report generation finished: success={success}")
 
