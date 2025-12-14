@@ -101,9 +101,18 @@ class BenchmarkRunner(QThread):
             - Example: (3, 10, "vid1.mp4", "vid2.mp4") means 3rd pair in current batch of 10
 
         hashing_progress: (current, total, pipeline_name)
-            Progress of hash precomputation phase (SHA-256, signatures, etc.)
+            LEGACY: Aggregated progress of all hash types combined
             - Emitted during _precompute_hashes() before actual comparison
-            - Separate from pipeline_progress (different phase)
+            - Use hash_type_progress for detailed per-algorithm tracking
+
+        hash_type_progress: (hash_type, current, total, pipeline_name)
+            REAL-TIME progress for each hash algorithm separately (NEW)
+            - hash_type: Algorithm name ('frame_hash', 'dct', 'ssim', 'optical_flow', 'motion', 'feature', 'color', 'edge')
+            - current: Number of videos processed for this specific algorithm
+            - total: Total videos to process for this algorithm
+            - Emitted after each video completes for that algorithm
+            - Example: ('ssim', 5, 20, 'Balanced') means 5/20 videos have SSIM computed
+            - Allows UI to show separate progress bars per algorithm type
 
         pipeline_metrics_updated: (pipeline_name, metrics_dict)
             Real-time metrics update (TP, FP, TN, FN, precision, recall, F1, speed, ETA)
@@ -121,6 +130,7 @@ class BenchmarkRunner(QThread):
     pipeline_progress = pyqtSignal(int, int, str)  # current, total, name
     pair_progress = pyqtSignal(int, int, str, str)  # current, total, video1, video2
     hashing_progress = pyqtSignal(int, int, str)  # current, total, name
+    hash_type_progress = pyqtSignal(str, int, int, str)  # hash_type, current, total, pipeline_name
     pipeline_metrics_updated = pyqtSignal(str, dict)  # name, metrics (tp, fp, tn, fn, p, r, f1, speed, eta)
     pipeline_completed = pyqtSignal(str, dict)  # name, results
     finished = pyqtSignal(int)  # run_id
@@ -326,24 +336,54 @@ class BenchmarkRunner(QThread):
         wants_feature = any(m.get('name') == 'feature_matching' and m.get('enabled', True) for m in methods)
         wants_color = any(m.get('name') == 'color_histogram' and m.get('enabled', True) for m in methods)
         wants_edge = any(m.get('name') == 'edge_pattern' and m.get('enabled', True) for m in methods)
-        # Ajouter un bonus pour pré-hasher quelques fenêtres du long si certaines méthodes sont actives
-        windows_per_video = 4 if (wants_feature or wants_motion or wants_ssim or wants_optflow or wants_color or wants_edge) else 0
-        extra_work = len(video_paths) * (wants_frame_hash + wants_dct + wants_ssim + wants_optflow + wants_motion + wants_feature + wants_color + wants_edge + windows_per_video)
 
-        total = max(1, total_pairs * 2 + extra_work)  # deux vidéos par paire + signatures
-        current = 0
+        # NEW: Track progress per hash type for more accurate real-time updates
+        hash_progress = {}  # hash_type -> {'current': int, 'total': int}
         progress_lock = threading.Lock()
-        self.hashing_progress.emit(current, total, pipeline_name)
 
-        def update_progress():
-            """Thread-safe progress update."""
-            nonlocal current
+        def init_hash_type(hash_type: str, total_work: int):
+            """Initialize progress tracking for a hash type."""
+            if total_work > 0:
+                with progress_lock:
+                    hash_progress[hash_type] = {'current': 0, 'total': total_work}
+                    self.hash_type_progress.emit(hash_type, 0, total_work, pipeline_name)
+
+        def update_hash_type_progress(hash_type: str):
+            """Thread-safe progress update for a specific hash type."""
             with progress_lock:
-                current += 1
-                self.hashing_progress.emit(current, total, pipeline_name)
+                if hash_type in hash_progress:
+                    hash_progress[hash_type]['current'] += 1
+                    current = hash_progress[hash_type]['current']
+                    total = hash_progress[hash_type]['total']
+                    self.hash_type_progress.emit(hash_type, current, total, pipeline_name)
+
+                # Also emit legacy hashing_progress (sum of all hash types)
+                total_current = sum(h['current'] for h in hash_progress.values())
+                total_all = sum(h['total'] for h in hash_progress.values())
+                if total_all > 0:
+                    self.hashing_progress.emit(total_current, total_all, pipeline_name)
+
+        # Initialize hash type progress trackers (only for user-visible algorithms)
+        # SHA-256 is internal plumbing - not tracked separately
+        if wants_frame_hash:
+            init_hash_type('frame_hash', len(video_paths))
+        if wants_dct:
+            init_hash_type('dct', len(video_paths))
+        if wants_ssim:
+            init_hash_type('ssim', len(video_paths))
+        if wants_optflow:
+            init_hash_type('optical_flow', len(video_paths))
+        if wants_motion:
+            init_hash_type('motion', len(video_paths))
+        if wants_feature:
+            init_hash_type('feature', len(video_paths))
+        if wants_color:
+            init_hash_type('color', len(video_paths))
+        if wants_edge:
+            init_hash_type('edge', len(video_paths))
 
         def compute_sha256_for_video(path: str):
-            """Compute SHA-256 for a single video (thread-safe)."""
+            """Compute SHA-256 for a single video (internal - no progress emission)."""
             if self._stop or not path:
                 return
             try:
@@ -362,10 +402,9 @@ class BenchmarkRunner(QThread):
                         )
                         conn.commit()
             except Exception:
-                # Best effort: on ignore mais on continue la progression
+                # Best effort: on ignore mais on continue
                 pass
-            finally:
-                update_progress()
+            # No progress emission - SHA-256 is internal plumbing
 
         try:
             # Étape 1 : SHA-256 + entrée video_files (PARALLÉLISÉ)
@@ -484,7 +523,7 @@ class BenchmarkRunner(QThread):
                             sample_rate = vam_worker.framehash_sample_rate
                             max_samples = getattr(vam_worker, 'framehash_max_samples', 300)
                             vam_worker._get_frame_hash_signature(path, sample_rate, max_samples)
-                            update_progress()
+                            update_hash_type_progress('frame_hash')
 
                         if wants_dct:
                             duration = vam_worker._get_duration(path)
@@ -495,7 +534,7 @@ class BenchmarkRunner(QThread):
                                     getattr(vam_worker, 'dct_sample_interval', 5.0),
                                     getattr(vam_worker, 'dct_num_samples', None)
                                 )
-                            update_progress()
+                            update_hash_type_progress('dct')
 
                         if wants_ssim:
                             duration = vam_worker._get_duration(path)
@@ -505,15 +544,15 @@ class BenchmarkRunner(QThread):
                                     getattr(vam_worker, 'ssim_sample_interval', 5.0),
                                     getattr(vam_worker, 'ssim_num_samples', None)
                                 )
-                            update_progress()
+                            update_hash_type_progress('ssim')
 
                         if wants_optflow:
                             vam_worker._get_optflow_signature(path)
-                            update_progress()
+                            update_hash_type_progress('optical_flow')
 
                         if wants_motion:
                             vam_worker._get_motion_signature(path, sample_interval=motion_params.get('sample_interval', getattr(vam_worker, 'motion_sample_interval', 3)))
-                            update_progress()
+                            update_hash_type_progress('motion')
 
                         if wants_feature:
                             # Pré-calcul des descripteurs du short; pour les longs on utilisera frame-by-frame
@@ -523,19 +562,19 @@ class BenchmarkRunner(QThread):
                                 detector_name=vam_worker.feature_detector,
                                 size=(640, 360)
                             )
-                            update_progress()
+                            update_hash_type_progress('feature')
 
                         if wants_color:
                             duration = vam_worker._get_duration(path)
                             if duration:
                                 vam_worker._get_color_signatures(path, duration, max(3, int(duration / 5)))
-                            update_progress()
+                            update_hash_type_progress('color')
 
                         if wants_edge:
                             duration = vam_worker._get_duration(path)
                             if duration:
                                 vam_worker._get_edge_signatures(path, duration, max(3, int(duration / 5)))
-                            update_progress()
+                            update_hash_type_progress('edge')
 
                         # Pré-calcul léger sur quelques fenêtres du long (pour SSIM/feature/motion/optflow/color/edge)
                         if windows_per_video > 0 and not self._stop:
@@ -569,7 +608,7 @@ class BenchmarkRunner(QThread):
                                         vam_worker._get_color_signatures(path, min(30.0, dur), max(3, int(min(30.0, dur) / 5)))
                                     if wants_edge:
                                         vam_worker._get_edge_signatures(path, min(30.0, dur), max(3, int(min(30.0, dur) / 5)))
-                                    update_progress()
+                                    # Note: No progress update here - windows are part of the algorithm work
                     except Exception:
                         # Best effort - on continue même en cas d'erreur
                         pass
