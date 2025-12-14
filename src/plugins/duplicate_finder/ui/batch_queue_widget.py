@@ -6,6 +6,7 @@ Provides UI for viewing and managing batch analysis jobs.
 
 from typing import Optional
 from datetime import datetime
+from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
@@ -18,7 +19,7 @@ from PyQt6.QtGui import QColor
 from ..controllers.batch_controller import (
     BatchController, BatchJob, JobStatus, JobType, get_batch_controller
 )
-from ..managers.unified_config_manager import UnifiedConfigManager
+from ..orchestration.unified_config_manager import UnifiedConfigManager
 from src.core.logger import Logger
 
 logger = Logger.get_logger(__name__)
@@ -278,7 +279,6 @@ class BatchQueueWidget(QWidget):
             config = self.config_manager.get_current_config()
 
         # Add job
-        from pathlib import Path
         job_id = self.batch_controller.add_job(
             job_type=job_type,
             name=name,
@@ -598,3 +598,13 @@ Result: {job.result if job.result else 'N/A'}
             hours = int(seconds / 3600)
             minutes = int((seconds % 3600) / 60)
             return f"{hours}h {minutes}m"
+
+    def closeEvent(self, event):
+        """
+        CORRECTION BUG #18: Cleanup resources when widget is closed.
+
+        Ensures proper cleanup of resources and signals.
+        """
+        # All signals are internal and auto-cleaned by Qt
+        # Added for consistency with other widgets
+        super().closeEvent(event)

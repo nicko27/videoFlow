@@ -22,7 +22,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 from src.core.logger import Logger
-from ..managers import TestSetManager
+from ..services.test_set_manager import TestSetManager
+from ..infrastructure.i18n import I18n
 
 logger = Logger.get_logger('DuplicateFinder.TestSetWizard')
 
@@ -37,12 +38,18 @@ class TestSetWizard(QDialog):
 
     test_set_created = pyqtSignal(str)
 
-    def __init__(self, test_set_manager: TestSetManager, parent=None):
+    def __init__(self, test_set_manager: TestSetManager, preset_file_list: Optional[List[str]] = None, existing_test_set: Optional[str] = None, parent=None):
         super().__init__(parent)
         self.test_set_manager = test_set_manager
-        self.setWindowTitle("Assistant Test Set")
+        self.preset_file_list = preset_file_list  # Files already loaded in Files tab
+        self.existing_test_set = existing_test_set  # Existing test set to edit
+        self.setWindowTitle(I18n.t("test_set_wizard"))
         self.setMinimumSize(800, 600)
         self._init_ui()
+
+        # Load existing test set data if provided
+        if self.existing_test_set:
+            self._load_existing_test_set()
 
     def _init_ui(self):
         """Initialize the wizard UI."""
@@ -86,9 +93,9 @@ class TestSetWizard(QDialog):
         # Test set name (common to all methods)
         name_group = QGroupBox("Nom du Test Set")
         name_layout = QHBoxLayout()
-        name_layout.addWidget(QLabel("Nom:"))
+        name_layout.addWidget(QLabel(I18n.t("name_label")))
         self.test_set_name = QLineEdit()
-        self.test_set_name.setPlaceholderText("Ex: validation_set_2025")
+        self.test_set_name.setPlaceholderText(I18n.t("name_placeholder"))
         name_layout.addWidget(self.test_set_name)
         name_group.setLayout(name_layout)
         layout.addWidget(name_group)
@@ -97,7 +104,7 @@ class TestSetWizard(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        self.cancel_btn = QPushButton("Annuler")
+        self.cancel_btn = QPushButton(I18n.t("cancel"))
         self.cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(self.cancel_btn)
 
@@ -125,12 +132,32 @@ class TestSetWizard(QDialog):
         list_layout = QHBoxLayout()
 
         file_list_container = QVBoxLayout()
-        file_list_container.addWidget(QLabel("Fichiers vidéo:"))
+        file_list_container.addWidget(QLabel(I18n.t("video_files")))
         self.file_list = QListWidget()
         file_list_container.addWidget(self.file_list)
 
         # File buttons
         file_btn_layout = QVBoxLayout()
+
+        # Use current files button (if preset_file_list provided)
+        if self.preset_file_list:
+            use_current_btn = QPushButton("✅ Utiliser les Fichiers Actuels")
+            use_current_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #28A745;
+                    color: white;
+                    font-weight: bold;
+                    padding: 8px;
+                    border-radius: 4px;
+                }
+                QPushButton:hover {
+                    background-color: #218838;
+                }
+            """)
+            use_current_btn.setToolTip(f"{len(self.preset_file_list)} fichiers déjà chargés dans l'onglet Files")
+            use_current_btn.clicked.connect(self._on_use_current_files)
+            file_btn_layout.addWidget(use_current_btn)
+
         add_files_btn = QPushButton("➕ Ajouter Fichiers")
         add_files_btn.clicked.connect(self._on_add_files)
         file_btn_layout.addWidget(add_files_btn)
@@ -188,13 +215,16 @@ class TestSetWizard(QDialog):
         layout.addWidget(strategy_group)
 
         # Expected result
-        expected_group = QGroupBox("Résultat Attendu par Défaut")
+        expected_group = QGroupBox(I18n.t("expected_result"))
         expected_layout = QHBoxLayout()
 
         self.expected_combo = QComboBox()
-        self.expected_combo.addItems(["duplicate", "not_duplicate", "unknown"])
-        self.expected_combo.setCurrentText("unknown")
-        expected_layout.addWidget(QLabel("Par défaut:"))
+        # Store actual values but display translations
+        self.expected_combo.addItem(I18n.t("scene_found"), "scene_found")
+        self.expected_combo.addItem(I18n.t("scene_not_found"), "scene_not_found")
+        self.expected_combo.addItem(I18n.t("unknown"), "unknown")
+        self.expected_combo.setCurrentIndex(2)  # unknown by default
+        expected_layout.addWidget(QLabel(I18n.t("default_expected") + ":"))
         expected_layout.addWidget(self.expected_combo)
         expected_layout.addStretch()
 
@@ -202,7 +232,7 @@ class TestSetWizard(QDialog):
         layout.addWidget(expected_group)
 
         # Stats
-        self.file_list_stats = QLabel("Fichiers: 0 | Paires estimées: 0")
+        self.file_list_stats = QLabel(I18n.t("files_pairs_stats").format(count=0, pairs=0))
         self.file_list_stats.setStyleSheet("background-color: #F0F0F0; padding: 5px; border-radius: 3px;")
         layout.addWidget(self.file_list_stats)
 
@@ -229,9 +259,9 @@ class TestSetWizard(QDialog):
 
         # Video 1
         video1_layout = QHBoxLayout()
-        video1_layout.addWidget(QLabel("Vidéo 1:"))
+        video1_layout.addWidget(QLabel(I18n.t("video_1")))
         self.video1_input = QLineEdit()
-        self.video1_input.setPlaceholderText("Chemin vers la première vidéo")
+        self.video1_input.setPlaceholderText(I18n.t("video_1_placeholder"))
         video1_layout.addWidget(self.video1_input)
         self.browse1_btn = QPushButton("📂 Parcourir")
         self.browse1_btn.clicked.connect(lambda: self._browse_video(self.video1_input))
@@ -240,9 +270,9 @@ class TestSetWizard(QDialog):
 
         # Video 2
         video2_layout = QHBoxLayout()
-        video2_layout.addWidget(QLabel("Vidéo 2:"))
+        video2_layout.addWidget(QLabel(I18n.t("video_2")))
         self.video2_input = QLineEdit()
-        self.video2_input.setPlaceholderText("Chemin vers la deuxième vidéo")
+        self.video2_input.setPlaceholderText(I18n.t("video_2_placeholder"))
         video2_layout.addWidget(self.video2_input)
         self.browse2_btn = QPushButton("📂 Parcourir")
         self.browse2_btn.clicked.connect(lambda: self._browse_video(self.video2_input))
@@ -251,14 +281,17 @@ class TestSetWizard(QDialog):
 
         # Expected result
         expected_layout = QHBoxLayout()
-        expected_layout.addWidget(QLabel("Résultat attendu:"))
+        expected_layout.addWidget(QLabel(I18n.t("expected_result") + ":"))
         self.manual_expected_combo = QComboBox()
-        self.manual_expected_combo.addItems(["duplicate", "not_duplicate", "unknown"])
+        # Store actual values but display translations
+        self.manual_expected_combo.addItem(I18n.t("scene_found"), "scene_found")
+        self.manual_expected_combo.addItem(I18n.t("scene_not_found"), "scene_not_found")
+        self.manual_expected_combo.addItem(I18n.t("unknown"), "unknown")
         expected_layout.addWidget(self.manual_expected_combo)
 
-        expected_layout.addWidget(QLabel("Notes:"))
+        expected_layout.addWidget(QLabel(I18n.t("notes")))
         self.notes_input = QLineEdit()
-        self.notes_input.setPlaceholderText("Notes optionnelles")
+        self.notes_input.setPlaceholderText(I18n.t("notes_placeholder"))
         expected_layout.addWidget(self.notes_input)
         input_layout.addLayout(expected_layout)
 
@@ -271,7 +304,7 @@ class TestSetWizard(QDialog):
         layout.addWidget(input_group)
 
         # Pairs table
-        layout.addWidget(QLabel("Paires ajoutées:"))
+        layout.addWidget(QLabel(I18n.t("pairs_added")))
         self.manual_pairs_table = QTableWidget()
         self.manual_pairs_table.setColumnCount(5)
         self.manual_pairs_table.setHorizontalHeaderLabels(["Vidéo 1", "Vidéo 2", "Attendu", "Notes", ""])
@@ -280,7 +313,7 @@ class TestSetWizard(QDialog):
         layout.addWidget(self.manual_pairs_table)
 
         # Stats
-        self.manual_stats = QLabel("Paires: 0")
+        self.manual_stats = QLabel(I18n.t("pairs_count").format(count=0))
         self.manual_stats.setStyleSheet("background-color: #F0F0F0; padding: 5px; border-radius: 3px;")
         layout.addWidget(self.manual_stats)
 
@@ -304,7 +337,7 @@ class TestSetWizard(QDialog):
         file_layout = QHBoxLayout()
 
         self.json_file_input = QLineEdit()
-        self.json_file_input.setPlaceholderText("Sélectionnez un fichier pairs.json")
+        self.json_file_input.setPlaceholderText(I18n.t("json_file_placeholder"))
         file_layout.addWidget(self.json_file_input)
 
         browse_json_btn = QPushButton("📂 Parcourir")
@@ -315,14 +348,14 @@ class TestSetWizard(QDialog):
         layout.addWidget(file_group)
 
         # Preview
-        layout.addWidget(QLabel("Aperçu du contenu:"))
+        layout.addWidget(QLabel(I18n.t("content_preview")))
         self.json_preview = QTextEdit()
         self.json_preview.setReadOnly(True)
         self.json_preview.setMaximumHeight(300)
         layout.addWidget(self.json_preview)
 
         # Stats
-        self.import_stats = QLabel("Aucun fichier sélectionné")
+        self.import_stats = QLabel(I18n.t("no_file_selected"))
         self.import_stats.setStyleSheet("background-color: #F0F0F0; padding: 5px; border-radius: 3px;")
         layout.addWidget(self.import_stats)
 
@@ -352,12 +385,12 @@ class TestSetWizard(QDialog):
         self.include_duplicates.setChecked(True)
         options_layout.addWidget(self.include_duplicates)
 
-        self.include_non_duplicates = QCheckBox("Inclure un échantillon de paires non-duplicata (résultat = not_duplicate)")
+        self.include_non_duplicates = QCheckBox(I18n.t("include_sample_not_found"))
         self.include_non_duplicates.setChecked(True)
         options_layout.addWidget(self.include_non_duplicates)
 
         sample_layout = QHBoxLayout()
-        sample_layout.addWidget(QLabel("   Nombre max de non-duplicata:"))
+        sample_layout.addWidget(QLabel("   " + I18n.t("max_not_found_count") + ":"))
         self.non_dup_sample = QSpinBox()
         self.non_dup_sample.setRange(10, 1000)
         self.non_dup_sample.setValue(100)
@@ -378,7 +411,7 @@ class TestSetWizard(QDialog):
         layout.addWidget(info_label)
 
         # Stats
-        self.results_stats = QLabel("Prêt à créer le test set depuis la base de données")
+        self.results_stats = QLabel(I18n.t("ready_to_create_from_db"))
         self.results_stats.setStyleSheet("background-color: #F0F0F0; padding: 5px; border-radius: 3px;")
         layout.addWidget(self.results_stats)
 
@@ -387,6 +420,29 @@ class TestSetWizard(QDialog):
         return tab
 
     # Event handlers
+
+    def _on_use_current_files(self):
+        """Load files from preset_file_list (Files tab)."""
+        if not self.preset_file_list:
+            return
+
+        # Clear current list
+        self.file_list.clear()
+
+        # Add all preset files
+        for file_path in self.preset_file_list:
+            self.file_list.addItem(file_path)
+
+        self._update_file_stats()
+
+        # Show confirmation
+        QMessageBox.information(
+            self,
+            "Fichiers Chargés",
+            f"✅ {len(self.preset_file_list)} fichiers chargés depuis l'onglet Files"
+        )
+
+        logger.info(f"Loaded {len(self.preset_file_list)} files from Files tab into wizard")
 
     def _on_add_files(self):
         """Add video files to the list."""
@@ -442,7 +498,22 @@ class TestSetWizard(QDialog):
             max_pairs = count * (count - 1) // 2 if count > 1 else 0
             pairs = min(self.random_count.value(), max_pairs)
 
-        self.file_list_stats.setText(f"Fichiers: {count} | Paires estimées: {pairs}")
+        # Estimate time (approximately 0.4s per pair)
+        estimated_seconds = pairs * 0.4
+
+        # Format time string
+        if estimated_seconds < 60:
+            time_str = f"~{estimated_seconds:.0f}s"
+        elif estimated_seconds < 3600:
+            minutes = estimated_seconds / 60
+            time_str = f"~{minutes:.1f} min"
+        else:
+            hours = estimated_seconds / 3600
+            time_str = f"~{hours:.1f}h"
+
+        self.file_list_stats.setText(
+            I18n.t("file_stats_with_time").format(count=count, pairs=pairs, time=time_str)
+        )
 
     def _browse_video(self, line_edit: QLineEdit):
         """Browse for a video file."""
@@ -460,11 +531,11 @@ class TestSetWizard(QDialog):
         video2 = self.video2_input.text().strip()
 
         if not video1 or not video2:
-            QMessageBox.warning(self, "Erreur", "Veuillez sélectionner les deux vidéos")
+            QMessageBox.warning(self, I18n.t("error"), I18n.t("select_both_videos"))
             return
 
         if video1 == video2:
-            QMessageBox.warning(self, "Erreur", "Les deux vidéos doivent être différentes")
+            QMessageBox.warning(self, I18n.t("error"), I18n.t("videos_must_differ"))
             return
 
         # Add row to table
@@ -473,7 +544,11 @@ class TestSetWizard(QDialog):
 
         self.manual_pairs_table.setItem(row, 0, QTableWidgetItem(os.path.basename(video1)))
         self.manual_pairs_table.setItem(row, 1, QTableWidgetItem(os.path.basename(video2)))
-        self.manual_pairs_table.setItem(row, 2, QTableWidgetItem(self.manual_expected_combo.currentText()))
+        # Display translated label but store actual value in UserRole
+        expected_value = self.manual_expected_combo.currentData()
+        expected_item = QTableWidgetItem(self.manual_expected_combo.currentText())
+        expected_item.setData(Qt.ItemDataRole.UserRole, expected_value)
+        self.manual_pairs_table.setItem(row, 2, expected_item)
         self.manual_pairs_table.setItem(row, 3, QTableWidgetItem(self.notes_input.text()))
 
         # Store full paths in item data
@@ -490,12 +565,12 @@ class TestSetWizard(QDialog):
         self.video2_input.clear()
         self.notes_input.clear()
 
-        self.manual_stats.setText(f"Paires: {self.manual_pairs_table.rowCount()}")
+        self.manual_stats.setText(I18n.t("pairs_count").format(count=self.manual_pairs_table.rowCount()))
 
     def _remove_manual_pair(self, row: int):
         """Remove a manual pair from the table."""
         self.manual_pairs_table.removeRow(row)
-        self.manual_stats.setText(f"Paires: {self.manual_pairs_table.rowCount()}")
+        self.manual_stats.setText(I18n.t("pairs_count").format(count=self.manual_pairs_table.rowCount()))
 
     def _on_browse_json(self):
         """Browse for JSON file."""
@@ -536,25 +611,30 @@ class TestSetWizard(QDialog):
 
                 self.import_stats.setText(
                     f"Total: {len(pairs)} paires | "
-                    f"✅ Duplicata: {duplicates} | "
-                    f"❌ Non-duplicata: {non_duplicates} | "
-                    f"❓ Inconnu: {unknowns}"
+                    f"✅ {I18n.t('scenes_found')}: {duplicates} | "
+                    f"❌ {I18n.t('scenes_not_found')}: {non_duplicates} | "
+                    f"❓ {I18n.t('unknown')}: {unknowns}"
                 )
             else:
-                self.json_preview.setText("Format JSON invalide: clé 'pairs' manquante")
-                self.import_stats.setText("Erreur: format invalide")
+                self.json_preview.setText(I18n.t("invalid_json_format_missing_pairs"))
+                self.import_stats.setText(I18n.t("error_prefix").format(error="format invalide"))
 
         except Exception as e:
-            self.json_preview.setText(f"Erreur lors de la lecture du fichier:\n{str(e)}")
-            self.import_stats.setText(f"Erreur: {str(e)}")
+            self.json_preview.setText(I18n.t("json_read_error").format(error=str(e)))
+            self.import_stats.setText(I18n.t("error_prefix").format(error=str(e)))
 
     def _on_create(self):
         """Create the test set based on current tab."""
         test_set_name = self.test_set_name.text().strip()
 
         if not test_set_name:
-            QMessageBox.warning(self, "Erreur", "Veuillez entrer un nom pour le test set")
+            QMessageBox.warning(self, I18n.t("error"), I18n.t("enter_test_set_name"))
             return
+
+        # If editing an existing test set, delete old pairs first
+        if self.existing_test_set and test_set_name == self.existing_test_set:
+            self.test_set_manager.delete_test_set(test_set_name)
+            logger.info(f"Deleted existing pairs from test set '{test_set_name}' before re-creating")
 
         current_tab = self.tabs.currentIndex()
 
@@ -569,7 +649,7 @@ class TestSetWizard(QDialog):
                 self._create_from_results(test_set_name)
 
         except Exception as e:
-            QMessageBox.critical(self, "Erreur", f"Erreur lors de la création du test set:\n{str(e)}")
+            QMessageBox.critical(self, I18n.t("error"), I18n.t("test_set_creation_error").format(error=str(e)))
             logger.error(f"Test set creation error: {e}", exc_info=True)
 
     def _create_from_file_list(self, test_set_name: str):
@@ -577,7 +657,7 @@ class TestSetWizard(QDialog):
         file_count = self.file_list.count()
 
         if file_count < 2:
-            QMessageBox.warning(self, "Erreur", "Il faut au moins 2 fichiers pour créer des paires")
+            QMessageBox.warning(self, I18n.t("error"), I18n.t("need_at_least_2_files"))
             return
 
         # Get all files
@@ -585,7 +665,7 @@ class TestSetWizard(QDialog):
 
         # Generate pairs based on strategy
         pairs = []
-        expected = self.expected_combo.currentText()
+        expected = self.expected_combo.currentData()  # Get actual value, not translation
 
         if self.all_pairs_radio.isChecked():
             # All possible pairs
@@ -604,7 +684,7 @@ class TestSetWizard(QDialog):
             num_pairs = min(self.random_count.value(), max_pairs)
 
             all_pairs = [(i, j) for i in range(len(files)) for j in range(i + 1, len(files))]
-            selected_pairs = random.sample(all_pairs, num_pairs)
+            selected_pairs = random.sample(all_pairs, num_pairs)  # nosec B311 - tirage pseudo-aléatoire suffisant
 
             for i, j in selected_pairs:
                 pairs.append((files[i], files[j], expected, ""))
@@ -612,28 +692,28 @@ class TestSetWizard(QDialog):
         # Save to database
         count = self._save_pairs(test_set_name, pairs)
 
-        QMessageBox.information(self, "Succès", f"Test set '{test_set_name}' créé avec {count} paires")
+        QMessageBox.information(self, I18n.t("success"), I18n.t("test_set_created_pairs").format(name=test_set_name, count=count))
         self.test_set_created.emit(test_set_name)
         self.accept()
 
     def _create_from_manual(self, test_set_name: str):
         """Create test set from manual pairs."""
         if self.manual_pairs_table.rowCount() == 0:
-            QMessageBox.warning(self, "Erreur", "Aucune paire ajoutée")
+            QMessageBox.warning(self, I18n.t("error"), I18n.t("no_pairs_added"))
             return
 
         pairs = []
         for row in range(self.manual_pairs_table.rowCount()):
             video1 = self.manual_pairs_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
             video2 = self.manual_pairs_table.item(row, 1).data(Qt.ItemDataRole.UserRole)
-            expected = self.manual_pairs_table.item(row, 2).text()
+            expected = self.manual_pairs_table.item(row, 2).data(Qt.ItemDataRole.UserRole)  # Get actual value, not translation
             notes = self.manual_pairs_table.item(row, 3).text()
 
             pairs.append((video1, video2, expected, notes))
 
         count = self._save_pairs(test_set_name, pairs)
 
-        QMessageBox.information(self, "Succès", f"Test set '{test_set_name}' créé avec {count} paires")
+        QMessageBox.information(self, I18n.t("success"), I18n.t("test_set_created_pairs").format(name=test_set_name, count=count))
         self.test_set_created.emit(test_set_name)
         self.accept()
 
@@ -642,19 +722,19 @@ class TestSetWizard(QDialog):
         json_file = self.json_file_input.text().strip()
 
         if not json_file or not os.path.exists(json_file):
-            QMessageBox.warning(self, "Erreur", "Veuillez sélectionner un fichier JSON valide")
+            QMessageBox.warning(self, I18n.t("error"), I18n.t("select_valid_json"))
             return
 
         count = self.test_set_manager.import_from_pairs_json(json_file, test_set_name)
 
-        QMessageBox.information(self, "Succès", f"Test set '{test_set_name}' créé avec {count} paires importées")
+        QMessageBox.information(self, I18n.t("success"), I18n.t("test_set_imported_pairs").format(name=test_set_name, count=count))
         self.test_set_created.emit(test_set_name)
         self.accept()
 
     def _create_from_results(self, test_set_name: str):
         """Create test set from analysis results."""
         # Query database for comparisons
-        db = self.test_set_manager.db_manager
+        db = self.test_set_manager.db
 
         pairs = []
 
@@ -673,24 +753,24 @@ class TestSetWizard(QDialog):
 
         # Get non-duplicates (sample)
         if self.include_non_duplicates.isChecked():
-            cursor = db.conn.execute(f"""
+            cursor = db.conn.execute("""
                 SELECT c.video1_path, c.video2_path, c.similarity
                 FROM video_comparisons c
                 WHERE c.is_duplicate = 0
                 ORDER BY RANDOM()
-                LIMIT {self.non_dup_sample.value()}
-            """)
+                LIMIT ?
+            """, (self.non_dup_sample.value(),))
 
             for video1, video2, similarity in cursor.fetchall():
                 pairs.append((video1, video2, 'not_duplicate', f'Similarity: {similarity:.2f}%'))
 
         if not pairs:
-            QMessageBox.warning(self, "Erreur", "Aucune comparaison trouvée dans la base de données")
+            QMessageBox.warning(self, I18n.t("error"), I18n.t("no_comparisons_in_db"))
             return
 
         count = self._save_pairs(test_set_name, pairs)
 
-        QMessageBox.information(self, "Succès", f"Test set '{test_set_name}' créé avec {count} paires depuis les résultats")
+        QMessageBox.information(self, I18n.t("success"), I18n.t("test_set_created_from_results").format(name=test_set_name, count=count))
         self.test_set_created.emit(test_set_name)
         self.accept()
 
@@ -705,16 +785,94 @@ class TestSetWizard(QDialog):
         Returns:
             Number of pairs saved
         """
-        db = self.test_set_manager.db_manager
-        cursor = db.conn.cursor()
+        db = self.test_set_manager.db
+        with db.pool.get_connection() as conn:
+            cursor = conn.cursor()
 
-        for video1, video2, expected, notes in pairs:
-            cursor.execute("""
-                INSERT INTO test_pairs (test_set_name, video1_path, video2_path, expected, notes)
-                VALUES (?, ?, ?, ?, ?)
-            """, (test_set_name, video1, video2, expected, notes))
+            for video1, video2, expected, notes in pairs:
+                cursor.execute("""
+                    INSERT INTO test_pairs (test_set_name, video1_path, video2_path, expected, notes)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (test_set_name, video1, video2, expected, notes))
 
-        db.conn.commit()
+            conn.commit()
         logger.info(f"Created test set '{test_set_name}' with {len(pairs)} pairs")
 
         return len(pairs)
+
+    def _load_existing_test_set(self):
+        """Load data from an existing test set for editing."""
+        if not self.existing_test_set:
+            return
+
+        # Set the test set name
+        self.test_set_name.setText(self.existing_test_set)
+        self.test_set_name.setReadOnly(True)  # Don't allow changing the name when editing
+        self.test_set_name.setStyleSheet("background-color: #F0F0F0;")
+
+        # Load pairs from the test set
+        pairs = self.test_set_manager.get_test_set(self.existing_test_set)
+
+        if not pairs:
+            logger.info(f"Test set '{self.existing_test_set}' is empty")
+            return
+
+        # Extract unique video files from pairs
+        video_files = set()
+        for pair in pairs:
+            video_files.add(pair['video1_path'])
+            video_files.add(pair['video2_path'])
+
+        # Add files to file list (Tab 1)
+        self.file_list.clear()
+        for video_file in sorted(video_files):
+            if os.path.exists(video_file):
+                self.file_list.addItem(video_file)
+
+        # Add pairs to manual pairs table (Tab 2)
+        self.manual_pairs_table.setRowCount(0)  # Clear existing
+        for pair in pairs:
+            row = self.manual_pairs_table.rowCount()
+            self.manual_pairs_table.insertRow(row)
+
+            # Video 1
+            video1_item = QTableWidgetItem(os.path.basename(pair['video1_path']))
+            video1_item.setData(Qt.ItemDataRole.UserRole, pair['video1_path'])
+            self.manual_pairs_table.setItem(row, 0, video1_item)
+
+            # Video 2
+            video2_item = QTableWidgetItem(os.path.basename(pair['video2_path']))
+            video2_item.setData(Qt.ItemDataRole.UserRole, pair['video2_path'])
+            self.manual_pairs_table.setItem(row, 1, video2_item)
+
+            # Expected (display translation but store actual value)
+            expected_item = QTableWidgetItem(I18n.t(pair['expected']))
+            expected_item.setData(Qt.ItemDataRole.UserRole, pair['expected'])
+            self.manual_pairs_table.setItem(row, 2, expected_item)
+
+            # Notes
+            notes_item = QTableWidgetItem(pair['notes'] or '')
+            self.manual_pairs_table.setItem(row, 3, notes_item)
+
+            # Remove button
+            remove_btn = QPushButton("🗑️")
+            remove_btn.clicked.connect(lambda checked, r=row: self._on_remove_manual_pair(r))
+            self.manual_pairs_table.setCellWidget(row, 4, remove_btn)
+
+        # Update stats
+        self._update_file_stats()
+        self.manual_stats.setText(I18n.t("pairs_count").format(count=len(pairs)))
+
+        # Switch to manual pairs tab since that's where the data is
+        self.tabs.setCurrentIndex(1)
+
+    def closeEvent(self, event):
+        """
+        CORRECTION BUG #18: Cleanup resources when dialog is closed.
+
+        Ensures proper memory cleanup when the dialog is destroyed.
+        """
+        # All signal connections in this dialog are to internal widgets
+        # and will be automatically cleaned up when the dialog is destroyed.
+        # This closeEvent is added for consistency and future-proofing.
+        super().closeEvent(event)

@@ -340,6 +340,26 @@ class ReportDialog(QDialog):
         self.generate_btn.setEnabled(True)
         logger.info("Report generation cancelled")
 
+    def closeEvent(self, event):
+        """
+        CORRECTION BUG #18: Cleanup resources when dialog is closed.
+
+        Stops worker thread if running and disconnects signals.
+        """
+        # Stop worker if running
+        if hasattr(self, 'worker') and self.worker and self.worker.isRunning():
+            self.worker.quit()
+            self.worker.wait(2000)  # Wait max 2 seconds
+
+            # Disconnect signals
+            try:
+                self.worker.finished.disconnect()
+                self.worker.progress.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+
+        super().closeEvent(event)
+
     def _format_size(self, size_bytes: int) -> str:
         """Format file size in human-readable form."""
         if size_bytes < 1024:

@@ -420,3 +420,13 @@ class ClusterViewDialog(QDialog):
             return "#FFCCBC"  # Light red-orange - large
         else:
             return "#F8BBD0"  # Light pink - xlarge
+
+    def closeEvent(self, event):
+        """
+        CORRECTION BUG #18: Cleanup resources when dialog is closed.
+
+        Ensures proper cleanup of resources and signals.
+        """
+        # All signals are internal and auto-cleaned by Qt
+        # Added for consistency with other dialogs
+        super().closeEvent(event)

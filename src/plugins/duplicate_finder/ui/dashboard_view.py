@@ -16,7 +16,7 @@ from PyQt6.QtGui import QFont
 from datetime import datetime
 from typing import Optional, Dict, List
 
-from ..database_manager import VideoDatabase
+from ..data import DatabaseManager
 from src.core.logger import Logger
 
 logger = Logger.get_logger(__name__)
@@ -210,7 +210,7 @@ class DashboardView(QWidget):
     start_analysis_requested = pyqtSignal()
     view_results_requested = pyqtSignal()
 
-    def __init__(self, db_manager: VideoDatabase, parent=None):
+    def __init__(self, db_manager: DatabaseManager, parent=None):
         super().__init__(parent)
         self.db_manager = db_manager
 
@@ -346,3 +346,13 @@ class DashboardView(QWidget):
         """Clear the activity log."""
         self.activity_log.clear()
         logger.info("Activity log cleared")
+
+    def closeEvent(self, event):
+        """
+        CORRECTION BUG #18: Cleanup resources when widget is closed.
+
+        Ensures proper cleanup of resources and signals.
+        """
+        # All signals are internal and auto-cleaned by Qt
+        # Added for consistency with other widgets
+        super().closeEvent(event)

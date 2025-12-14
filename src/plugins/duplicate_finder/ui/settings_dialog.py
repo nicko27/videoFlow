@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
     QPushButton, QLabel, QSpinBox, QDoubleSpinBox, QComboBox,
-    QCheckBox, QGroupBox, QFormLayout, QMessageBox, QFileDialog
+    QCheckBox, QGroupBox, QFormLayout, QMessageBox, QFileDialog, QSlider
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
@@ -16,19 +16,21 @@ from PyQt6.QtGui import QFont
 from src.core.logger import Logger
 
 try:
-    from ..managers.unified_config_manager import (
+    from ..orchestration.unified_config_manager import (
         UnifiedConfigManager, UnifiedConfig,
         VideoHashingConfig, ComparisonConfig, AudioFirstConfig,
         CacheConfig, SubsequenceConfig
     )
-    from ..managers.profile_manager import ProfileManager, get_profile_manager
+    from ..infrastructure.config.profile_manager import ProfileManager, get_profile_manager
+    from ..data import DatabaseManager
 except ImportError:
-    from managers.unified_config_manager import (
+    from ..orchestration.unified_config_manager import (
         UnifiedConfigManager, UnifiedConfig,
         VideoHashingConfig, ComparisonConfig, AudioFirstConfig,
         CacheConfig, SubsequenceConfig
     )
-    from managers.profile_manager import ProfileManager, get_profile_manager
+    from ..infrastructure.config.profile_manager import ProfileManager, get_profile_manager
+    from ..data import DatabaseManager
 
 logger = Logger.get_logger('DuplicateFinder.SettingsDialog')
 
@@ -155,6 +157,43 @@ class SettingsDialog(QDialog):
 
         layout.addLayout(button_layout)
 
+        # Sync slider/combo with current config
+        self._sync_threshold_controls()
+
+    def _on_clear_hashes(self):
+        """Purge tous les hashs/signatures/caches stockés en base."""
+        confirm = QMessageBox.question(
+            self,
+            "Purge des hashs",
+            "Supprimer tous les hashs vidéo, signatures et caches de vérification ?\n"
+            "Cette opération peut être longue sur une grosse base.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        self.clear_hashes_btn.setEnabled(False)
+        try:
+            db = DatabaseManager()
+            db.clear_verification_cache()
+            db.clear_method_signatures()
+            db.clear_hash_caches()
+            db.close()
+            QMessageBox.information(
+                self,
+                "Caches purgés",
+                "Tous les hashs, signatures et caches de vérification ont été supprimés."
+            )
+        except Exception as e:
+            logger.error(f"Erreur lors de la purge des hashs: {e}", exc_info=True)
+            QMessageBox.critical(
+                self,
+                "Erreur",
+                f"Echec de la purge des hashs/caches : {e}"
+            )
+        finally:
+            self.clear_hashes_btn.setEnabled(True)
+
     def _create_hashing_tab(self) -> QWidget:
         """Create the hashing configuration tab."""
         widget = QWidget()
@@ -170,31 +209,54 @@ class SettingsDialog(QDialog):
         self.hash_method_combo.addItem("dHash (Difference)", "dHash")
         self.hash_method_combo.addItem("aHash (Average)", "aHash")
         self.hash_method_combo.addItem("wHash (Wavelet)", "wHash")
+        self.hash_method_combo.setToolTip("Choix du type de hash vidéo (pHash = le plus robuste, aHash = le plus rapide).")
         form.addRow("Hash Method:", self.hash_method_combo)
 
         # Workers
         self.hash_workers_spin = QSpinBox()
         self.hash_workers_spin.setRange(1, 32)
         self.hash_workers_spin.setSuffix(" workers")
+        self.hash_workers_spin.setToolTip("Nombre de workers en parallèle pour le hachage (plus haut = plus rapide, plus de CPU).")
         form.addRow("Parallel Workers:", self.hash_workers_spin)
 
         # Timeout
         self.hash_timeout_spin = QSpinBox()
         self.hash_timeout_spin.setRange(10, 300)
         self.hash_timeout_spin.setSuffix(" seconds")
+        self.hash_timeout_spin.setToolTip("Temps maximal pour le hachage d'une vidéo (secondes).")
         form.addRow("Timeout:", self.hash_timeout_spin)
 
         # Frame sampling
         self.frame_sampling_spin = QSpinBox()
         self.frame_sampling_spin.setRange(1, 100)
         self.frame_sampling_spin.setSuffix(" frames")
+        self.frame_sampling_spin.setToolTip("Échantillonne une frame toutes les N frames (plus petit = plus précis, plus lent).")
         form.addRow("Frame Sampling:", self.frame_sampling_spin)
+
+        # Bouton de purge des caches/hash
+        self.clear_hashes_btn = QPushButton("Purger les hashs / caches")
+        self.clear_hashes_btn.setToolTip("Supprime les hashs vidéo, signatures et caches de vérification (DB).")
+        self.clear_hashes_btn.clicked.connect(self._on_clear_hashes)
+        form.addRow(self.clear_hashes_btn)
 
         group.setLayout(form)
         layout.addWidget(group)
         layout.addStretch()
 
         return widget
+
+    def _sync_threshold_controls(self):
+        """Synchronise spin/slider/strictness combo."""
+        val = self.threshold_spin.value()
+        self.threshold_slider.blockSignals(True)
+        self.threshold_slider.setValue(int(val * 100))
+        self.threshold_slider.blockSignals(False)
+        # Try to match preset
+        preset_map = {0.55: 0, 0.70: 1, 0.85: 2}
+        if val in preset_map:
+            self.strictness_combo.setCurrentIndex(preset_map[val])
+        else:
+            self.strictness_combo.setCurrentIndex(self.strictness_combo.count() - 1)
 
     def _create_comparison_tab(self) -> QWidget:
         """Create the comparison configuration tab."""
@@ -210,30 +272,54 @@ class SettingsDialog(QDialog):
         self.threshold_spin.setRange(0.0, 1.0)
         self.threshold_spin.setSingleStep(0.05)
         self.threshold_spin.setDecimals(2)
-        form.addRow("Similarity Threshold:", self.threshold_spin)
+        self.threshold_spin.setToolTip("Seuil global de similarité (0-1). Plus haut = plus strict.")
+        self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
+        self.threshold_slider.setRange(0, 100)
+        self.threshold_slider.setSingleStep(1)
+        self.threshold_slider.setToolTip("Glissez pour régler rapidement (valeur = pourcentage).")
+        self.threshold_slider.valueChanged.connect(self._on_threshold_slider_changed)
+        self.threshold_spin.valueChanged.connect(self._on_threshold_spin_changed)
+        # Strictness presets
+        self.strictness_combo = QComboBox()
+        self.strictness_combo.addItem("Rapide (permissif)", 0.55)
+        self.strictness_combo.addItem("Équilibré", 0.70)
+        self.strictness_combo.addItem("Strict", 0.85)
+        self.strictness_combo.addItem("Personnalisé", None)
+        self.strictness_combo.currentIndexChanged.connect(self._on_strictness_changed)
+
+        th_layout = QHBoxLayout()
+        th_layout.addWidget(self.threshold_spin)
+        th_layout.addWidget(self.threshold_slider)
+        th_layout.addWidget(self.strictness_combo)
+        form.addRow("Similarity Threshold:", th_layout)
 
         # Workers
         self.comparison_workers_spin = QSpinBox()
         self.comparison_workers_spin.setRange(1, 32)
         self.comparison_workers_spin.setSuffix(" workers")
+        self.comparison_workers_spin.setToolTip("Workers en parallèle pour les comparaisons (CPU).")
         form.addRow("Parallel Workers:", self.comparison_workers_spin)
 
         # Batch size
         self.batch_size_spin = QSpinBox()
         self.batch_size_spin.setRange(10, 1000)
+        self.batch_size_spin.setToolTip("Nombre de paires traitées par lot (mémoire vs vitesse).")
         form.addRow("Batch Size:", self.batch_size_spin)
 
         # Timeout
         self.comparison_timeout_spin = QSpinBox()
         self.comparison_timeout_spin.setRange(10, 300)
         self.comparison_timeout_spin.setSuffix(" seconds")
+        self.comparison_timeout_spin.setToolTip("Timeout maximum pour une comparaison complète (secondes).")
         form.addRow("Timeout:", self.comparison_timeout_spin)
 
         # Options
         self.enable_metadata_filter = QCheckBox("Enable metadata pre-filtering")
+        self.enable_metadata_filter.setToolTip("Filtre rapide par durée/taille pour éviter les comparaisons inutiles.")
         form.addRow("", self.enable_metadata_filter)
 
         self.enable_flip_detection = QCheckBox("Enable flip/mirror detection")
+        self.enable_flip_detection.setToolTip("Détecte les vidéos retournées (miroir). Peut ajouter un léger coût.")
         form.addRow("", self.enable_flip_detection)
 
         group.setLayout(form)
@@ -368,6 +454,7 @@ class SettingsDialog(QDialog):
             self.current_config = self.config_manager.load()
             self._config_to_widgets(self.current_config)
             logger.info("Loaded current configuration")
+            self._sync_threshold_controls()
         except Exception as e:
             logger.error(f"Failed to load configuration: {e}")
             QMessageBox.warning(
@@ -376,6 +463,7 @@ class SettingsDialog(QDialog):
             )
             self.current_config = UnifiedConfig()
             self._config_to_widgets(self.current_config)
+            self._sync_threshold_controls()
 
     def _config_to_widgets(self, config: UnifiedConfig):
         """
@@ -486,6 +574,34 @@ class SettingsDialog(QDialog):
                 self, "Error",
                 f"Failed to save settings:\n{e}"
             )
+
+    def _on_threshold_slider_changed(self, value: int):
+        """Sync spin when slider moves."""
+        self.threshold_spin.blockSignals(True)
+        self.threshold_spin.setValue(value / 100.0)
+        self.threshold_spin.blockSignals(False)
+        # If slider moved manually, set preset to "Custom"
+        self.strictness_combo.blockSignals(True)
+        self.strictness_combo.setCurrentIndex(self.strictness_combo.count() - 1)
+        self.strictness_combo.blockSignals(False)
+
+    def _on_threshold_spin_changed(self, value: float):
+        """Sync slider when spin changes."""
+        self.threshold_slider.blockSignals(True)
+        self.threshold_slider.setValue(int(value * 100))
+        self.threshold_slider.blockSignals(False)
+
+    def _on_strictness_changed(self, idx: int):
+        """Apply preset threshold."""
+        val = self.strictness_combo.currentData()
+        if val is None:
+            return
+        self.threshold_spin.blockSignals(True)
+        self.threshold_spin.setValue(val)
+        self.threshold_spin.blockSignals(False)
+        self.threshold_slider.blockSignals(True)
+        self.threshold_slider.setValue(int(val * 100))
+        self.threshold_slider.blockSignals(False)
 
     def _import_config(self):
         """Import configuration from JSON file."""
@@ -674,3 +790,13 @@ class SettingsDialog(QDialog):
         except Exception as e:
             logger.error(f"Failed to delete profile: {e}")
             QMessageBox.critical(self, "Error", f"Failed to delete profile:\n{e}")
+
+    def closeEvent(self, event):
+        """
+        CORRECTION BUG #18: Cleanup resources when dialog is closed.
+
+        Ensures proper cleanup of resources and signals.
+        """
+        # All signals are internal and auto-cleaned by Qt
+        # Added for consistency with other dialogs
+        super().closeEvent(event)

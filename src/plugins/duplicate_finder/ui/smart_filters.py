@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
-from ..managers.filter_manager import FilterManager, FilterCriteria, get_filter_manager
+from ..orchestration.filter_manager import FilterManager, FilterCriteria, get_filter_manager
 from src.core.logger import Logger
 
 logger = Logger.get_logger(__name__)
@@ -516,3 +516,13 @@ class SmartFiltersWidget(QWidget):
     def get_current_criteria(self) -> FilterCriteria:
         """Get current filter criteria."""
         return self.criteria
+
+    def closeEvent(self, event):
+        """
+        CORRECTION BUG #18: Cleanup resources when widget is closed.
+
+        Ensures proper cleanup of resources and signals.
+        """
+        # All signals are internal and auto-cleaned by Qt
+        # Added for consistency with other widgets
+        super().closeEvent(event)

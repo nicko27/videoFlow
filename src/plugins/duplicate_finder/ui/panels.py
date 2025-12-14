@@ -17,13 +17,13 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
-from ..progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator, HashDebuggerV2, AudioFingerprintDebugger
-from ..design_system import get_current_theme
+from .widgets.progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator, HashDebuggerV2, AudioFingerprintDebugger
+from ..infrastructure.config.design_system import get_current_theme
 from ..validators import ConfigValidator
 from src.core.i18n import t
 import cv2
-from ..verification_pipeline import VerificationPipeline
-from ..database_manager import VideoDatabase
+from ..verification import VerificationPipeline
+from ..data import DatabaseManager
 from .benchmark_widgets import BenchmarkTabWidget
 
 
@@ -73,7 +73,7 @@ class UIPanels:
                 - 'add_files', 'add_folder', 'clear_list', 'clear_cache'
                 - 'apply_preset', 'analyze', 'stop'
                 - 'show_stats', 'show_pending', 'close'
-            db_manager: Optional VideoDatabase instance for benchmark system.
+            db_manager: Optional DatabaseManager instance for benchmark system.
 
         Returns:
             Configured QFrame containing the left panel.
@@ -99,9 +99,24 @@ class UIPanels:
         config_tabs = UIPanels._create_config_tabs(file_list_widget, callbacks, db_manager)
         layout.addWidget(config_tabs)
 
-        # Action buttons
+        # Action buttons (only for analysis, not for benchmark/batch)
         action_buttons = UIPanels._create_action_buttons(callbacks)
         layout.addWidget(action_buttons)
+
+        # Hide action buttons when benchmark or batch queue tab is active
+        def on_tab_changed(index):
+            tab_widget = config_tabs.widget(index)
+            if tab_widget and hasattr(tab_widget, 'objectName'):
+                tab_name = tab_widget.objectName()
+                # Show buttons only for files and params tabs
+                should_show = tab_name in ['files_tab', 'params_tab']
+                action_buttons.setVisible(should_show)
+
+        # Connect signal
+        config_tabs.currentChanged.connect(on_tab_changed)
+
+        # Set initial visibility (files tab is usually first)
+        on_tab_changed(config_tabs.currentIndex())
 
         return panel
 
@@ -117,7 +132,7 @@ class UIPanels:
         Args:
             file_list_widget: FileListWidget instance.
             callbacks: Dictionary of callbacks.
-            db_manager: Optional VideoDatabase instance for benchmark system.
+            db_manager: Optional DatabaseManager instance for benchmark system.
 
         Returns:
             Configured QTabWidget.
@@ -142,20 +157,52 @@ class UIPanels:
             }
         """)
 
+        # Utiliser un seul PipelineManager partagé pour tous les onglets
+        pipeline_manager = None
+        if db_manager:
+            from ..orchestration.pipeline_manager import PipelineManager
+            pipeline_manager = PipelineManager(db_manager)
+
         # Files tab
         files_tab = UIPanels._create_files_tab(file_list_widget, callbacks)
         files_tab.setObjectName("files_tab")
         tabs.addTab(files_tab, "📁 Fichiers")
 
         # Parameters tab
-        params_tab = UIPanels._create_parameters_tab(callbacks)
+        params_tab = UIPanels._create_parameters_tab(callbacks, db_manager, pipeline_manager)
         params_tab.setObjectName("params_tab")
         tabs.addTab(params_tab, "⚙️ Paramètres")
 
-        # Debug tab
-        debug_tab = UIPanels._create_debug_tab(file_list_widget, db_manager)
-        debug_tab.setObjectName("debug_tab")
-        tabs.addTab(debug_tab, "🔬 Débogage")
+        # Benchmark tab (Multi-Pipeline Comparison)
+        if db_manager:
+            from .multi_pipeline_benchmark import MultiPipelineBenchmarkWidget
+            from ..services.benchmark_manager import BenchmarkManager
+            from ..services.test_set_manager import TestSetManager
+            
+            benchmark_tab = MultiPipelineBenchmarkWidget(
+                BenchmarkManager(db_manager),
+                pipeline_manager,
+                TestSetManager(db_manager),
+                db_manager,
+                file_list_widget
+            )
+            benchmark_tab.setObjectName("benchmark_tab")
+            tabs.addTab(benchmark_tab, "📊 Benchmark")
+
+            # Store reference to benchmark widget for signal connection in main window
+            tabs.benchmark_widget = benchmark_tab
+        else:
+            tabs.benchmark_widget = None
+
+        # Batch Queue tab
+        from .batch_queue_widget import BatchQueueWidget
+        from ..controllers.batch_controller import get_batch_controller
+        batch_queue_tab = BatchQueueWidget(
+            batch_controller=get_batch_controller(),
+            config_manager=None  # Will be set by main_window
+        )
+        batch_queue_tab.setObjectName("batch_queue_tab")
+        tabs.addTab(batch_queue_tab, "📋 Batch Queue")
 
         return tabs
 
@@ -249,7 +296,7 @@ class UIPanels:
         return tab
 
     @staticmethod
-    def _create_parameters_tab(callbacks: Dict[str, Callable]) -> QWidget:
+    def _create_parameters_tab(callbacks: Dict[str, Callable], db_manager=None, pipeline_manager=None) -> QWidget:
         """
         Create the parameters configuration tab with scrollbar.
 
@@ -263,11 +310,17 @@ class UIPanels:
 
         Args:
             callbacks: Dictionary of callbacks.
+            db_manager: Database manager for saving pipelines.
 
         Returns:
             Configured QWidget for parameters tab.
         """
         tab = QWidget()
+
+        # Initialize PipelineManager if not provided but db_manager available
+        if pipeline_manager is None and db_manager:
+            from ..orchestration.pipeline_manager import PipelineManager
+            pipeline_manager = PipelineManager(db_manager)
 
         # Create scroll area
         scroll_area = QScrollArea()
@@ -715,25 +768,71 @@ class UIPanels:
             }
         """)
 
+        manage_pipelines_btn = QPushButton("📚 Gérer les Pipelines")
+        manage_pipelines_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #607D8B;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #455A64;
+            }
+        """)
+
         def save_pipeline():
-            """Save current pipeline configuration to JSON file."""
-            from PyQt6.QtWidgets import QMessageBox
+            """Save current pipeline configuration to database."""
+            from PyQt6.QtWidgets import QMessageBox, QInputDialog
+
+            if not pipeline_manager:
+                QMessageBox.warning(None, "Erreur", "Base de données non disponible")
+                return
+
             try:
                 config = pipeline_config_widget.get_pipeline_config()
-                file_path, _ = QFileDialog.getSaveFileName(
+
+                # Demander un nom pour le pipeline
+                name, ok = QInputDialog.getText(
                     None,
-                    "Sauvegarder le pipeline",
-                    "my_pipeline.json",
-                    "JSON Files (*.json)"
+                    "Nom du pipeline",
+                    "Entrez un nom pour ce pipeline:",
+                    text="Mon Pipeline"
                 )
-                if file_path:
-                    with open(file_path, 'w', encoding='utf-8') as f:
-                        json.dump(config, f, indent=2, ensure_ascii=False)
-                    QMessageBox.information(
-                        None,
-                        "Succès",
-                        f"Pipeline sauvegardé:\n{file_path}"
-                    )
+
+                if not ok or not name.strip():
+                    return
+
+                # Demander une description
+                description, ok = QInputDialog.getText(
+                    None,
+                    "Description",
+                    "Entrez une description (optionnel):",
+                    text=""
+                )
+
+                if not ok:
+                    description = ""
+
+                # Sauvegarder dans la DB
+                pipeline_id = pipeline_manager.save_pipeline(
+                    name=name.strip(),
+                    description=description.strip(),
+                    mode=config['mode'],
+                    methods=config['methods'],
+                    confirmation=config.get('confirmation'),
+                    global_threshold=config.get('global_threshold')
+                )
+
+                QMessageBox.information(
+                    None,
+                    "Succès",
+                    f"✅ Pipeline '{name}' sauvegardé dans la base de données (ID: {pipeline_id})"
+                )
+            except ValueError as e:
+                QMessageBox.warning(None, "Erreur", str(e))
             except Exception as e:
                 QMessageBox.critical(None, "Erreur", f"Erreur de sauvegarde: {e}")
 
@@ -759,11 +858,34 @@ class UIPanels:
             except Exception as e:
                 QMessageBox.critical(None, "Erreur", f"Erreur de chargement: {e}")
 
+        def manage_pipelines():
+            """Open pipeline library dialog."""
+            from PyQt6.QtWidgets import QMessageBox
+            from .pipeline_library_dialog import PipelineLibraryDialog
+
+            if not pipeline_manager:
+                QMessageBox.warning(None, "Erreur", "Base de données non disponible")
+                return
+
+            # Get main window (traverse up the parent hierarchy)
+            import sys
+            from PyQt6.QtWidgets import QApplication
+            main_window = None
+            for widget in QApplication.topLevelWidgets():
+                if widget.__class__.__name__ == 'MainWindow':
+                    main_window = widget
+                    break
+
+            dialog = PipelineLibraryDialog(pipeline_manager, db_manager, parent=main_window)
+            dialog.exec()
+
         save_pipeline_btn.clicked.connect(save_pipeline)
         load_pipeline_btn.clicked.connect(load_pipeline)
+        manage_pipelines_btn.clicked.connect(manage_pipelines)
 
         pipeline_actions_layout.addWidget(save_pipeline_btn)
         pipeline_actions_layout.addWidget(load_pipeline_btn)
+        pipeline_actions_layout.addWidget(manage_pipelines_btn)
         pipeline_actions_layout.addStretch()
 
         subseq_detection_layout.addLayout(pipeline_actions_layout)
@@ -837,7 +959,7 @@ class UIPanels:
 
         Args:
             file_list_widget: Optional FileListWidget to access main file list.
-            db_manager: Optional VideoDatabase instance for benchmark system.
+            db_manager: Optional DatabaseManager instance for benchmark system.
 
         Returns:
             Configured QWidget for debug tab.
@@ -1316,7 +1438,7 @@ class UIPanels:
                     return
 
             try:
-                db = VideoDatabase()
+                db = DatabaseManager()
             except Exception as e:
                 append(f"❌ Erreur connexion BDD: {e}")
                 return
@@ -1425,8 +1547,8 @@ class UIPanels:
 
                 try:
                     db.upsert_debug_label(short, long, expected, notes=item.get('preference'))
-                except Exception:
-                    pass
+                except Exception as label_err:
+                    logger.debug(f"Impossible d'enregistrer le debug_label: {label_err}")
 
                 t0 = time.time()
                 try:
@@ -1614,7 +1736,7 @@ class UIPanels:
         layout.addWidget(status_indicator)
 
         # Stats counter (duplicates, subsequences, etc.)
-        from ..progress_widgets import StatsCounter
+        from .widgets.progress_widgets import StatsCounter
         stats_counter = StatsCounter()
         layout.addWidget(stats_counter)
 
@@ -1635,6 +1757,61 @@ class UIPanels:
         verification_progress.hide()
         layout.addWidget(verification_progress)
 
+        # Live benchmark comparison widget (shown during benchmark execution)
+        from PyQt6.QtWidgets import QTableWidget, QGroupBox
+        benchmark_live_group = QGroupBox("⚡ Comparaison en Temps Réel - Benchmarks")
+        benchmark_live_layout = QVBoxLayout(benchmark_live_group)
+
+        benchmark_live_table = QTableWidget()
+        benchmark_live_table.setMinimumHeight(250)
+        benchmark_live_table.setStyleSheet("""
+            QTableWidget {
+                border: 2px solid #2196F3;
+                border-radius: 5px;
+                background-color: #f0f8ff;
+            }
+            QTableWidget::item {
+                padding: 5px;
+            }
+            QHeaderView::section {
+                background-color: #2196F3;
+                color: white;
+                padding: 8px;
+                border: none;
+                font-weight: bold;
+            }
+        """)
+        benchmark_live_layout.addWidget(benchmark_live_table)
+
+        benchmark_live_group.setVisible(False)  # Hidden until benchmark starts
+        layout.addWidget(benchmark_live_group)
+
+        # Benchmark results widget (hidden by default)
+        benchmark_results_group = QGroupBox("📊 Résultats Comparatifs - Benchmark")
+        benchmark_results_layout = QVBoxLayout(benchmark_results_group)
+
+        benchmark_results_table = QTableWidget()
+        benchmark_results_table.setMinimumHeight(250)
+        benchmark_results_table.setStyleSheet("""
+            QTableWidget {
+                border: 1px solid #ddd;
+                border-radius: 5px;
+            }
+            QTableWidget::item {
+                padding: 5px;
+            }
+            QHeaderView::section {
+                background-color: #f5f5f5;
+                padding: 8px;
+                border: none;
+                font-weight: bold;
+            }
+        """)
+        benchmark_results_layout.addWidget(benchmark_results_table)
+
+        benchmark_results_group.setVisible(False)  # Hidden until benchmark completes
+        layout.addWidget(benchmark_results_group)
+
         # Add stretch
         layout.addStretch(2)
 
@@ -1644,7 +1821,11 @@ class UIPanels:
             'audio_progress': audio_progress,
             'file_progress': file_progress,
             'duplicate_progress': duplicate_progress,
-            'verification_progress': verification_progress
+            'verification_progress': verification_progress,
+            'benchmark_live_group': benchmark_live_group,
+            'benchmark_live_table': benchmark_live_table,
+            'benchmark_results_group': benchmark_results_group,
+            'benchmark_results_table': benchmark_results_table
         }
 
         return panel, widgets
@@ -1686,3 +1867,13 @@ class UIPanels:
                 background-color: #CCCCCC;
             }}
         """
+
+    def closeEvent(self, event):
+        """
+        CORRECTION BUG #18: Cleanup resources when widget is closed.
+
+        Ensures proper cleanup of resources and signals.
+        """
+        # All signals are internal and auto-cleaned by Qt
+        # Added for consistency with other widgets
+        super().closeEvent(event)
