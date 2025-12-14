@@ -12,11 +12,164 @@ logger = Logger.get_logger('DuplicateFinder.PipelineManager')
 class PipelineManager:
     """Gestionnaire pour les pipelines de vérification sauvegardés."""
 
-    # Protocoles prédéfinis - DÉSACTIVÉ
-    # Les pipelines optimisés sont maintenant gérés via scripts/generate_optimized_pipelines.py
-    # Pour réinitialiser: python3 scripts/delete_all_pipelines.py --force && python3 scripts/generate_optimized_pipelines.py
+    # Protocoles prédéfinis - Initialisés automatiquement au premier démarrage
     DEFAULT_PROTOCOLS = {
-        # Vide - plus de pipelines par défaut auto-insérés
+        'color_histogram': {
+            'name': '🎨 Color Histogram',
+            'description': 'Compare color distribution using histogram analysis',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'color_histogram',
+                        'enabled': True,
+                        'parameters': {'threshold': 85.0},
+                        'weight': 1.0
+                    }
+                ]
+            }
+        },
+        'edge_pattern': {
+            'name': '📐 Edge Pattern',
+            'description': 'Detect duplicates based on edge detection patterns',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'edge_pattern',
+                        'enabled': True,
+                        'parameters': {'threshold': 80.0},
+                        'weight': 1.0
+                    }
+                ]
+            }
+        },
+        'motion_analysis': {
+            'name': '🎬 Motion Analysis',
+            'description': 'Analyze motion vectors and temporal patterns',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'motion_analysis',
+                        'enabled': True,
+                        'parameters': {'correlation_threshold': 85.0, 'sample_interval': 3},
+                        'weight': 1.0
+                    }
+                ]
+            }
+        },
+        'dct_coefficients': {
+            'name': '🔢 DCT Coefficients',
+            'description': 'Use Discrete Cosine Transform for frequency domain comparison',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'dct_coefficients',
+                        'enabled': True,
+                        'parameters': {'threshold': 75.0, 'num_coeffs': 15},
+                        'weight': 1.0
+                    }
+                ]
+            }
+        },
+        'perceptual_hash': {
+            'name': '🔑 Perceptual Hash',
+            'description': 'Fast perceptual hashing for quick comparison',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'perceptual_hash',
+                        'enabled': True,
+                        'parameters': {'threshold': 90.0},
+                        'weight': 1.0
+                    }
+                ]
+            }
+        },
+        'combined_balanced': {
+            'name': '⚖️ Balanced Combined',
+            'description': 'Balanced mix of multiple algorithms for good accuracy',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'color_histogram',
+                        'enabled': True,
+                        'parameters': {'threshold': 85.0},
+                        'weight': 1.0
+                    },
+                    {
+                        'name': 'motion_analysis',
+                        'enabled': True,
+                        'parameters': {'correlation_threshold': 85.0, 'sample_interval': 3},
+                        'weight': 1.5
+                    },
+                    {
+                        'name': 'dct_coefficients',
+                        'enabled': True,
+                        'parameters': {'threshold': 75.0, 'num_coeffs': 15},
+                        'weight': 1.5
+                    }
+                ]
+            }
+        },
+        'high_precision': {
+            'name': '🎯 High Precision',
+            'description': 'Maximum accuracy with strict thresholds',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'color_histogram',
+                        'enabled': True,
+                        'parameters': {'threshold': 92.0},
+                        'weight': 1.5
+                    },
+                    {
+                        'name': 'motion_analysis',
+                        'enabled': True,
+                        'parameters': {'correlation_threshold': 90.0, 'sample_interval': 3},
+                        'weight': 2.0
+                    },
+                    {
+                        'name': 'dct_coefficients',
+                        'enabled': True,
+                        'parameters': {'threshold': 85.0, 'num_coeffs': 15},
+                        'weight': 2.0
+                    },
+                    {
+                        'name': 'edge_pattern',
+                        'enabled': True,
+                        'parameters': {'threshold': 85.0},
+                        'weight': 1.0
+                    }
+                ]
+            }
+        },
+        'fast_screening': {
+            'name': '⚡ Fast Screening',
+            'description': 'Quick screening with perceptual hash',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'perceptual_hash',
+                        'enabled': True,
+                        'parameters': {'threshold': 88.0},
+                        'weight': 1.0
+                    },
+                    {
+                        'name': 'color_histogram',
+                        'enabled': True,
+                        'parameters': {'threshold': 80.0},
+                        'weight': 0.5
+                    }
+                ]
+            }
+        }
     }
 
     def __init__(self, db_manager):
