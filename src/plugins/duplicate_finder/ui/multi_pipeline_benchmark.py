@@ -443,6 +443,12 @@ class MultiPipelineBenchmarkWidget(QWidget):
             self.monitor_dialog.deleteLater()
             self.monitor_dialog = None
 
+        # CORRECTION BUG #34: Reset progress bars between benchmarks
+        self.progress_bar.setValue(0)
+        self.progress_bar.setMaximum(100)
+        self.status_label.setText("Prêt à démarrer")
+        self.pair_status_label.setText("")
+
         logger.debug("Previous benchmark resources cleaned up")
 
     def _on_start_benchmark(self):
@@ -645,6 +651,9 @@ class MultiPipelineBenchmarkWidget(QWidget):
 
     def _on_pipeline_progress(self, current, total, name):
         """Update global progress when switching to a new pipeline."""
+        # CORRECTION BUG #32: Validate progress bounds to prevent exceeding 100%
+        current = max(0, min(current, total))  # Clamp current to [0, total]
+
         # Calculer la progression globale de TOUS les pipelines
         total_pairs_all_pipelines = 0
         completed_pairs_all_pipelines = 0
@@ -657,6 +666,8 @@ class MultiPipelineBenchmarkWidget(QWidget):
         # Mettre à jour la barre globale avec le vrai nombre de paires
         if total_pairs_all_pipelines > 0:
             self.progress_bar.setMaximum(total_pairs_all_pipelines)
+            # CORRECTION BUG #32: Ensure global progress doesn't exceed maximum
+            completed_pairs_all_pipelines = min(completed_pairs_all_pipelines, total_pairs_all_pipelines)
             self.progress_bar.setValue(completed_pairs_all_pipelines)
             progress_pct = int((completed_pairs_all_pipelines / total_pairs_all_pipelines) * 100)
             self.status_label.setText(f"Pipeline {name}: {current}/{total} paires ({progress_pct}% total)")
@@ -682,6 +693,9 @@ class MultiPipelineBenchmarkWidget(QWidget):
 
     def _on_pair_progress(self, current_pair, total_pairs, video1, video2):
         """Update detailed progress for current pipeline pair processing."""
+        # CORRECTION BUG #32: Validate pair progress bounds
+        current_pair = max(0, min(current_pair, total_pairs))  # Clamp to [0, total_pairs]
+
         # Find the currently active pipeline
         current_pipeline = None
         for pipe_name, widgets in self.pipeline_progress_bars.items():

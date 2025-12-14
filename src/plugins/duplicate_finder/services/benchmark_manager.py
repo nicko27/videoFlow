@@ -24,10 +24,12 @@ def normalize_expected_label(expected: str) -> str:
     """
     Normalize expected labels to standard positive/negative/unknown format.
 
+    CORRECTION BUG #5: Complete label normalization including French, numeric, and boolean values.
+
     Maps:
-    - 'scene_found', 'duplicate' → 'positive'
-    - 'scene_not_found', 'not_duplicate' → 'negative'
-    - 'unknown' → 'unknown'
+    - 'scene_found', 'duplicate', 'positive', 'yes', 'true', '1', 'positif', 'oui' → 'positive'
+    - 'scene_not_found', 'not_duplicate', 'negative', 'no', 'false', '0', 'négatif', 'non' → 'negative'
+    - 'unknown', 'inconnu' → 'unknown'
     - Already normalized labels pass through unchanged
 
     Args:
@@ -36,17 +38,43 @@ def normalize_expected_label(expected: str) -> str:
     Returns:
         Normalized label ('positive', 'negative', or 'unknown')
     """
+    # Normalize case and whitespace
+    expected_lower = str(expected).strip().lower()
+
     label_map = {
+        # English - positive
         'scene_found': 'positive',
         'duplicate': 'positive',
+        'positive': 'positive',
+        'yes': 'positive',
+        'true': 'positive',
+        '1': 'positive',
+
+        # English - negative
         'scene_not_found': 'negative',
         'not_duplicate': 'negative',
-        'positive': 'positive',
         'negative': 'negative',
-        'unknown': 'unknown'
+        'no': 'negative',
+        'false': 'negative',
+        '0': 'negative',
+
+        # French - positive
+        'positif': 'positive',
+        'oui': 'positive',
+        'vrai': 'positive',
+
+        # French - negative
+        'négatif': 'negative',
+        'negatif': 'negative',  # Without accent
+        'non': 'negative',
+        'faux': 'negative',
+
+        # Unknown
+        'unknown': 'unknown',
+        'inconnu': 'unknown'
     }
 
-    normalized = label_map.get(expected, 'unknown')
+    normalized = label_map.get(expected_lower, 'unknown')
     if normalized != expected:
         logger.debug(f"Normalized label '{expected}' → '{normalized}'")
     return normalized
@@ -588,8 +616,23 @@ class BenchmarkRunner(QThread):
         # Pré-calcul / hash des fichiers pour afficher une vraie progression dédiée
         self._precompute_hashes(pipeline_name, total_pairs, pipeline_config)
 
-        def emit_intermediate_metrics():
-            """Émet les métriques intermédiaires (appelé après chaque paire) - THREAD-SAFE."""
+        # CORRECTION BUG #35: Throttle emissions to reduce overhead
+        # Instead of emitting after every pair (1000x for 1000 pairs), emit every 0.5s or every 10 pairs
+        last_emit_time = [0.0]  # List for mutability in closure
+        last_emit_pairs = [0]   # Track last emission pair count
+        EMIT_INTERVAL_SECONDS = 0.5  # Minimum time between emissions
+        EMIT_INTERVAL_PAIRS = 10     # Minimum pairs between emissions for small benchmarks
+
+        def emit_intermediate_metrics(force=False):
+            """
+            Émet les métriques intermédiaires (appelé après chaque paire) - THREAD-SAFE.
+
+            CORRECTION BUG #35: Throttled to emit max every 0.5s or every 10 pairs (whichever comes first),
+            reducing signal overhead from 100-200ms on large benchmarks.
+
+            Args:
+                force: If True, emit regardless of throttling (used for final emission)
+            """
             elapsed = time.time() - pipeline_start_time
 
             # CORRECTION BUG #31: Protéger la lecture avec le lock
@@ -598,6 +641,24 @@ class BenchmarkRunner(QThread):
 
             if processed == 0:
                 return
+
+            # CORRECTION BUG #35: Throttle emissions (skip if too soon)
+            current_time = time.time()
+            pairs_since_last_emit = processed - last_emit_pairs[0]
+
+            if not force:
+                # Skip if both conditions are true:
+                # 1. Less than EMIT_INTERVAL_SECONDS has passed
+                # 2. Less than EMIT_INTERVAL_PAIRS have been processed
+                time_too_soon = (current_time - last_emit_time[0]) < EMIT_INTERVAL_SECONDS
+                pairs_too_few = pairs_since_last_emit < EMIT_INTERVAL_PAIRS
+
+                if time_too_soon and pairs_too_few:
+                    return  # Skip this emission
+
+            # Update throttle tracking
+            last_emit_time[0] = current_time
+            last_emit_pairs[0] = processed
 
             # Calculer métriques actuelles (avec la copie locale thread-safe)
             tp, fp, tn, fn = metrics['tp'], metrics['fp'], metrics['tn'], metrics['fn']
@@ -927,7 +988,8 @@ class BenchmarkRunner(QThread):
                        f"{acceptance_rate:.1f}% acceptance rate)")
 
         # Émettre métriques finales et progression à 100%
-        emit_intermediate_metrics()
+        # CORRECTION BUG #35: Force final emission to ensure 100% is shown
+        emit_intermediate_metrics(force=True)
         # Note: emit_intermediate_metrics() émet déjà pipeline_progress, pas besoin de dupliquer
 
         return {
