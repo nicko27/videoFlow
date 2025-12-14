@@ -515,7 +515,8 @@ class MultiPipelineBenchmarkWidget(QWidget):
         self.monitor_dialog = EnhancedBenchmarkMonitor(parent=self)
 
         # Connect runner signals to monitor dialog
-        self.runner.hashing_progress.connect(self.monitor_dialog.update_hash_progress)
+        self.runner.hashing_progress.connect(self.monitor_dialog.update_hash_progress)  # Legacy aggregated
+        self.runner.hash_type_progress.connect(self.monitor_dialog.update_hash_type_progress)  # NEW: Per-algorithm
         self.runner.pipeline_progress.connect(self.monitor_dialog.update_pipeline_progress)
         self.runner.pipeline_metrics_updated.connect(self.monitor_dialog.update_metrics)
 

@@ -14,7 +14,7 @@ Cette fenêtre affiche une vue complète de l'exécution des benchmarks avec :
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QProgressBar,
     QWidget, QFrame, QScrollArea, QGridLayout, QPushButton,
-    QTextEdit, QGroupBox, QSizePolicy
+    QTextEdit, QGroupBox, QSizePolicy, QTabWidget
 )
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QTimer
 from PyQt6.QtGui import QFont, QColor
@@ -126,7 +126,19 @@ class MetricCard(QFrame):
 
 
 class HashProgressWidget(QFrame):
-    """Widget pour afficher la progression de tous les types de hash."""
+    """Widget pour afficher la progression de tous les types de hash (par algorithme)."""
+
+    # Mapping des noms d'algorithmes vers des labels lisibles + emojis
+    HASH_TYPE_LABELS = {
+        'frame_hash': '🔑 Frame Hash',
+        'dct': '🔢 DCT Coefficients',
+        'ssim': '📊 SSIM',
+        'optical_flow': '🌊 Optical Flow',
+        'motion': '🎬 Motion Analysis',
+        'feature': '🔍 Feature Matching',
+        'color': '🎨 Color Histogram',
+        'edge': '📐 Edge Pattern',
+    }
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -146,12 +158,17 @@ class HashProgressWidget(QFrame):
         self.layout.setSpacing(6)
 
         # Titre
-        title = QLabel("② PROGRESSION DES HASHES")
-        title.setStyleSheet("font-weight: bold; font-size: 12px; color: #495057; padding-bottom: 5px;")
+        title = QLabel("📊 PROGRESSION PAR ALGORITHME")
+        title.setStyleSheet("font-weight: bold; font-size: 12px; color: #FF9800; padding-bottom: 5px;")
         self.layout.addWidget(title)
 
+        # Sous-titre explicatif
+        subtitle = QLabel("Pré-calcul des signatures vidéo par algorithme (temps réel)")
+        subtitle.setStyleSheet("font-size: 10px; color: #6c757d; font-style: italic; padding-bottom: 3px;")
+        self.layout.addWidget(subtitle)
+
     def add_hash_type(self, hash_name: str):
-        """Ajoute un type de hash à suivre."""
+        """Ajoute un type de hash à suivre avec label convivial."""
         if hash_name in self.hash_bars:
             return
 
@@ -161,10 +178,11 @@ class HashProgressWidget(QFrame):
         h_layout.setContentsMargins(0, 0, 0, 0)
         h_layout.setSpacing(8)
 
-        # Label du nom
-        label = QLabel(hash_name + ":")
-        label.setFixedWidth(180)
-        label.setStyleSheet("font-size: 11px; color: #495057;")
+        # Label du nom (avec emoji et nom convivial)
+        display_name = self.HASH_TYPE_LABELS.get(hash_name, f"🔧 {hash_name}")
+        label = QLabel(display_name + ":")
+        label.setFixedWidth(200)
+        label.setStyleSheet("font-size: 11px; font-weight: bold; color: #495057;")
         h_layout.addWidget(label)
 
         # Barre de progression
@@ -173,7 +191,7 @@ class HashProgressWidget(QFrame):
         progress.setValue(0)
         progress.setTextVisible(True)
         progress.setFormat("%p% (%v/%m)")
-        progress.setFixedHeight(20)
+        progress.setFixedHeight(22)
         progress.setStyleSheet("""
             QProgressBar {
                 border: 1px solid #ced4da;
@@ -183,7 +201,7 @@ class HashProgressWidget(QFrame):
                 font-size: 10px;
             }
             QProgressBar::chunk {
-                background-color: #007bff;
+                background-color: #FF9800;
                 border-radius: 3px;
             }
         """)
@@ -931,12 +949,16 @@ class EnhancedBenchmarkMonitor(QDialog):
 
     @pyqtSlot(int, int, str)
     def update_hash_progress(self, current: int, total: int, pipeline_name: str):
-        """Met à jour la progression d'un type de hash."""
-        # Extract hash type from pipeline emissions
-        # Pour l'instant, on utilise un hash générique "SHA-256"
-        # TODO: détecter le vrai type de hash depuis les émissions
-        self.hash_widget.update_hash("SHA-256", current, total)
-        self.add_log("INFO", f"Hash progress: {current}/{total} for {pipeline_name}")
+        """LEGACY: Met à jour la progression agrégée (tous algorithmes)."""
+        # Ce signal est conservé pour compatibilité mais n'affiche rien
+        # Utiliser update_hash_type_progress() à la place pour des barres séparées
+        pass
+
+    @pyqtSlot(str, int, int, str)
+    def update_hash_type_progress(self, hash_type: str, current: int, total: int, pipeline_name: str):
+        """Met à jour la progression d'un algorithme spécifique (NOUVEAU)."""
+        # Met à jour la barre de progression pour cet algorithme
+        self.hash_widget.update_hash(hash_type, current, total)
 
     @pyqtSlot(int, int, str)
     def update_pipeline_progress(self, current: int, total: int, pipeline_name: str):
