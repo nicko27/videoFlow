@@ -14,15 +14,18 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 from src.core.logger import Logger
-from ..managers import PipelineManager, TestSetManager, BenchmarkManager, BenchmarkRunner
-from ..progress_widgets import ModernProgressWidget
+from ..orchestration.pipeline_manager import PipelineManager
+from ..services.test_set_manager import TestSetManager
+from ..services.benchmark_manager import BenchmarkManager, BenchmarkRunner
+from .widgets.progress_widgets import ModernProgressWidget
 from .test_set_wizard import TestSetWizard
 
 # Matplotlib for visualizations
 try:
     import matplotlib
-    matplotlib.use('Qt5Agg')
-    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+    # CORRECTION BUG #19: Utiliser QtAgg (universel PyQt5/PyQt6) au lieu de Qt5Agg
+    matplotlib.use('QtAgg')
+    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.figure import Figure
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
@@ -32,6 +35,1060 @@ except ImportError:
 logger = Logger.get_logger('DuplicateFinder.BenchmarkWidgets')
 if not MATPLOTLIB_AVAILABLE:
     logger.warning("Matplotlib not available - benchmark visualizations disabled")
+
+
+class ConfusionMatrixWidget(QWidget):
+    """
+    Interactive confusion matrix visualization.
+
+    Features:
+        - 2x2 matrix display (TP, FP, TN, FN)
+        - Clickable cells to view specific pairs
+        - Color-coded cells (green for correct, red for errors)
+        - Percentages and absolute values
+        - Hover tooltips with details
+
+    Signals:
+        cell_clicked(str, list): Emitted when cell clicked (cell_type, pairs_list)
+    """
+
+    cell_clicked = pyqtSignal(str, list)  # (cell_type, pairs)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.confusion_data = {'TP': 0, 'FP': 0, 'TN': 0, 'FN': 0}
+        self.results = []
+        self._init_ui()
+
+    def _init_ui(self):
+        """Initialize the UI."""
+        layout = QVBoxLayout(self)
+
+        # Title
+        title = QLabel("📊 <b>Matrice de Confusion</b>")
+        title.setStyleSheet("font-size: 14px; padding: 10px;")
+        layout.addWidget(title)
+
+        # Matrix grid
+        grid_widget = QWidget()
+        grid_widget.setStyleSheet("""
+            QWidget {
+                background-color: white;
+                border: 2px solid #E0E0E0;
+                border-radius: 8px;
+            }
+        """)
+        grid_layout = QVBoxLayout(grid_widget)
+        grid_layout.setSpacing(2)
+        grid_layout.setContentsMargins(20, 20, 20, 20)
+
+        # Header row
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(QLabel(""))  # Top-left empty
+        header_layout.addWidget(self._create_header_label("Prédit: Duplicate"))
+        header_layout.addWidget(self._create_header_label("Prédit: Not Duplicate"))
+        grid_layout.addLayout(header_layout)
+
+        # Row 1: Actual Duplicate
+        row1_layout = QHBoxLayout()
+        row1_layout.addWidget(self._create_header_label("Réel: Duplicate"))
+
+        self.tp_cell = self._create_matrix_cell("TP", "True Positives", "#4CAF50")
+        row1_layout.addWidget(self.tp_cell)
+
+        self.fn_cell = self._create_matrix_cell("FN", "False Negatives", "#F44336")
+        row1_layout.addWidget(self.fn_cell)
+
+        grid_layout.addLayout(row1_layout)
+
+        # Row 2: Actual Not Duplicate
+        row2_layout = QHBoxLayout()
+        row2_layout.addWidget(self._create_header_label("Réel: Not Duplicate"))
+
+        self.fp_cell = self._create_matrix_cell("FP", "False Positives", "#FF9800")
+        row2_layout.addWidget(self.fp_cell)
+
+        self.tn_cell = self._create_matrix_cell("TN", "True Negatives", "#8BC34A")
+        row2_layout.addWidget(self.tn_cell)
+
+        grid_layout.addLayout(row2_layout)
+
+        layout.addWidget(grid_widget)
+
+        # Metrics summary
+        metrics_layout = QHBoxLayout()
+
+        self.accuracy_label = QLabel("Accuracy: --")
+        self.accuracy_label.setStyleSheet("font-weight: bold; padding: 5px;")
+        metrics_layout.addWidget(self.accuracy_label)
+
+        self.precision_label = QLabel("Precision: --")
+        self.precision_label.setStyleSheet("font-weight: bold; padding: 5px;")
+        metrics_layout.addWidget(self.precision_label)
+
+        self.recall_label = QLabel("Recall: --")
+        self.recall_label.setStyleSheet("font-weight: bold; padding: 5px;")
+        metrics_layout.addWidget(self.recall_label)
+
+        self.f1_label = QLabel("F1: --")
+        self.f1_label.setStyleSheet("font-weight: bold; padding: 5px;")
+        metrics_layout.addWidget(self.f1_label)
+
+        layout.addLayout(metrics_layout)
+
+    def _create_header_label(self, text: str) -> QLabel:
+        """Create a header label for the matrix."""
+        label = QLabel(text)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setStyleSheet("""
+            QLabel {
+                font-size: 11px;
+                font-weight: bold;
+                color: #666;
+                padding: 8px;
+                min-width: 150px;
+            }
+        """)
+        return label
+
+    def _create_matrix_cell(self, cell_type: str, tooltip: str, color: str) -> QPushButton:
+        """Create a clickable matrix cell."""
+        cell = QPushButton("0\n(0.0%)")
+        cell.setMinimumSize(150, 100)
+        cell.setToolTip(f"{tooltip}\nCliquez pour voir les paires")
+        cell.setProperty("cell_type", cell_type)
+
+        cell.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {color};
+                color: white;
+                font-size: 20px;
+                font-weight: bold;
+                border: 2px solid white;
+                border-radius: 8px;
+                padding: 10px;
+            }}
+            QPushButton:hover {{
+                border-color: #2196F3;
+                border-width: 3px;
+            }}
+            QPushButton:pressed {{
+                background-color: #1976D2;
+            }}
+        """)
+
+        cell.clicked.connect(lambda: self._on_cell_clicked(cell_type))
+
+        return cell
+
+    def set_results(self, results: List[Dict]):
+        """
+        Update matrix with benchmark results.
+
+        Args:
+            results: List of result dicts with 'expected' and 'is_match' keys
+        """
+        self.results = results
+
+        # Calculate confusion matrix
+        tp = fp = tn = fn = 0
+
+        for result in results:
+            expected = result.get('expected')
+            predicted = 'duplicate' if result.get('is_match') else 'not_duplicate'
+
+            if expected == 'duplicate' and predicted == 'duplicate':
+                tp += 1
+            elif expected == 'not_duplicate' and predicted == 'duplicate':
+                fp += 1
+            elif expected == 'not_duplicate' and predicted == 'not_duplicate':
+                tn += 1
+            elif expected == 'duplicate' and predicted == 'not_duplicate':
+                fn += 1
+
+        self.confusion_data = {'TP': tp, 'FP': fp, 'TN': tn, 'FN': fn}
+
+        # Update display
+        self._update_display()
+
+    def _update_display(self):
+        """Update matrix cells and metrics."""
+        total = sum(self.confusion_data.values())
+
+        if total == 0:
+            return
+
+        # Update cells
+        for cell_type, cell in [('TP', self.tp_cell), ('FP', self.fp_cell),
+                                 ('TN', self.tn_cell), ('FN', self.fn_cell)]:
+            count = self.confusion_data[cell_type]
+            percentage = (count / total * 100) if total > 0 else 0
+            cell.setText(f"{count}\n({percentage:.1f}%)")
+
+        # Calculate metrics
+        tp = self.confusion_data['TP']
+        fp = self.confusion_data['FP']
+        tn = self.confusion_data['TN']
+        fn = self.confusion_data['FN']
+
+        accuracy = (tp + tn) / total if total > 0 else 0
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+        # Update metrics labels
+        self.accuracy_label.setText(f"Accuracy: {accuracy:.3f}")
+        self.precision_label.setText(f"Precision: {precision:.3f}")
+        self.recall_label.setText(f"Recall: {recall:.3f}")
+        self.f1_label.setText(f"F1 Score: {f1:.3f}")
+
+    def _on_cell_clicked(self, cell_type: str):
+        """Handle cell click - show pairs for this category."""
+        pairs = self._get_pairs_for_cell(cell_type)
+
+        if not pairs:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(self, "Info", f"Aucune paire dans la catégorie {cell_type}")
+            return
+
+        self.cell_clicked.emit(cell_type, pairs)
+
+        # Show dialog with pairs
+        self._show_pairs_dialog(cell_type, pairs)
+
+    def _get_pairs_for_cell(self, cell_type: str) -> List[Dict]:
+        """Get pairs belonging to a specific cell."""
+        pairs = []
+
+        for result in self.results:
+            expected = result.get('expected')
+            predicted = 'duplicate' if result.get('is_match') else 'not_duplicate'
+
+            match = False
+            if cell_type == 'TP' and expected == 'duplicate' and predicted == 'duplicate':
+                match = True
+            elif cell_type == 'FP' and expected == 'not_duplicate' and predicted == 'duplicate':
+                match = True
+            elif cell_type == 'TN' and expected == 'not_duplicate' and predicted == 'not_duplicate':
+                match = True
+            elif cell_type == 'FN' and expected == 'duplicate' and predicted == 'not_duplicate':
+                match = True
+
+            if match:
+                pairs.append(result)
+
+        return pairs
+
+    def _show_pairs_dialog(self, cell_type: str, pairs: List[Dict]):
+        """Show dialog with pairs from clicked cell."""
+        from pathlib import Path
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"{cell_type} - {len(pairs)} paires")
+        dialog.setMinimumSize(600, 400)
+
+        layout = QVBoxLayout(dialog)
+
+        # Description
+        descriptions = {
+            'TP': "✅ Vrais Positifs - Correctement identifiés comme duplicata",
+            'FP': "❌ Faux Positifs - Incorrectement identifiés comme duplicata",
+            'TN': "✅ Vrais Négatifs - Correctement identifiés comme non-duplicata",
+            'FN': "❌ Faux Négatifs - Incorrectement identifiés comme non-duplicata"
+        }
+
+        desc_label = QLabel(descriptions.get(cell_type, ""))
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("font-weight: bold; padding: 10px; background-color: #F5F5F5;")
+        layout.addWidget(desc_label)
+
+        # Table
+        table = QTableWidget()
+        table.setColumnCount(3)
+        table.setHorizontalHeaderLabels(["Vidéo 1", "Vidéo 2", "Similarité"])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
+        for pair in pairs:
+            row = table.rowCount()
+            table.insertRow(row)
+
+            v1 = Path(pair.get('video1_path', '')).name
+            v2 = Path(pair.get('video2_path', '')).name
+            sim = pair.get('similarity', 0)
+
+            table.setItem(row, 0, QTableWidgetItem(v1))
+            table.setItem(row, 1, QTableWidgetItem(v2))
+            table.setItem(row, 2, QTableWidgetItem(f"{sim:.2f}%"))
+
+        layout.addWidget(table)
+
+        # Close button
+        close_btn = QPushButton("Fermer")
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+
+        dialog.exec()
+
+
+class ROCCurveWidget(QWidget):
+    """
+    Interactive ROC Curve visualization with adjustable threshold.
+
+    Features:
+        - ROC curve plot with matplotlib
+        - Interactive threshold slider (0.0 - 1.0)
+        - Real-time metrics update (TPR, FPR, Precision, Recall, F1)
+        - AUC score display
+        - Current threshold point highlighted on curve
+        - Optimal threshold suggestion (max F1)
+
+    Signals:
+        threshold_changed(float): Emitted when threshold slider changes
+    """
+
+    threshold_changed = pyqtSignal(float)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.results = []
+        self.current_threshold = 0.5
+        self.roc_points = []  # List of (threshold, fpr, tpr) tuples
+        self.optimal_threshold = 0.5
+        self._init_ui()
+
+    def _init_ui(self):
+        """Initialize the UI."""
+        layout = QVBoxLayout(self)
+
+        # Title
+        title = QLabel("📈 <b>Courbe ROC Interactive</b>")
+        title.setStyleSheet("font-size: 14px; padding: 10px;")
+        layout.addWidget(title)
+
+        # Check if matplotlib is available
+        if not MATPLOTLIB_AVAILABLE:
+            warning = QLabel("⚠️ Matplotlib non disponible - visualisation désactivée")
+            warning.setStyleSheet("color: #FF5722; padding: 20px; font-size: 12px;")
+            layout.addWidget(warning)
+            return
+
+        # Main content
+        content_widget = QWidget()
+        content_layout = QHBoxLayout(content_widget)
+
+        # Left side: ROC Curve plot
+        plot_widget = QWidget()
+        plot_layout = QVBoxLayout(plot_widget)
+        plot_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.figure = Figure(figsize=(6, 5), dpi=100)
+        self.canvas = FigureCanvas(self.figure)
+        self.ax = self.figure.add_subplot(111)
+        plot_layout.addWidget(self.canvas)
+
+        content_layout.addWidget(plot_widget, stretch=2)
+
+        # Right side: Controls and metrics
+        controls_widget = QWidget()
+        controls_widget.setStyleSheet("""
+            QWidget {
+                background-color: #F5F5F5;
+                border: 2px solid #E0E0E0;
+                border-radius: 8px;
+            }
+        """)
+        controls_widget.setMaximumWidth(300)
+        controls_layout = QVBoxLayout(controls_widget)
+        controls_layout.setSpacing(15)
+
+        # AUC Score
+        self.auc_label = QLabel("AUC: --")
+        self.auc_label.setStyleSheet("""
+            font-size: 16px;
+            font-weight: bold;
+            color: #1976D2;
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+        """)
+        self.auc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        controls_layout.addWidget(self.auc_label)
+
+        # Threshold slider section
+        slider_group = QGroupBox("🎯 Seuil de Similarité")
+        slider_layout = QVBoxLayout(slider_group)
+
+        # Threshold value display
+        threshold_display_layout = QHBoxLayout()
+        threshold_display_layout.addWidget(QLabel("Seuil actuel:"))
+        self.threshold_value_label = QLabel("0.50")
+        self.threshold_value_label.setStyleSheet("font-weight: bold; color: #1976D2;")
+        threshold_display_layout.addWidget(self.threshold_value_label)
+        threshold_display_layout.addStretch()
+        slider_layout.addLayout(threshold_display_layout)
+
+        # Slider
+        from PyQt6.QtWidgets import QSlider
+        self.threshold_slider = QSlider(Qt.Orientation.Horizontal)
+        self.threshold_slider.setMinimum(0)
+        self.threshold_slider.setMaximum(100)
+        self.threshold_slider.setValue(50)
+        self.threshold_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.threshold_slider.setTickInterval(10)
+        self.threshold_slider.valueChanged.connect(self._on_threshold_changed)
+        slider_layout.addWidget(self.threshold_slider)
+
+        # Min/Max labels
+        minmax_layout = QHBoxLayout()
+        minmax_layout.addWidget(QLabel("0.0"))
+        minmax_layout.addStretch()
+        minmax_layout.addWidget(QLabel("1.0"))
+        slider_layout.addLayout(minmax_layout)
+
+        # Optimal threshold button
+        self.optimal_btn = QPushButton("✨ Utiliser Seuil Optimal")
+        self.optimal_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                font-weight: bold;
+                padding: 8px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #45A049;
+            }
+            QPushButton:disabled {
+                background-color: #CCCCCC;
+            }
+        """)
+        self.optimal_btn.clicked.connect(self._set_optimal_threshold)
+        self.optimal_btn.setEnabled(False)
+        slider_layout.addWidget(self.optimal_btn)
+
+        controls_layout.addWidget(slider_group)
+
+        # Metrics display
+        metrics_group = QGroupBox("📊 Métriques au Seuil Actuel")
+        metrics_layout = QVBoxLayout(metrics_group)
+        metrics_layout.setSpacing(8)
+
+        self.tpr_label = self._create_metric_label("TPR (Recall):", "--")
+        self.fpr_label = self._create_metric_label("FPR:", "--")
+        self.precision_label = self._create_metric_label("Precision:", "--")
+        self.f1_label = self._create_metric_label("F1 Score:", "--")
+
+        metrics_layout.addWidget(self.tpr_label)
+        metrics_layout.addWidget(self.fpr_label)
+        metrics_layout.addWidget(self.precision_label)
+        metrics_layout.addWidget(self.f1_label)
+
+        controls_layout.addWidget(metrics_group)
+
+        controls_layout.addStretch()
+
+        content_layout.addWidget(controls_widget, stretch=1)
+
+        layout.addWidget(content_widget)
+
+        # Initial plot
+        self._plot_empty_curve()
+
+    def _create_metric_label(self, text: str, value: str) -> QLabel:
+        """Create a metric label."""
+        label = QLabel(f"{text} <b>{value}</b>")
+        label.setStyleSheet("padding: 5px; background-color: white; border-radius: 3px;")
+        return label
+
+    def set_results(self, results: List[Dict]):
+        """
+        Set benchmark results and calculate ROC curve.
+
+        Args:
+            results: List of benchmark result dicts with 'similarity', 'expected', 'is_match'
+        """
+        if not MATPLOTLIB_AVAILABLE:
+            return
+
+        self.results = results
+
+        if not results:
+            self._plot_empty_curve()
+            return
+
+        # Calculate ROC curve points
+        self._calculate_roc_curve()
+
+        # Find optimal threshold (max F1)
+        self._find_optimal_threshold()
+
+        # Plot curve
+        self._plot_roc_curve()
+
+        # Update metrics for current threshold
+        self._update_metrics()
+
+        # Enable optimal button
+        self.optimal_btn.setEnabled(True)
+
+    def _calculate_roc_curve(self):
+        """Calculate ROC curve points for different thresholds."""
+        # Extract similarities and ground truth
+        similarities = []
+        ground_truth = []
+
+        for result in self.results:
+            similarities.append(result.get('similarity', 0))
+            expected = result['expected']
+            ground_truth.append(1 if expected == 'duplicate' else 0)
+
+        # Sort by similarity (descending)
+        sorted_indices = sorted(range(len(similarities)), key=lambda i: similarities[i], reverse=True)
+
+        # Calculate TP, FP for different thresholds
+        self.roc_points = []
+        thresholds = sorted(set(similarities), reverse=True)
+
+        # Add endpoints
+        if 1.0 not in thresholds:
+            thresholds.insert(0, 1.0)
+        if 0.0 not in thresholds:
+            thresholds.append(0.0)
+
+        total_positives = sum(ground_truth)
+        total_negatives = len(ground_truth) - total_positives
+
+        for threshold in thresholds:
+            tp = fp = 0
+
+            for i, sim in enumerate(similarities):
+                if sim >= threshold:
+                    if ground_truth[i] == 1:
+                        tp += 1
+                    else:
+                        fp += 1
+
+            tpr = tp / total_positives if total_positives > 0 else 0
+            fpr = fp / total_negatives if total_negatives > 0 else 0
+
+            self.roc_points.append((threshold, fpr, tpr))
+
+        # Calculate AUC using trapezoidal rule
+        auc = 0.0
+        for i in range(len(self.roc_points) - 1):
+            x1, y1 = self.roc_points[i][1], self.roc_points[i][2]
+            x2, y2 = self.roc_points[i + 1][1], self.roc_points[i + 1][2]
+            auc += (x2 - x1) * (y1 + y2) / 2
+
+        self.auc_label.setText(f"AUC: {auc:.3f}")
+
+    def _find_optimal_threshold(self):
+        """Find threshold that maximizes F1 score."""
+        best_f1 = 0
+        best_threshold = 0.5
+
+        for threshold, _, _ in self.roc_points:
+            metrics = self._calculate_metrics_at_threshold(threshold)
+            if metrics['f1'] > best_f1:
+                best_f1 = metrics['f1']
+                best_threshold = threshold
+
+        self.optimal_threshold = best_threshold
+        self.optimal_btn.setText(f"✨ Optimal: {best_threshold:.2f} (F1={best_f1:.3f})")
+
+    def _calculate_metrics_at_threshold(self, threshold: float) -> Dict:
+        """Calculate all metrics at a given threshold."""
+        tp = fp = tn = fn = 0
+
+        for result in self.results:
+            similarity = result.get('similarity', 0)
+            expected = result['expected']
+            predicted = 'duplicate' if similarity >= threshold else 'not_duplicate'
+
+            if expected == 'duplicate' and predicted == 'duplicate':
+                tp += 1
+            elif expected == 'not_duplicate' and predicted == 'duplicate':
+                fp += 1
+            elif expected == 'not_duplicate' and predicted == 'not_duplicate':
+                tn += 1
+            elif expected == 'duplicate' and predicted == 'not_duplicate':
+                fn += 1
+
+        total_positives = tp + fn
+        total_negatives = tn + fp
+
+        tpr = tp / total_positives if total_positives > 0 else 0
+        fpr = fp / total_negatives if total_negatives > 0 else 0
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+        recall = tpr
+        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+        return {
+            'tpr': tpr,
+            'fpr': fpr,
+            'precision': precision,
+            'recall': recall,
+            'f1': f1
+        }
+
+    def _plot_empty_curve(self):
+        """Plot empty ROC curve placeholder."""
+        self.ax.clear()
+        self.ax.plot([0, 1], [0, 1], 'k--', lw=2, label='Random (AUC=0.50)')
+        self.ax.set_xlim([0.0, 1.0])
+        self.ax.set_ylim([0.0, 1.05])
+        self.ax.set_xlabel('False Positive Rate', fontsize=10)
+        self.ax.set_ylabel('True Positive Rate', fontsize=10)
+        self.ax.set_title('ROC Curve', fontsize=12, fontweight='bold')
+        self.ax.legend(loc="lower right", fontsize=9)
+        self.ax.grid(True, alpha=0.3)
+        self.figure.tight_layout()
+        self.canvas.draw()
+
+    def _plot_roc_curve(self):
+        """Plot the ROC curve with current threshold highlighted."""
+        self.ax.clear()
+
+        # Extract FPR and TPR
+        fpr_values = [point[1] for point in self.roc_points]
+        tpr_values = [point[2] for point in self.roc_points]
+
+        # Plot ROC curve
+        self.ax.plot(fpr_values, tpr_values, 'b-', lw=2, label=f'ROC Curve')
+
+        # Plot random baseline
+        self.ax.plot([0, 1], [0, 1], 'k--', lw=1, alpha=0.5, label='Random (AUC=0.50)')
+
+        # Highlight current threshold point
+        metrics = self._calculate_metrics_at_threshold(self.current_threshold)
+        self.ax.plot(metrics['fpr'], metrics['tpr'], 'ro', markersize=10,
+                    label=f'Seuil actuel: {self.current_threshold:.2f}')
+
+        # Highlight optimal threshold
+        opt_metrics = self._calculate_metrics_at_threshold(self.optimal_threshold)
+        self.ax.plot(opt_metrics['fpr'], opt_metrics['tpr'], 'g*', markersize=15,
+                    label=f'Optimal: {self.optimal_threshold:.2f}')
+
+        self.ax.set_xlim([0.0, 1.0])
+        self.ax.set_ylim([0.0, 1.05])
+        self.ax.set_xlabel('False Positive Rate (FPR)', fontsize=10)
+        self.ax.set_ylabel('True Positive Rate (TPR)', fontsize=10)
+        self.ax.set_title('ROC Curve - Receiver Operating Characteristic', fontsize=11, fontweight='bold')
+        self.ax.legend(loc="lower right", fontsize=8)
+        self.ax.grid(True, alpha=0.3)
+
+        self.figure.tight_layout()
+        self.canvas.draw()
+
+    def _update_metrics(self):
+        """Update metrics display for current threshold."""
+        metrics = self._calculate_metrics_at_threshold(self.current_threshold)
+
+        self.tpr_label.setText(f"TPR (Recall): <b>{metrics['tpr']:.3f}</b>")
+        self.fpr_label.setText(f"FPR: <b>{metrics['fpr']:.3f}</b>")
+        self.precision_label.setText(f"Precision: <b>{metrics['precision']:.3f}</b>")
+        self.f1_label.setText(f"F1 Score: <b>{metrics['f1']:.3f}</b>")
+
+        # Color code F1 score
+        if metrics['f1'] >= 0.8:
+            f1_color = "#4CAF50"  # Green
+        elif metrics['f1'] >= 0.6:
+            f1_color = "#FF9800"  # Orange
+        else:
+            f1_color = "#F44336"  # Red
+
+        self.f1_label.setStyleSheet(f"padding: 5px; background-color: white; border-radius: 3px; border-left: 4px solid {f1_color};")
+
+    def _on_threshold_changed(self, value: int):
+        """Handle threshold slider change."""
+        # Convert 0-100 to 0.0-1.0
+        self.current_threshold = value / 100.0
+        self.threshold_value_label.setText(f"{self.current_threshold:.2f}")
+
+        # Update plot and metrics
+        if self.results:
+            self._plot_roc_curve()
+            self._update_metrics()
+
+        # Emit signal
+        self.threshold_changed.emit(self.current_threshold)
+
+    def _set_optimal_threshold(self):
+        """Set threshold to optimal value."""
+        slider_value = int(self.optimal_threshold * 100)
+        self.threshold_slider.setValue(slider_value)
+
+
+class BenchmarkPresets:
+    """
+    Predefined benchmark modes for quick testing.
+
+    Modes:
+        QUICK: Fast validation (~30s) - 10 pairs, 1 pipeline
+        STANDARD: Balanced testing (~5min) - 50 pairs, 2 pipelines
+        DEEP: Thorough testing (~30min) - 200 pairs, 5 pipelines
+        STRESS: Comprehensive test (~2h+) - All pairs, all pipelines
+    """
+
+    QUICK = {
+        'name': '⚡ Quick',
+        'description': 'Fast validation test (~30 seconds)',
+        'max_pairs': 10,
+        'pipelines': ['quick'],
+        'sample_strategy': 'random',
+        'estimated_time': '30s',
+        'icon': '⚡',
+        'color': '#2196F3'
+    }
+
+    STANDARD = {
+        'name': '⚖️ Standard',
+        'description': 'Balanced testing (~5 minutes)',
+        'max_pairs': 50,
+        'pipelines': ['quick', 'balanced'],
+        'sample_strategy': 'stratified',
+        'estimated_time': '5min',
+        'icon': '⚖️',
+        'color': '#4CAF50'
+    }
+
+    DEEP = {
+        'name': '🔬 Deep',
+        'description': 'Thorough validation (~30 minutes)',
+        'max_pairs': 200,
+        'pipelines': ['quick', 'balanced', 'accurate', 'paranoid', 'comprehensive'],
+        'sample_strategy': 'comprehensive',
+        'estimated_time': '30min',
+        'icon': '🔬',
+        'color': '#FF9800'
+    }
+
+    STRESS = {
+        'name': '🚀 Stress',
+        'description': 'Exhaustive test (2h+)',
+        'max_pairs': -1,  # All pairs
+        'pipelines': 'all',  # All available pipelines
+        'sample_strategy': 'exhaustive',
+        'estimated_time': '2h+',
+        'icon': '🚀',
+        'color': '#F44336'
+    }
+
+    @classmethod
+    def get_all_modes(cls):
+        """Get all available benchmark modes."""
+        return [cls.QUICK, cls.STANDARD, cls.DEEP, cls.STRESS]
+
+    @classmethod
+    def get_mode_by_name(cls, name: str):
+        """Get a specific mode by name."""
+        for mode in cls.get_all_modes():
+            if mode['name'] == name or name in mode['name']:
+                return mode
+        return None
+
+    @classmethod
+    def estimate_duration(cls, num_pairs: int, num_pipelines: int) -> str:
+        """
+        Estimate benchmark duration.
+
+        Args:
+            num_pairs: Number of video pairs to test
+            num_pipelines: Number of pipelines to run
+
+        Returns:
+            Human-readable duration estimate
+        """
+        # Assume ~0.4s per pair per pipeline
+        total_seconds = num_pairs * num_pipelines * 0.4
+
+        if total_seconds < 60:
+            return f"~{int(total_seconds)}s"
+        elif total_seconds < 3600:
+            return f"~{int(total_seconds / 60)}min"
+        else:
+            return f"~{total_seconds / 3600:.1f}h"
+
+
+class BenchmarkDashboardWidget(QWidget):
+    """
+    Unified dashboard for quick benchmark overview and actions.
+
+    Features:
+        - Last run summary with key metrics
+        - Quick Start button for immediate benchmark execution
+        - Top 3 recent pipelines with performance metrics
+        - Quick access to common operations
+        - At-a-glance health indicators
+
+    Signals:
+        quick_run_clicked: Emitted when Quick Start Run button clicked
+        create_pipeline_clicked: Emitted when Create Pipeline clicked
+        create_test_set_clicked: Emitted when Create Test Set clicked
+    """
+
+    quick_run_clicked = pyqtSignal()
+    create_pipeline_clicked = pyqtSignal()
+    create_test_set_clicked = pyqtSignal()
+
+    def __init__(self, benchmark_manager: BenchmarkManager, pipeline_manager: PipelineManager,
+                 test_set_manager: TestSetManager):
+        super().__init__()
+        self.benchmark_manager = benchmark_manager
+        self.pipeline_manager = pipeline_manager
+        self.test_set_manager = test_set_manager
+        self._init_ui()
+        self._load_data()
+
+    def _init_ui(self):
+        """Initialize the dashboard UI."""
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+
+        # Header
+        header = QLabel("📊 <b>Benchmark Dashboard</b>")
+        header.setStyleSheet("font-size: 18px; padding: 10px; color: #2196F3;")
+        layout.addWidget(header)
+
+        # Quick Actions Section
+        actions_group = QGroupBox("⚡ Quick Actions")
+        actions_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        actions_layout = QHBoxLayout()
+
+        quick_run_btn = QPushButton("▶️ Quick Start Run")
+        quick_run_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                padding: 15px 30px;
+                border-radius: 6px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+        """)
+        quick_run_btn.setToolTip("Lance un benchmark avec les paramètres par défaut")
+        quick_run_btn.clicked.connect(self.quick_run_clicked.emit)
+        actions_layout.addWidget(quick_run_btn)
+
+        new_pipeline_btn = QPushButton("🔧 New Pipeline")
+        new_pipeline_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28A745;
+                color: white;
+                font-size: 12px;
+                padding: 12px 20px;
+                border-radius: 5px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
+        new_pipeline_btn.clicked.connect(self.create_pipeline_clicked.emit)
+        actions_layout.addWidget(new_pipeline_btn)
+
+        new_test_set_btn = QPushButton("📋 New Test Set")
+        new_test_set_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FFC107;
+                color: #333;
+                font-size: 12px;
+                padding: 12px 20px;
+                border-radius: 5px;
+                border: none;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #FFB300;
+            }
+        """)
+        new_test_set_btn.clicked.connect(self.create_test_set_clicked.emit)
+        actions_layout.addWidget(new_test_set_btn)
+
+        actions_group.setLayout(actions_layout)
+        layout.addWidget(actions_group)
+
+        # Stats Cards Section
+        stats_layout = QHBoxLayout()
+
+        # Last Run Card
+        self.last_run_card = self._create_stat_card(
+            "📅 Last Run",
+            "No runs yet",
+            "Never",
+            "#E3F2FD"
+        )
+        stats_layout.addWidget(self.last_run_card)
+
+        # Total Runs Card
+        self.total_runs_card = self._create_stat_card(
+            "🔢 Total Runs",
+            "0",
+            "All time",
+            "#F3E5F5"
+        )
+        stats_layout.addWidget(self.total_runs_card)
+
+        # Best F1 Score Card
+        self.best_f1_card = self._create_stat_card(
+            "🏆 Best F1 Score",
+            "N/A",
+            "No data",
+            "#E8F5E9"
+        )
+        stats_layout.addWidget(self.best_f1_card)
+
+        layout.addLayout(stats_layout)
+
+        # Top Pipelines Section
+        pipelines_group = QGroupBox("🔝 Top 3 Recent Pipelines")
+        pipelines_group.setStyleSheet("QGroupBox { font-weight: bold; }")
+        pipelines_layout = QVBoxLayout()
+
+        self.pipelines_table = QTableWidget()
+        self.pipelines_table.setColumnCount(4)
+        self.pipelines_table.setHorizontalHeaderLabels(["Pipeline", "F1 Score", "Last Run", "Status"])
+        self.pipelines_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.pipelines_table.setMaximumHeight(150)
+        self.pipelines_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+
+        pipelines_layout.addWidget(self.pipelines_table)
+        pipelines_group.setLayout(pipelines_layout)
+        layout.addWidget(pipelines_group)
+
+        # Info Section
+        info_label = QLabel(
+            "ℹ️ <i>Use Quick Start Run to test the default pipeline, "
+            "or create custom pipelines and test sets for detailed validation.</i>"
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #666; font-size: 11px; padding: 10px;")
+        layout.addWidget(info_label)
+
+        layout.addStretch()
+
+    def _create_stat_card(self, title: str, value: str, subtitle: str, bg_color: str) -> QGroupBox:
+        """Create a statistics card widget."""
+        card = QGroupBox()
+        card.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: {bg_color};
+                border-radius: 8px;
+                padding: 15px;
+                border: 1px solid #DDDDDD;
+            }}
+        """)
+
+        layout = QVBoxLayout(card)
+        layout.setSpacing(5)
+
+        title_label = QLabel(title)
+        title_label.setStyleSheet("font-size: 11px; color: #666; font-weight: bold;")
+        layout.addWidget(title_label)
+
+        value_label = QLabel(value)
+        value_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #333;")
+        value_label.setObjectName("value_label")  # For easy updating
+        layout.addWidget(value_label)
+
+        subtitle_label = QLabel(subtitle)
+        subtitle_label.setStyleSheet("font-size: 10px; color: #999;")
+        subtitle_label.setObjectName("subtitle_label")
+        layout.addWidget(subtitle_label)
+
+        return card
+
+    def _load_data(self):
+        """Load and display dashboard data."""
+        try:
+            # Get last run info
+            runs = self.benchmark_manager.get_run_history(limit=1)
+            if runs:
+                last_run = runs[0]
+                self._update_card(self.last_run_card,
+                                last_run['pipeline_name'][:20],
+                                f"{last_run['timestamp'][:10]}")
+
+            # Get total runs count
+            all_runs = self.benchmark_manager.get_run_history(limit=1000)
+            self._update_card(self.total_runs_card,
+                            str(len(all_runs)),
+                            "Benchmarks completed")
+
+            # Get best F1 score
+            if all_runs:
+                best_run = max(all_runs, key=lambda r: r.get('f1_score', 0))
+                f1_score = best_run.get('f1_score', 0)
+                self._update_card(self.best_f1_card,
+                                f"{f1_score:.3f}",
+                                f"{best_run['pipeline_name'][:15]}")
+
+            # Load top 3 pipelines
+            self._load_top_pipelines()
+
+        except Exception as e:
+            logger.error(f"Error loading dashboard data: {e}", exc_info=True)
+
+    def _update_card(self, card: QGroupBox, value: str, subtitle: str):
+        """Update a stat card's values."""
+        value_label = card.findChild(QLabel, "value_label")
+        subtitle_label = card.findChild(QLabel, "subtitle_label")
+
+        if value_label:
+            value_label.setText(value)
+        if subtitle_label:
+            subtitle_label.setText(subtitle)
+
+    def _load_top_pipelines(self):
+        """Load top 3 recent pipelines into table."""
+        self.pipelines_table.setRowCount(0)
+
+        try:
+            # Get recent benchmark runs
+            runs = self.benchmark_manager.get_run_history(limit=10)
+
+            # Group by pipeline and get latest for each
+            pipeline_runs = {}
+            for run in runs:
+                pipeline_name = run['pipeline_name']
+                if pipeline_name not in pipeline_runs:
+                    pipeline_runs[pipeline_name] = run
+
+            # Take top 3
+            top_3 = list(pipeline_runs.values())[:3]
+
+            for run in top_3:
+                row = self.pipelines_table.rowCount()
+                self.pipelines_table.insertRow(row)
+
+                # Pipeline name
+                self.pipelines_table.setItem(row, 0, QTableWidgetItem(run['pipeline_name']))
+
+                # F1 Score
+                f1_score = run.get('f1_score', 0)
+                f1_item = QTableWidgetItem(f"{f1_score:.3f}" if f1_score else "N/A")
+                self.pipelines_table.setItem(row, 1, f1_item)
+
+                # Last run date
+                timestamp = run['timestamp'][:10] if run.get('timestamp') else "Unknown"
+                self.pipelines_table.setItem(row, 2, QTableWidgetItem(timestamp))
+
+                # Status indicator
+                status = "✅ Good" if f1_score > 0.8 else "⚠️ OK" if f1_score > 0.5 else "❌ Poor"
+                status_item = QTableWidgetItem(status)
+                self.pipelines_table.setItem(row, 3, status_item)
+
+        except Exception as e:
+            logger.error(f"Error loading top pipelines: {e}", exc_info=True)
+
+    def refresh(self):
+        """Refresh dashboard data."""
+        self._load_data()
 
 
 class PipelineEditorWidget(QWidget):
@@ -250,33 +1307,44 @@ class PipelineEditorWidget(QWidget):
         self.name_input.setEnabled(not is_default)
         self.desc_input.setEnabled(not is_default)
         self.mode_combo.setEnabled(not is_default)
+        # Sauvegarde via éditeur unifié, mais pour cohérence UI on bloque le bouton pour les défauts
         self.save_btn.setEnabled(not is_default)
         self.delete_btn.setEnabled(not is_default)
 
     def _on_new_pipeline(self):
-        """Create new pipeline."""
-        self.name_input.clear()
-        self.desc_input.clear()
-        self.mode_combo.setCurrentText("filtering")
-        self.name_input.setEnabled(True)
-        self.desc_input.setEnabled(True)
-        self.mode_combo.setEnabled(True)
-        self.save_btn.setEnabled(True)
+        """Créer un pipeline via l'éditeur unifié."""
+        from .unified_pipeline_editor_dialog import UnifiedPipelineEditorDialog
+
+        dialog = UnifiedPipelineEditorDialog(
+            pipeline_manager=self.pipeline_manager,
+            db_manager=None,
+            pipeline_data=None,
+            is_copy=False,
+            parent=self,
+        )
+        if dialog.exec():
+            self._load_pipelines()
+            self.pipeline_saved.emit(dialog.name_edit.text().strip())
 
     def _on_duplicate_pipeline(self):
-        """Duplicate current pipeline."""
+        """Dupliquer un pipeline via l'éditeur unifié."""
         current = self.pipeline_list.currentItem()
         if not current:
             return
 
         pipeline = current.data(Qt.ItemDataRole.UserRole)
-        self.name_input.setText(f"{pipeline['name']} (copie)")
-        self.desc_input.setText(pipeline['description'])
-        self.mode_combo.setCurrentText(pipeline['mode'])
-        self.name_input.setEnabled(True)
-        self.desc_input.setEnabled(True)
-        self.mode_combo.setEnabled(True)
-        self.save_btn.setEnabled(True)
+
+        from .unified_pipeline_editor_dialog import UnifiedPipelineEditorDialog
+        dialog = UnifiedPipelineEditorDialog(
+            pipeline_manager=self.pipeline_manager,
+            db_manager=None,
+            pipeline_data=pipeline,
+            is_copy=True,
+            parent=self,
+        )
+        if dialog.exec():
+            self._load_pipelines()
+            self.pipeline_saved.emit(dialog.name_edit.text().strip())
 
     def _on_delete_pipeline(self):
         """Delete current pipeline."""
@@ -400,39 +1468,24 @@ class PipelineEditorWidget(QWidget):
         return methods
 
     def _on_save_pipeline(self):
-        """Save pipeline."""
-        name = self.name_input.text().strip()
-        description = self.desc_input.toPlainText().strip()
-        mode = self.mode_combo.currentText()
+        """Ouvre l'éditeur unifié pour créer/éditer le pipeline sélectionné."""
+        current = self.pipeline_list.currentItem()
+        pipeline = current.data(Qt.ItemDataRole.UserRole) if current else None
 
-        if not name:
-            QMessageBox.warning(self, "Erreur", "Le nom du pipeline est requis")
-            return
+        # Si pipeline par défaut, on force la copie (pas d'édition en place)
+        is_default = pipeline.get('is_default', False) if pipeline else False
 
-        # Validate and get methods
-        if not self._validate_pipeline():
-            QMessageBox.warning(
-                self, "Erreur",
-                "Veuillez sélectionner au moins une méthode de vérification"
-            )
-            return
-
-        methods = self._get_selected_methods()
-
-        try:
-            pipeline_id = self.pipeline_manager.save_pipeline(name, description, mode, methods)
-            QMessageBox.information(
-                self, "Succès",
-                f"Pipeline '{name}' sauvegardé avec {len(methods)} méthode(s)\nID: {pipeline_id}"
-            )
+        from .unified_pipeline_editor_dialog import UnifiedPipelineEditorDialog
+        dialog = UnifiedPipelineEditorDialog(
+            pipeline_manager=self.pipeline_manager,
+            db_manager=None,
+            pipeline_data=pipeline,
+            is_copy=is_default or (pipeline is None and True),
+            parent=self,
+        )
+        if dialog.exec():
             self._load_pipelines()
-            self.pipeline_saved.emit(name)
-
-            # Reset preset selector
-            self.preset_combo.setCurrentText("-- Sélectionner --")
-
-        except ValueError as e:
-            QMessageBox.warning(self, "Erreur", str(e))
+            self.pipeline_saved.emit(dialog.name_edit.text().strip())
 
 
 class TestSetEditorWidget(QWidget):
@@ -461,18 +1514,15 @@ class TestSetEditorWidget(QWidget):
         self.test_set_combo.currentTextChanged.connect(self._on_test_set_changed)
         selector_layout.addWidget(self.test_set_combo)
 
-        self.wizard_btn = QPushButton("🧙 Assistant")
+        self.wizard_btn = QPushButton("🧙 Créer / Modifier")
         self.wizard_btn.clicked.connect(self._on_open_wizard)
-        self.wizard_btn.setToolTip("Ouvrir l'assistant de création de test set")
+        self.wizard_btn.setToolTip("Créer un nouveau test set ou modifier le test set sélectionné")
         self.wizard_btn.setStyleSheet("font-weight: bold;")
         selector_layout.addWidget(self.wizard_btn)
 
-        self.new_set_btn = QPushButton("➕ Nouveau")
-        self.new_set_btn.clicked.connect(self._on_new_test_set)
-        selector_layout.addWidget(self.new_set_btn)
-
         self.delete_set_btn = QPushButton("🗑️ Supprimer")
         self.delete_set_btn.clicked.connect(self._on_delete_test_set)
+        self.delete_set_btn.setToolTip("Supprimer le test set sélectionné et toutes ses paires")
         selector_layout.addWidget(self.delete_set_btn)
 
         layout.addLayout(selector_layout)
@@ -487,6 +1537,11 @@ class TestSetEditorWidget(QWidget):
         self.export_json_btn.clicked.connect(self._on_export_json)
         import_layout.addWidget(self.export_json_btn)
 
+        self.expand_btn = QPushButton("🔄 Enrichir (Toutes les paires)")
+        self.expand_btn.clicked.connect(self._on_expand_test_set)
+        self.expand_btn.setToolTip("Ajouter toutes les paires possibles manquantes pour une validation exhaustive")
+        import_layout.addWidget(self.expand_btn)
+
         import_layout.addStretch()
         layout.addLayout(import_layout)
 
@@ -497,16 +1552,12 @@ class TestSetEditorWidget(QWidget):
 
         # Pairs table
         self.pairs_table = QTableWidget()
-        self.pairs_table.setColumnCount(5)
-        self.pairs_table.setHorizontalHeaderLabels(["ID", "Vidéo 1", "Vidéo 2", "Attendu", "Notes"])
+        self.pairs_table.setColumnCount(6)
+        self.pairs_table.setHorizontalHeaderLabels(["ID", "Vidéo 1", "Vidéo 2", "Attendu", "Notes", "Actions"])
         self.pairs_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.pairs_table.horizontalHeader().setStretchLastSection(True)
+        self.pairs_table.horizontalHeader().setStretchLastSection(False)
+        self.pairs_table.setColumnWidth(5, 100)  # Actions column width
         layout.addWidget(self.pairs_table)
-
-        # Add pair button
-        self.add_pair_btn = QPushButton("➕ Ajouter une paire")
-        self.add_pair_btn.clicked.connect(self._on_add_pair)
-        layout.addWidget(self.add_pair_btn)
 
         # Load test sets
         self._load_test_sets()
@@ -538,6 +1589,26 @@ class TestSetEditorWidget(QWidget):
             self.pairs_table.setItem(row, 3, QTableWidgetItem(pair['expected']))
             self.pairs_table.setItem(row, 4, QTableWidgetItem(pair['notes'] or ''))
 
+            # Actions buttons
+            actions_widget = QWidget()
+            actions_layout = QHBoxLayout(actions_widget)
+            actions_layout.setContentsMargins(2, 2, 2, 2)
+            actions_layout.setSpacing(2)
+
+            edit_btn = QPushButton("✏️")
+            edit_btn.setMaximumWidth(30)
+            edit_btn.setToolTip("Modifier cette paire")
+            edit_btn.clicked.connect(lambda checked, p=pair: self._on_edit_pair(p))
+            actions_layout.addWidget(edit_btn)
+
+            delete_btn = QPushButton("🗑️")
+            delete_btn.setMaximumWidth(30)
+            delete_btn.setToolTip("Supprimer cette paire")
+            delete_btn.clicked.connect(lambda checked, p=pair: self._on_delete_pair(p))
+            actions_layout.addWidget(delete_btn)
+
+            self.pairs_table.setCellWidget(row, 5, actions_widget)
+
         # Update stats
         stats = self.test_set_manager.get_stats(test_set_name)
         self.stats_label.setText(
@@ -548,13 +1619,6 @@ class TestSetEditorWidget(QWidget):
         )
 
         self.test_set_changed.emit(test_set_name)
-
-    def _on_new_test_set(self):
-        """Create new test set."""
-        name, ok = QInputDialog.getText(self, "Nouveau Test Set", "Nom du test set:")
-        if ok and name:
-            self.test_set_combo.addItem(name)
-            self.test_set_combo.setCurrentText(name)
 
     def _on_delete_test_set(self):
         """Delete current test set."""
@@ -599,13 +1663,144 @@ class TestSetEditorWidget(QWidget):
             self.test_set_manager.export_to_pairs_json(test_set_name, file_path)
             QMessageBox.information(self, "Succès", "Export réussi")
 
-    def _on_add_pair(self):
-        """Add a new pair."""
-        QMessageBox.information(self, "Info", "Fonctionnalité à implémenter: dialogue d'ajout de paire")
+    def _on_expand_test_set(self):
+        """Expand test set with all possible pairs."""
+        test_set_name = self.test_set_combo.currentText()
+        if not test_set_name:
+            return
+
+        # Confirm action
+        reply = QMessageBox.question(
+            self, "Enrichir le Test Set",
+            f"Voulez-vous enrichir '{test_set_name}' avec TOUTES les paires possibles ?\n\n"
+            "Cela ajoutera toutes les combinaisons manquantes entre les vidéos du test set "
+            "avec le label 'unknown', permettant de détecter si le pipeline trouve des "
+            "matches non prévus.\n\n"
+            "Note: Les paires existantes ne seront pas modifiées.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                result = self.test_set_manager.expand_test_set_with_all_pairs(test_set_name)
+
+                QMessageBox.information(
+                    self, "Enrichissement Terminé",
+                    f"✅ Test set '{test_set_name}' enrichi avec succès !\n\n"
+                    f"• Paires existantes: {result['existing_pairs']}\n"
+                    f"• Nouvelles paires ajoutées: {result['new_pairs']}\n"
+                    f"• Total: {result['total_pairs']} paires\n\n"
+                    "Les nouvelles paires ont le label 'unknown' et peuvent maintenant "
+                    "être testées par le pipeline."
+                )
+
+                # Refresh the table
+                self._on_test_set_changed(test_set_name)
+
+            except Exception as e:
+                QMessageBox.critical(self, "Erreur", f"Erreur lors de l'enrichissement:\n{str(e)}")
+                logger.error(f"Test set expansion error: {e}", exc_info=True)
+
+    def _on_delete_pair(self, pair: dict):
+        """Delete a specific pair."""
+        reply = QMessageBox.question(
+            self, "Confirmation",
+            f"Supprimer la paire:\n{os.path.basename(pair['video1_path'])} ↔ {os.path.basename(pair['video2_path'])} ?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            success = self.test_set_manager.delete_test_pair(pair['id'])
+            if success:
+                QMessageBox.information(self, "Succès", "Paire supprimée")
+                # Refresh the table
+                test_set_name = self.test_set_combo.currentText()
+                self._on_test_set_changed(test_set_name)
+            else:
+                QMessageBox.warning(self, "Erreur", "Échec de la suppression")
+
+    def _on_edit_pair(self, pair: dict):
+        """Edit a specific pair."""
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox, QDialogButtonBox
+
+        # Create edit dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Modifier la paire")
+        dialog.setMinimumWidth(500)
+
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+
+        # Video paths (read-only)
+        video1_label = QLabel(pair['video1_path'])
+        video1_label.setWordWrap(True)
+        form.addRow("Vidéo 1:", video1_label)
+
+        video2_label = QLabel(pair['video2_path'])
+        video2_label.setWordWrap(True)
+        form.addRow("Vidéo 2:", video2_label)
+
+        # Expected result (editable)
+        expected_combo = QComboBox()
+        expected_combo.addItem("Scène trouvée", "scene_found")
+        expected_combo.addItem("Scène non trouvée", "scene_not_found")
+        expected_combo.addItem("Inconnu", "unknown")
+        expected_combo.addItem("Duplicata", "duplicate")
+        expected_combo.addItem("Non-duplicata", "not_duplicate")
+        expected_combo.addItem("Positif", "positive")
+        expected_combo.addItem("Négatif", "negative")
+
+        # Set current value
+        for i in range(expected_combo.count()):
+            if expected_combo.itemData(i) == pair['expected']:
+                expected_combo.setCurrentIndex(i)
+                break
+
+        form.addRow("Résultat attendu:", expected_combo)
+
+        # Notes (editable)
+        notes_input = QLineEdit(pair['notes'] or '')
+        form.addRow("Notes:", notes_input)
+
+        layout.addLayout(form)
+
+        # Buttons
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Update the pair
+            success = self.test_set_manager.update_test_pair(
+                pair_id=pair['id'],
+                expected=expected_combo.currentData(),
+                notes=notes_input.text()
+            )
+
+            if success:
+                QMessageBox.information(self, "Succès", "Paire modifiée")
+                # Refresh the table
+                test_set_name = self.test_set_combo.currentText()
+                self._on_test_set_changed(test_set_name)
+            else:
+                QMessageBox.warning(self, "Erreur", "Échec de la modification")
 
     def _on_open_wizard(self):
-        """Open the test set creation wizard."""
-        wizard = TestSetWizard(self.test_set_manager, self)
+        """Open the test set creation/edit wizard."""
+        # Get currently selected test set (if any)
+        current_test_set = self.test_set_combo.currentText() if self.test_set_combo.count() > 0 else None
+
+        # TestSetEditorWidget doesn't have access to main file list
+        # User can add files manually in the wizard
+        wizard = TestSetWizard(
+            self.test_set_manager,
+            preset_file_list=None,
+            existing_test_set=current_test_set,
+            parent=self
+        )
         wizard.test_set_created.connect(self._on_wizard_completed)
         wizard.exec()
 
@@ -626,13 +1821,15 @@ class BenchmarkBatchWidget(QWidget):
         benchmark_manager: BenchmarkManager,
         pipeline_manager: PipelineManager,
         test_set_manager: TestSetManager,
-        db_manager
+        db_manager,
+        file_list_widget=None
     ):
         super().__init__()
         self.benchmark_manager = benchmark_manager
         self.pipeline_manager = pipeline_manager
         self.test_set_manager = test_set_manager
         self.db_manager = db_manager
+        self.file_list_widget = file_list_widget
         self.runner: Optional[BenchmarkRunner] = None
         self._init_ui()
 
@@ -724,8 +1921,40 @@ class BenchmarkBatchWidget(QWidget):
             item.setData(Qt.ItemDataRole.UserRole, pipeline)
             self.pipeline_list.addItem(item)
 
+    def _cleanup_previous_benchmark(self):
+        """
+        CORRECTION BUG #18: Cleanup previous benchmark to prevent memory leaks.
+
+        Disconnects all signals and deletes previous runner object.
+        """
+        if self.runner:
+            # Disconnect all runner signals
+            try:
+                self.runner.pipeline_progress.disconnect()
+                self.runner.pair_progress.disconnect()
+                self.runner.pipeline_completed.disconnect()
+                self.runner.finished.disconnect()
+                self.runner.error.disconnect()
+            except (RuntimeError, TypeError):
+                # Signals may already be disconnected
+                pass
+
+            # Stop and wait for thread if still running
+            if self.runner.isRunning():
+                self.runner.stop()
+                self.runner.wait(2000)  # Wait max 2 seconds
+
+            # Delete runner
+            self.runner.deleteLater()
+            self.runner = None
+
+        logger.debug("Previous benchmark resources cleaned up (BenchmarkBatchWidget)")
+
     def _on_start_benchmark(self):
         """Start benchmark."""
+        # CORRECTION BUG #18: Cleanup previous benchmark before starting new one
+        self._cleanup_previous_benchmark()
+
         # Validation
         test_set_name = self.test_set_combo.currentText()
         if not test_set_name:
@@ -818,6 +2047,15 @@ class BenchmarkBatchWidget(QWidget):
         self.status_label.setText(f"❌ Erreur: {error_msg}")
 
         QMessageBox.critical(self, "Erreur", f"Erreur durant le benchmark:\n{error_msg}")
+
+    def closeEvent(self, event):
+        """
+        CORRECTION BUG #18: Cleanup resources when widget is closed.
+
+        Ensures proper memory cleanup when the widget is destroyed.
+        """
+        self._cleanup_previous_benchmark()
+        super().closeEvent(event)
 
 
 class BenchmarkResultsWidget(QWidget):
@@ -1475,9 +2713,10 @@ class BenchmarkHistoryWidget(QWidget):
 class BenchmarkTabWidget(QWidget):
     """Widget principal contenant tous les widgets de benchmark dans des onglets."""
 
-    def __init__(self, db_manager):
+    def __init__(self, db_manager, file_list_widget=None):
         super().__init__()
         self.db_manager = db_manager
+        self.file_list_widget = file_list_widget
 
         # Create managers
         self.pipeline_manager = PipelineManager(db_manager)
@@ -1520,34 +2759,18 @@ class BenchmarkTabWidget(QWidget):
 
         layout.addWidget(toolbar)
 
-        # Create tab widget
+        # Create tab widget (SIMPLIFIED TO 2 TABS - TASK 3)
         self.tabs = QTabWidget()
 
-        # REORDERED TABS - Test Sets first as per TASK 3.1
-        # Tab 1: Test sets (PRIMARY - users need data first)
-        self.test_set_widget = TestSetEditorWidget(self.test_set_manager)
-        self.tabs.addTab(self.test_set_widget, "📋 Test Sets")
+        # TAB 1: "📊 Dashboard" - Unified overview + management
+        # Consolidates: Test Sets, Pipelines, Dashboard, Monitoring
+        dashboard_tab = self._create_unified_dashboard_tab()
+        self.tabs.addTab(dashboard_tab, "📊 Dashboard")
 
-        # Tab 2: Pipelines (SECONDARY - configure what to test)
-        self.pipeline_widget = PipelineEditorWidget(self.pipeline_manager)
-        self.tabs.addTab(self.pipeline_widget, "🔧 Pipelines")
-
-        # Tab 3: Benchmark batch (ACTION - run the tests)
-        self.benchmark_widget = BenchmarkBatchWidget(
-            self.benchmark_manager,
-            self.pipeline_manager,
-            self.test_set_manager,
-            self.db_manager
-        )
-        self.tabs.addTab(self.benchmark_widget, "🧪 Exécution")
-
-        # Tab 4: Results (RESULTS - view current results)
-        self.results_widget = BenchmarkResultsWidget(self.benchmark_manager)
-        self.tabs.addTab(self.results_widget, "📊 Résultats")
-
-        # Tab 5: History (NEW - compare past runs)
-        self.history_widget = BenchmarkHistoryWidget(self.benchmark_manager)
-        self.tabs.addTab(self.history_widget, "📜 Historique")
+        # TAB 2: "🚀 Benchmark" - Execution + Results + History
+        # Consolidates: Exécution, Résultats, Historique
+        benchmark_tab = self._create_unified_benchmark_tab()
+        self.tabs.addTab(benchmark_tab, "🚀 Benchmark")
 
         layout.addWidget(self.tabs)
 
@@ -1555,6 +2778,89 @@ class BenchmarkTabWidget(QWidget):
         self.benchmark_widget.benchmark_finished.connect(self._on_benchmark_finished)
         self.pipeline_widget.pipeline_saved.connect(self._on_pipeline_saved)
         self.test_set_widget.test_set_changed.connect(self._on_test_set_changed)
+
+    def _create_unified_dashboard_tab(self) -> QWidget:
+        """
+        Create unified dashboard tab (replaces Test Sets + Pipelines + Dashboard).
+
+        Provides:
+        - Dashboard overview with key metrics
+        - Quick access to test set management
+        - Quick access to pipeline management
+        - System monitoring
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setSpacing(15)
+
+        # Dashboard widget (from Phase 1)
+        from .monitoring_dashboard import MonitoringDashboard
+        self.dashboard_widget = MonitoringDashboard(
+            self.benchmark_manager,
+            alert_system=None  # Can add alert system if available
+        )
+        layout.addWidget(self.dashboard_widget, stretch=2)
+
+        # Management section (collapsible)
+        management_group = QGroupBox("⚙️ Gestion (Test Sets & Pipelines)")
+        management_group.setCheckable(True)
+        management_group.setChecked(True)  # Expanded by default for easy access
+        management_layout = QVBoxLayout(management_group)
+
+        # Sub-tabs for Test Sets and Pipelines
+        management_tabs = QTabWidget()
+
+        self.test_set_widget = TestSetEditorWidget(self.test_set_manager)
+        management_tabs.addTab(self.test_set_widget, "📋 Test Sets")
+
+        self.pipeline_widget = PipelineEditorWidget(self.pipeline_manager)
+        management_tabs.addTab(self.pipeline_widget, "🔧 Pipelines")
+
+        management_layout.addWidget(management_tabs)
+        layout.addWidget(management_group, stretch=1)
+
+        return tab
+
+    def _create_unified_benchmark_tab(self) -> QWidget:
+        """
+        Create unified benchmark tab (replaces Exécution + Résultats + Historique).
+
+        Provides:
+        - Benchmark execution (with wizard option)
+        - Results viewing
+        - History tracking
+        """
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setSpacing(10)
+
+        # Top section: Execution controls
+        execution_section = QGroupBox("▶️ Exécution")
+        execution_layout = QVBoxLayout(execution_section)
+
+        self.benchmark_widget = BenchmarkBatchWidget(
+            self.benchmark_manager,
+            self.pipeline_manager,
+            self.test_set_manager,
+            self.db_manager,
+            self.file_list_widget
+        )
+        execution_layout.addWidget(self.benchmark_widget)
+
+        layout.addWidget(execution_section, stretch=1)
+
+        # Bottom section: Results & History (tabbed)
+        results_tabs = QTabWidget()
+
+        self.results_widget = BenchmarkResultsWidget(self.benchmark_manager)
+        results_tabs.addTab(self.results_widget, "📊 Résultats")
+
+        self.history_widget = BenchmarkHistoryWidget(self.benchmark_manager)
+        results_tabs.addTab(self.history_widget, "📜 Historique")
+
+        layout.addWidget(results_tabs, stretch=2)
+
+        return tab
 
     def _on_benchmark_finished(self, run_id):
         """Handle benchmark completion."""
@@ -1574,14 +2880,34 @@ class BenchmarkTabWidget(QWidget):
 
     def _quick_new_test_set(self):
         """Quick action: create new test set."""
-        self.tabs.setCurrentWidget(self.test_set_widget)
+        # Go to Dashboard tab (index 0), expand management section, select test sets
+        self.tabs.setCurrentIndex(0)
         self.test_set_widget._on_new_test_set()
 
     def _quick_new_pipeline(self):
         """Quick action: create new pipeline."""
-        self.tabs.setCurrentWidget(self.pipeline_widget)
+        # Go to Dashboard tab (index 0), expand management section, select pipelines
+        self.tabs.setCurrentIndex(0)
         self.pipeline_widget._on_new_pipeline()
 
     def _quick_run_benchmark(self):
         """Quick action: go to benchmark tab."""
-        self.tabs.setCurrentWidget(self.benchmark_widget)
+        # Go to Benchmark tab (index 1)
+        self.tabs.setCurrentIndex(1)
+
+    def closeEvent(self, event):
+        """
+        CORRECTION BUG #18: Cleanup resources when widget is closed.
+
+        Disconnects signals from child widgets to prevent memory leaks.
+        """
+        # Disconnect all signal connections
+        try:
+            self.benchmark_widget.benchmark_finished.disconnect()
+            self.pipeline_widget.pipeline_saved.disconnect()
+            self.test_set_widget.test_set_changed.disconnect()
+        except (RuntimeError, TypeError):
+            # Signals may already be disconnected
+            pass
+
+        super().closeEvent(event)
