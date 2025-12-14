@@ -84,14 +84,38 @@ class BenchmarkRunner(QThread):
     """
     Worker thread pour exécuter un benchmark batch.
 
+    CORRECTION BUG #33: Clarified signal semantics to avoid confusion.
+
     Signals:
-        pipeline_progress: (current_pipeline, total_pipelines, pipeline_name)
+        pipeline_progress: (current, total, pipeline_name)
+            CUMULATIVE progress across ALL pairs in the current pipeline.
+            - current: Number of pairs processed so far (monotonically increasing)
+            - total: Total number of pairs to process in this pipeline
+            - Emitted after each pair is processed (subject to throttling)
+            - Example: (45, 100, "Fast Audio") means 45/100 pairs done
+
         pair_progress: (current_pair, total_pairs, video1, video2)
+            BATCH progress within the current ThreadPoolExecutor batch.
+            - NOT cumulative - resets for each batch
+            - Used for detailed "current operation" display
+            - Example: (3, 10, "vid1.mp4", "vid2.mp4") means 3rd pair in current batch of 10
+
         hashing_progress: (current, total, pipeline_name)
+            Progress of hash precomputation phase (SHA-256, signatures, etc.)
+            - Emitted during _precompute_hashes() before actual comparison
+            - Separate from pipeline_progress (different phase)
+
         pipeline_metrics_updated: (pipeline_name, metrics_dict)
+            Real-time metrics update (TP, FP, TN, FN, precision, recall, F1, speed, ETA)
+
         pipeline_completed: (pipeline_name, results_dict)
+            Final results when pipeline finishes all pairs
+
         finished: (benchmark_run_id)
+            All pipelines complete, benchmark_run_id saved to database
+
         error: (error_msg)
+            Critical error occurred, benchmark should stop
     """
 
     pipeline_progress = pyqtSignal(int, int, str)  # current, total, name
@@ -564,9 +588,15 @@ class BenchmarkRunner(QThread):
                         logger.info("🛑 Arrêt du pré-calcul des signatures demandé")
                 finally:
                     executor_sig.shutdown(wait=False)
-        except Exception:
-            # Pas d'impact sur le benchmark si le pré-calcul échoue
-            self.hashing_progress.emit(total, total, pipeline_name)
+        except Exception as e:
+            # CORRECTION BUG #10: Log error and emit accurate progress instead of falsely showing 100%
+            logger.error(f"[{pipeline_name}] Precompute hashes failed: {e}", exc_info=True)
+            # Emit actual progress (current state), not 100% which would be misleading
+            with progress_lock:
+                actual_current = current
+            self.hashing_progress.emit(actual_current, total, pipeline_name)
+            # Note: Don't re-raise - precompute failure shouldn't stop benchmark
+            # The comparison will just be slower without cached hashes
 
     def _run_pipeline_benchmark(self, pipeline_config: Dict, pipeline_name: str = None) -> Dict:
         """
