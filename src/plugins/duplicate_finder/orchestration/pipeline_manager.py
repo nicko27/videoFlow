@@ -13,7 +13,11 @@ class PipelineManager:
     """Gestionnaire pour les pipelines de vérification sauvegardés."""
 
     # Protocoles prédéfinis - Initialisés automatiquement au premier démarrage
+    # TOUS LES 9 ALGORITHMES DISPONIBLES + COMBINAISONS OPTIMISÉES
     DEFAULT_PROTOCOLS = {
+        # ═══════════════════════════════════════════════════════════
+        # ALGORITHMES INDIVIDUELS (9 au total)
+        # ═══════════════════════════════════════════════════════════
         'color_histogram': {
             'name': '🎨 Color Histogram',
             'description': 'Compare color distribution using histogram analysis',
@@ -38,7 +42,7 @@ class PipelineManager:
                     {
                         'name': 'edge_pattern',
                         'enabled': True,
-                        'parameters': {'threshold': 80.0},
+                        'parameters': {'threshold': 80.0, 'canny_low': 50, 'canny_high': 150},
                         'weight': 1.0
                     }
                 ]
@@ -74,21 +78,90 @@ class PipelineManager:
                 ]
             }
         },
-        'perceptual_hash': {
-            'name': '🔑 Perceptual Hash',
-            'description': 'Fast perceptual hashing for quick comparison',
+        'ssim': {
+            'name': '📊 SSIM',
+            'description': 'Structural Similarity Index for perceptual quality comparison',
             'mode': 'multiple',
             'methods': {
                 'methods': [
                     {
-                        'name': 'perceptual_hash',
+                        'name': 'ssim',
                         'enabled': True,
-                        'parameters': {'threshold': 90.0},
+                        'parameters': {'threshold': 0.85, 'search_step': 3.0, 'max_windows': 200},
                         'weight': 1.0
                     }
                 ]
             }
         },
+        'feature_matching': {
+            'name': '🔍 Feature Matching',
+            'description': 'Keypoint detection and matching (ORB/SIFT/AKAZE)',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'feature_matching',
+                        'enabled': True,
+                        'parameters': {'threshold': 70.0, 'detector': 'ORB', 'search_step': 3.0, 'max_windows': 100},
+                        'weight': 1.0
+                    }
+                ]
+            }
+        },
+        'optical_flow': {
+            'name': '🌊 Optical Flow',
+            'description': 'Analyze motion patterns using optical flow',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'optical_flow',
+                        'enabled': True,
+                        'parameters': {'threshold': 70.0, 'max_frames': 30, 'frame_step': 3, 'min_variance': 0.0},
+                        'weight': 1.0
+                    }
+                ]
+            }
+        },
+        'frame_hash': {
+            'name': '🔑 Frame Hash',
+            'description': 'Fast perceptual hashing for quick frame comparison',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'frame_hash',
+                        'enabled': True,
+                        'parameters': {'threshold': 75.0, 'hash_size': 16, 'sample_rate': 5, 'search_step': 3.0},
+                        'weight': 1.0
+                    }
+                ]
+            }
+        },
+        'strategy3': {
+            'name': '🎯 Strategy 3',
+            'description': 'Scene-based detection with subsequence matching',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'strategy3',
+                        'enabled': True,
+                        'parameters': {
+                            'scene_threshold': 50.0,
+                            'dct_threshold': 75.0,
+                            'sequence_threshold': 95.0,
+                            'num_samples': 10
+                        },
+                        'weight': 1.0
+                    }
+                ]
+            }
+        },
+
+        # ═══════════════════════════════════════════════════════════
+        # COMBINAISONS OPTIMISÉES
+        # ═══════════════════════════════════════════════════════════
         'combined_balanced': {
             'name': '⚖️ Balanced Combined',
             'description': 'Balanced mix of multiple algorithms for good accuracy',
@@ -143,7 +216,7 @@ class PipelineManager:
                     {
                         'name': 'edge_pattern',
                         'enabled': True,
-                        'parameters': {'threshold': 85.0},
+                        'parameters': {'threshold': 85.0, 'canny_low': 50, 'canny_high': 150},
                         'weight': 1.0
                     }
                 ]
@@ -151,14 +224,14 @@ class PipelineManager:
         },
         'fast_screening': {
             'name': '⚡ Fast Screening',
-            'description': 'Quick screening with perceptual hash',
+            'description': 'Quick screening with frame hash and color',
             'mode': 'multiple',
             'methods': {
                 'methods': [
                     {
-                        'name': 'perceptual_hash',
+                        'name': 'frame_hash',
                         'enabled': True,
-                        'parameters': {'threshold': 88.0},
+                        'parameters': {'threshold': 75.0, 'hash_size': 16, 'sample_rate': 5, 'search_step': 3.0},
                         'weight': 1.0
                     },
                     {
@@ -166,6 +239,33 @@ class PipelineManager:
                         'enabled': True,
                         'parameters': {'threshold': 80.0},
                         'weight': 0.5
+                    }
+                ]
+            }
+        },
+        'perceptual_suite': {
+            'name': '🎨 Perceptual Suite',
+            'description': 'Comprehensive perceptual analysis with SSIM and feature matching',
+            'mode': 'multiple',
+            'methods': {
+                'methods': [
+                    {
+                        'name': 'ssim',
+                        'enabled': True,
+                        'parameters': {'threshold': 0.85, 'search_step': 3.0, 'max_windows': 200},
+                        'weight': 2.0
+                    },
+                    {
+                        'name': 'feature_matching',
+                        'enabled': True,
+                        'parameters': {'threshold': 70.0, 'detector': 'ORB', 'search_step': 3.0, 'max_windows': 100},
+                        'weight': 1.5
+                    },
+                    {
+                        'name': 'color_histogram',
+                        'enabled': True,
+                        'parameters': {'threshold': 85.0},
+                        'weight': 1.0
                     }
                 ]
             }
