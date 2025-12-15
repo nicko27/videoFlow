@@ -370,7 +370,7 @@ class EnhancedBenchmarkMonitor(QDialog):
         self.update_timer.start(1000)  # Update every second
 
     def init_ui(self):
-        """Initialise l'interface."""
+        """Initialise l'interface avec onglets."""
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(8)
         main_layout.setContentsMargins(10, 10, 10, 10)
@@ -381,43 +381,140 @@ class EnhancedBenchmarkMonitor(QDialog):
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(header)
 
-        # Scroll area pour tout le contenu
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { border: none; background-color: #f8f9fa; }")
+        # PROGRESSION GLOBALE (toujours visible en haut)
+        main_layout.addWidget(self.create_global_progress_section())
 
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setSpacing(12)
+        # ONGLETS pour organiser le contenu
+        self.tabs = QTabWidget()
+        self.tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                background-color: #ffffff;
+            }
+            QTabBar::tab {
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-bottom: none;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                padding: 8px 16px;
+                margin-right: 2px;
+                font-weight: bold;
+            }
+            QTabBar::tab:selected {
+                background-color: #ffffff;
+                color: #007bff;
+            }
+            QTabBar::tab:hover {
+                background-color: #e9ecef;
+            }
+        """)
 
-        # ① PROGRESSION GLOBALE
-        scroll_layout.addWidget(self.create_global_progress_section())
+        # ═══════════════════════════════════════════════════════════
+        # ONGLET 1: PROGRESSION
+        # ═══════════════════════════════════════════════════════════
+        progress_tab = QWidget()
+        progress_layout = QVBoxLayout(progress_tab)
+        progress_layout.setSpacing(12)
+        progress_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Scroll area pour progression
+        progress_scroll = QScrollArea()
+        progress_scroll.setWidgetResizable(True)
+        progress_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        progress_scroll.setStyleSheet("QScrollArea { border: none; background-color: #f8f9fa; }")
+
+        progress_content = QWidget()
+        progress_content_layout = QVBoxLayout(progress_content)
+        progress_content_layout.setSpacing(12)
 
         # ② PROGRESSION DES HASHES
         self.hash_widget = HashProgressWidget()
-        scroll_layout.addWidget(self.hash_widget)
+        progress_content_layout.addWidget(self.hash_widget)
 
         # ③ PROGRESSION DES PIPELINES
         self.pipelines_section = self.create_pipelines_section()
-        scroll_layout.addWidget(self.pipelines_section)
+        progress_content_layout.addWidget(self.pipelines_section)
+
+        progress_content_layout.addStretch()
+        progress_scroll.setWidget(progress_content)
+        progress_layout.addWidget(progress_scroll)
+
+        self.tabs.addTab(progress_tab, "📊 Progression")
+
+        # ═══════════════════════════════════════════════════════════
+        # ONGLET 2: MÉTRIQUES
+        # ═══════════════════════════════════════════════════════════
+        metrics_tab = QWidget()
+        metrics_layout = QVBoxLayout(metrics_tab)
+        metrics_layout.setSpacing(12)
+        metrics_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Scroll area pour métriques
+        metrics_scroll = QScrollArea()
+        metrics_scroll.setWidgetResizable(True)
+        metrics_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        metrics_scroll.setStyleSheet("QScrollArea { border: none; background-color: #f8f9fa; }")
+
+        metrics_content = QWidget()
+        metrics_content_layout = QVBoxLayout(metrics_content)
+        metrics_content_layout.setSpacing(12)
 
         # ④ MÉTRIQUES TEMPS RÉEL
-        scroll_layout.addWidget(self.create_metrics_section())
+        metrics_content_layout.addWidget(self.create_metrics_section())
+
+        metrics_content_layout.addStretch()
+        metrics_scroll.setWidget(metrics_content)
+        metrics_layout.addWidget(metrics_scroll)
+
+        self.tabs.addTab(metrics_tab, "📈 Métriques")
+
+        # ═══════════════════════════════════════════════════════════
+        # ONGLET 3: PERFORMANCES
+        # ═══════════════════════════════════════════════════════════
+        perf_tab = QWidget()
+        perf_layout = QVBoxLayout(perf_tab)
+        perf_layout.setSpacing(12)
+        perf_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Scroll area pour performances
+        perf_scroll = QScrollArea()
+        perf_scroll.setWidgetResizable(True)
+        perf_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        perf_scroll.setStyleSheet("QScrollArea { border: none; background-color: #f8f9fa; }")
+
+        perf_content = QWidget()
+        perf_content_layout = QVBoxLayout(perf_content)
+        perf_content_layout.setSpacing(12)
 
         # ⑤ PERFORMANCE TEMPS RÉEL
-        scroll_layout.addWidget(self.create_performance_section())
+        perf_content_layout.addWidget(self.create_performance_section())
 
         # ⑥ TEMPS PAR MÉTHODE
-        scroll_layout.addWidget(self.create_methods_section())
+        perf_content_layout.addWidget(self.create_methods_section())
+
+        perf_content_layout.addStretch()
+        perf_scroll.setWidget(perf_content)
+        perf_layout.addWidget(perf_scroll)
+
+        self.tabs.addTab(perf_tab, "⚡ Performances")
+
+        # ═══════════════════════════════════════════════════════════
+        # ONGLET 4: LOGS
+        # ═══════════════════════════════════════════════════════════
+        logs_tab = QWidget()
+        logs_layout = QVBoxLayout(logs_tab)
+        logs_layout.setSpacing(12)
+        logs_layout.setContentsMargins(10, 10, 10, 10)
 
         # ⑦ LOGS TEMPS RÉEL
-        scroll_layout.addWidget(self.create_logs_section())
+        logs_layout.addWidget(self.create_logs_section())
 
-        scroll_layout.addStretch()
+        self.tabs.addTab(logs_tab, "📋 Logs")
 
-        scroll.setWidget(scroll_content)
-        main_layout.addWidget(scroll)
+        # Ajouter les onglets au layout principal
+        main_layout.addWidget(self.tabs)
 
     def create_global_progress_section(self) -> QFrame:
         """Crée la section ① Progression globale."""
