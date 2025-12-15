@@ -1542,6 +1542,11 @@ class TestSetEditorWidget(QWidget):
         self.expand_btn.setToolTip("Ajouter toutes les paires possibles manquantes pour une validation exhaustive")
         import_layout.addWidget(self.expand_btn)
 
+        self.enrich_negatives_btn = QPushButton("➖ Enrichir (Non-duplicatas)")
+        self.enrich_negatives_btn.clicked.connect(self._on_enrich_negatives)
+        self.enrich_negatives_btn.setToolTip("Ajouter des paires de vidéos différentes (non-duplicatas) pour valider les faux positifs")
+        import_layout.addWidget(self.enrich_negatives_btn)
+
         import_layout.addStretch()
         layout.addLayout(import_layout)
 
@@ -1700,6 +1705,44 @@ class TestSetEditorWidget(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Erreur lors de l'enrichissement:\n{str(e)}")
                 logger.error(f"Test set expansion error: {e}", exc_info=True)
+
+    def _on_enrich_negatives(self):
+        """Enrichit le test set avec des paires de non-duplicatas."""
+        test_set_name = self.test_set_combo.currentText()
+        if not test_set_name:
+            return
+
+        # Confirm action
+        reply = QMessageBox.question(
+            self, "Enrichir avec Non-Duplicatas",
+            f"Voulez-vous enrichir '{test_set_name}' avec des paires de NON-DUPLICATAS ?\n\n"
+            "Cela ajoutera des paires de vidéos différentes (fichiers distincts sans relation) "
+            "avec le label 'negative', permettant de valider que le pipeline ne génère pas de "
+            "faux positifs (détection incorrecte de duplicatas).\n\n"
+            "Recommandé pour un test set équilibré.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                # Add non-duplicate pairs (different videos, labeled as 'negative')
+                result = self.test_set_manager.expand_test_set_with_all_pairs(test_set_name, default_expected='negative')
+
+                QMessageBox.information(
+                    self, "Enrichissement Terminé",
+                    f"✅ Test set '{test_set_name}' enrichi avec des non-duplicatas !\n\n"
+                    f"• Paires existantes: {result['existing_pairs']}\n"
+                    f"• Nouvelles paires (negative): {result['new_pairs']}\n"
+                    f"• Total: {result['total_pairs']} paires\n\n"
+                    "Ces paires permettront de détecter les faux positifs."
+                )
+
+                # Refresh the table
+                self._on_test_set_changed(test_set_name)
+
+            except Exception as e:
+                QMessageBox.critical(self, "Erreur", f"Erreur lors de l'enrichissement:\n{str(e)}")
+                logger.error(f"Test set negatives enrichment error: {e}", exc_info=True)
 
     def _on_delete_pair(self, pair: dict):
         """Delete a specific pair."""
