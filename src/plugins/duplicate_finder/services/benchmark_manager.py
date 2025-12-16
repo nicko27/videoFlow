@@ -403,8 +403,9 @@ class BenchmarkRunner(QThread):
             output_path = os.path.join(export_dir, f'run_{run_id}_{timestamp}.json')
 
             # Exporter via BenchmarkJSONExporter
+            # Pass db manager (self.db) instead of self (BenchmarkRunner)
             exporter = BenchmarkJSONExporter()
-            export_data = exporter.export_run(run_id, self, output_path)
+            export_data = exporter.export_run(run_id, self.db, output_path)
 
             # Log le résumé
             ci_summary = BenchmarkJSONExporter.create_ci_friendly_format(export_data)
