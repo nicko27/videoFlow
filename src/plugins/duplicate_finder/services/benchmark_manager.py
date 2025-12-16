@@ -3,6 +3,7 @@ Benchmark Manager - Exécution et gestion des benchmarks
 """
 import json
 import os
+import sys
 import time
 import threading
 from typing import Dict, List, Optional
@@ -16,6 +17,7 @@ from ..verification import VerificationPipeline
 from ..analysis.phash_visual import PHashComparator
 from ..utils.timeout import timeout, TimeoutError
 from ..utils.worker_optimization import calculate_benchmark_workers
+from .benchmark_exporter import BenchmarkJSONExporter
 
 logger = Logger.get_logger('DuplicateFinder.BenchmarkManager')
 
@@ -164,6 +166,7 @@ class BenchmarkRunner(QThread):
         self._stop = False
         self._progress_lock = Lock()
         self._completed_pipelines = 0
+        self._hash_progress_trackers = {}  # pipeline_name -> {hash_type -> {'current', 'total'}}
 
         # Auto-optimisation des workers si activée
         if auto_optimize_workers and (max_pipeline_workers is None or max_pair_workers is None):
@@ -195,6 +198,8 @@ class BenchmarkRunner(QThread):
 
     def run(self):
         """Exécute le benchmark batch avec parallélisation."""
+        start_time = time.time()  # Track duration for notifications
+
         try:
             # Créer le run dans la DB
             run_id = self._create_benchmark_run()
@@ -230,6 +235,21 @@ class BenchmarkRunner(QThread):
             # Marquer run comme complété
             if not self._stop:
                 self._complete_benchmark_run(run_id)
+
+                # NOUVEAU: Export automatique JSON après chaque benchmark
+                self._auto_export_json(run_id)
+
+                # Calculate duration
+                duration_sec = time.time() - start_time
+
+                # Show notification for long benchmarks (>5 minutes)
+                if duration_sec > 300:
+                    self._show_completion_notification(
+                        duration_sec=duration_sec,
+                        num_pipelines=total_pipelines,
+                        num_pairs=len(self.test_pairs)
+                    )
+
                 self.finished.emit(run_id)
             else:
                 logger.info("Benchmark stopped by user")
@@ -252,6 +272,18 @@ class BenchmarkRunner(QThread):
 
             # Exécuter benchmark pour ce pipeline (avec nom pour métriques intermédiaires)
             results = self._run_pipeline_benchmark(pipeline_config, pipeline_name)
+
+            # FIX: Ensure all hash progress bars reach 100%
+            if pipeline_name in self._hash_progress_trackers:
+                hash_progress = self._hash_progress_trackers[pipeline_name]
+                with self._progress_lock:
+                    for hash_type, progress_data in hash_progress.items():
+                        total = progress_data['total']
+                        current = progress_data['current']
+                        if current < total:
+                            # Force emit 100% completion signal
+                            self.hash_type_progress.emit(hash_type, total, total, pipeline_name)
+                            logger.debug(f"[{pipeline_name}] Completed progress bar: {hash_type} → {total}/{total}")
 
             # Stocker résultats
             logger.info(f"💾 [STORING RESULTS] {pipeline_name}")
@@ -312,6 +344,77 @@ class BenchmarkRunner(QThread):
             """, (datetime.now().isoformat(), run_id))
             conn.commit()
 
+    def _show_completion_notification(self, duration_sec: float, num_pipelines: int, num_pairs: int):
+        """
+        Show system notification for benchmark completion.
+
+        Only shown for long benchmarks (>5 minutes) to avoid notification spam.
+
+        Args:
+            duration_sec: Benchmark duration in seconds
+            num_pipelines: Number of pipelines tested
+            num_pairs: Number of test pairs
+        """
+        try:
+            title = "Benchmark Complete"
+            duration_min = duration_sec / 60.0
+            message = f"Duration: {duration_min:.1f} min\\nPipelines: {num_pipelines}\\nPairs: {num_pairs}"
+
+            if sys.platform == 'darwin':  # macOS
+                # Use osascript for native macOS notification
+                os.system(f'''
+                    osascript -e 'display notification "{message}" with title "{title}" sound name "Glass"'
+                ''')
+                logger.info(f"📢 Notification sent: {title}")
+            elif sys.platform == 'linux':
+                # Use notify-send on Linux
+                os.system(f'notify-send "{title}" "{message}"')
+                logger.info(f"📢 Notification sent: {title}")
+            elif sys.platform == 'win32':
+                # Use Windows toast notification (requires win10toast)
+                try:
+                    from win10toast import ToastNotifier
+                    toaster = ToastNotifier()
+                    toaster.show_toast(title, message, duration=10)
+                    logger.info(f"📢 Notification sent: {title}")
+                except ImportError:
+                    logger.debug("win10toast not available, skipping notification")
+
+        except Exception as e:
+            logger.debug(f"Failed to show notification: {e}")
+            # Don't propagate error - notifications are optional
+
+    def _auto_export_json(self, run_id: int):
+        """
+        Export automatique des résultats de benchmark au format JSON.
+
+        Sauvegarde dans benchmark_results/run_{run_id}_{timestamp}.json
+        avec toutes les métriques, confusion matrix, et détails des paires.
+        """
+        try:
+            # Créer le répertoire benchmark_results à la racine du projet
+            import os
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+            export_dir = os.path.join(project_root, 'benchmark_results')
+            os.makedirs(export_dir, exist_ok=True)
+
+            # Créer le nom de fichier avec timestamp
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            output_path = os.path.join(export_dir, f'run_{run_id}_{timestamp}.json')
+
+            # Exporter via BenchmarkJSONExporter
+            exporter = BenchmarkJSONExporter()
+            export_data = exporter.export_run(run_id, self, output_path)
+
+            # Log le résumé
+            ci_summary = BenchmarkJSONExporter.create_ci_friendly_format(export_data)
+            logger.info(f"📊 Benchmark Export: {ci_summary}")
+            logger.info(f"📁 Saved to: {output_path}")
+
+        except Exception as e:
+            logger.error(f"❌ Failed to auto-export benchmark {run_id}: {e}", exc_info=True)
+            # Ne pas propager l'erreur pour ne pas bloquer le benchmark
+
     def _precompute_hashes(self, pipeline_name: str, total_pairs: int, pipeline_config: Dict):
         """
         Passe de pré-calcul pour alimenter la barre de progression "hash".
@@ -340,6 +443,9 @@ class BenchmarkRunner(QThread):
         # NEW: Track progress per hash type for more accurate real-time updates
         hash_progress = {}  # hash_type -> {'current': int, 'total': int}
         progress_lock = threading.Lock()
+
+        # Store reference for later completion signal
+        self._hash_progress_trackers[pipeline_name] = hash_progress
 
         def init_hash_type(hash_type: str, total_work: int):
             """Initialize progress tracking for a hash type."""
@@ -656,7 +762,8 @@ class BenchmarkRunner(QThread):
         metrics = {
             'tp': 0, 'fp': 0, 'tn': 0, 'fn': 0,
             'accepted': 0, 'rejected': 0,  # Raw counts for unlabeled sets
-            'labeled_count': 0, 'unlabeled_count': 0
+            'labeled_count': 0, 'unlabeled_count': 0,
+            'errors': 0  # FIX #15: Track error count
         }
         per_pair_results = []
         pairs_processed = [0]  # Liste pour mutabilité dans la closure
@@ -743,6 +850,78 @@ class BenchmarkRunner(QThread):
             # Émettre signal de progression pour la timeline globale
             self.pipeline_progress.emit(processed, total_pairs, pipeline_name)
 
+            # 🔍 DIAGNOSTIC
+            logger.info(f"🔍 [DIAG] Emitting metrics: {processed}/{total_pairs} pairs")
+            logger.info(f"🔍 [DIAG] per_pair_results count: {len(per_pair_results)}")
+
+            # Calculer stats par méthode depuis les résultats
+            method_stats = {}
+            legacy_format_count = 0
+
+            for result in per_pair_results:
+                # TIER 1: Check for VerificationResult first (preferred - OPTIMIZED PATH)
+                # NOTE: We don't skip 'from_cache' results here because cached VerificationResults
+                # still have complete method_results that we want to include in stats
+                verification_result = result.get('verification_result')
+                if verification_result:
+                    # Use VerificationResult.method_results (list of MethodResult)
+                    for method_result in verification_result.method_results:
+                        method_name = method_result.method_name
+                        exec_time = method_result.execution_time_ms / 1000.0  # Convert to seconds
+
+                        if method_name not in method_stats:
+                            method_stats[method_name] = {'calls': 0, 'total_time': 0.0, 'times': []}
+
+                        method_stats[method_name]['calls'] += 1
+                        method_stats[method_name]['total_time'] += exec_time
+                        method_stats[method_name]['times'].append(exec_time)
+                    continue
+
+                # TIER 2: Handle LIST format (current after VerificationResult integration)
+                # DEPRECATED: This path will be removed in future versions
+                # Skip cached results in legacy format - they don't have detailed stats
+                if result.get('from_cache', False):
+                    continue
+
+                pipeline_results = result.get('pipeline_results', [])
+
+                if isinstance(pipeline_results, list):
+                    legacy_format_count += 1
+                    for method_result in pipeline_results:
+                        if isinstance(method_result, dict):
+                            method_name = method_result.get('method_name', 'unknown')
+                            exec_time = method_result.get('execution_time', 0)
+
+                            if exec_time > 0:
+                                if method_name not in method_stats:
+                                    method_stats[method_name] = {'calls': 0, 'total_time': 0.0, 'times': []}
+
+                                method_stats[method_name]['calls'] += 1
+                                method_stats[method_name]['total_time'] += exec_time
+                                method_stats[method_name]['times'].append(exec_time)
+
+                # TIER 3: Handle DICT format (legacy backward compatibility)
+                # DEPRECATED: This path will be removed in future versions
+                elif isinstance(pipeline_results, dict):
+                    legacy_format_count += 1
+                    for method_name, method_result in pipeline_results.items():
+                        if isinstance(method_result, dict):
+                            exec_time = method_result.get('execution_time', 0)
+                            if exec_time > 0:
+                                if method_name not in method_stats:
+                                    method_stats[method_name] = {'calls': 0, 'total_time': 0.0, 'times': []}
+                                method_stats[method_name]['calls'] += 1
+                                method_stats[method_name]['total_time'] += exec_time
+                                method_stats[method_name]['times'].append(exec_time)
+
+            # Log warning if legacy formats used
+            if legacy_format_count > 0:
+                logger.warning(f"⚠️ {legacy_format_count} results using legacy format (not VerificationResult). "
+                             f"Consider migrating to VerificationResult for better performance and features.")
+
+            # 🔍 DIAGNOSTIC
+            logger.info(f"🔍 [DIAG] method_stats calculated: {list(method_stats.keys())}")
+
             # Émettre signal de métriques pour les détails
             metrics_data = {
                 'tp': tp,
@@ -755,7 +934,11 @@ class BenchmarkRunner(QThread):
                 'speed': speed,
                 'eta': eta,
                 'processed': processed,
-                'total': total_pairs
+                'total': total_pairs,
+                'method_stats': method_stats,  # NOUVEAU: stats par méthode
+                'accepted': metrics.get('accepted', 0),  # FIX #16: Add accepted count
+                'rejected': metrics.get('rejected', 0),  # FIX #16: Add rejected count
+                'errors': metrics.get('errors', 0)       # FIX #15: Add errors count
             }
             self.pipeline_metrics_updated.emit(pipeline_name, metrics_data)
 
@@ -908,11 +1091,11 @@ class BenchmarkRunner(QThread):
                 }
 
             finally:
-                # Toujours incrémenter le compteur et émettre les métriques
+                # Toujours incrémenter le compteur
                 # (exactement UNE fois par paire, succès ou échec)
+                # NOTE: Les métriques sont émises dans le loop principal APRÈS que le résultat soit ajouté à per_pair_results
                 with metrics_lock:
                     pairs_processed[0] += 1
-                emit_intermediate_metrics()
 
         # Traiter les paires en parallèle avec BATCH PROCESSING INTELLIGENT
         pairs_with_idx = [(pair, idx) for idx, pair in enumerate(self.test_pairs, 1)]
@@ -959,7 +1142,8 @@ class BenchmarkRunner(QThread):
             # OPTIMISÉ: Timeout réduit à 2s pour réactivité maximale au stop
             timeout_per_wait = 2  # Vérifier stop toutes les 2 secondes (vs 5s avant, vs 180s dans l'ancien code)
             last_progress_time = time.time()
-            no_progress_timeout = 180  # Timeout global sans progrès
+            # CORRECTION: Augmenté de 180s à 600s (10min) car algorithmes optimisés peuvent prendre 30-80s par paire
+            no_progress_timeout = 600  # Timeout global sans progrès
 
             while futures and not self._stop:
                 # Attendre qu'au moins un future se termine (avec timeout court)
@@ -987,10 +1171,20 @@ class BenchmarkRunner(QThread):
                             result = future.result(timeout=1)
                             if result:
                                 per_pair_results.append(result)
+
+                                # CORRECTION: Émettre métriques après chaque paire (throttled)
+                                emit_intermediate_metrics()
+
                         except TimeoutError:
                             logger.error(f"⏰ [{pipeline_name}] TIMEOUT getting result for completed future")
+                            # FIX #15: Increment error count
+                            with metrics_lock:
+                                metrics['errors'] += 1
                         except Exception as e:
                             logger.error(f"❌ [{pipeline_name}] Error getting result: {e}", exc_info=True)
+                            # FIX #15: Increment error count
+                            with metrics_lock:
+                                metrics['errors'] += 1
                 else:
                     # Aucun future ne s'est terminé pendant timeout_per_wait secondes
                     if elapsed_since_progress > no_progress_timeout:
@@ -1118,6 +1312,31 @@ class BenchmarkRunner(QThread):
 
     def _store_pipeline_results(self, run_id: int, pipeline_config: Dict, results: Dict):
         """Stocke les résultats d'un pipeline dans la DB."""
+        # Sanitize results for JSON serialization (numpy types, bools, etc.)
+        def sanitize_for_json(obj):
+            """Convert numpy/bool types to JSON-serializable Python types."""
+            import numpy as np
+            # Check numpy types first (before dict/list) to handle numpy.bool_ properly
+            if isinstance(obj, np.bool_):
+                return bool(obj)
+            elif isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, dict):
+                return {k: sanitize_for_json(v) for k, v in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [sanitize_for_json(item) for item in obj]
+            # Python native bool is already JSON serializable, but check anyway
+            elif type(obj).__name__ == 'bool' and type(obj).__module__ == 'builtins':
+                return obj
+            return obj
+
+        # Sanitize ALL results fields, not just per_pair_results
+        sanitized_results = sanitize_for_json(results)
+
         with self.db.pool.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -1131,13 +1350,13 @@ class BenchmarkRunner(QThread):
                 run_id,
                 pipeline_config['name'],
                 json.dumps(pipeline_config, ensure_ascii=False),
-                results['tp'], results['fp'], results['tn'], results['fn'],
-                results['precision'], results['recall'], results['f1_score'],
-                results['total_time'],
-                json.dumps(results['per_pair_results'], ensure_ascii=False),
-                results['accepted'], results['rejected'],
-                1 if results['is_labeled'] else 0,  # Store as INTEGER (0 or 1)
-                results['labeled_count'], results['unlabeled_count']
+                sanitized_results['tp'], sanitized_results['fp'], sanitized_results['tn'], sanitized_results['fn'],
+                sanitized_results['precision'], sanitized_results['recall'], sanitized_results['f1_score'],
+                sanitized_results['total_time'],
+                json.dumps(sanitized_results.get('per_pair_results', []), ensure_ascii=False),
+                sanitized_results['accepted'], sanitized_results['rejected'],
+                1 if sanitized_results['is_labeled'] else 0,  # Store as INTEGER (0 or 1)
+                sanitized_results['labeled_count'], sanitized_results['unlabeled_count']
             ))
             conn.commit()
 

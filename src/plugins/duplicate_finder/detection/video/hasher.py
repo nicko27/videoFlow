@@ -15,6 +15,7 @@ from enum import Enum
 from ...data import DatabaseManager
 from ...processing.cache.lru_cache import LRUCache
 from ...processing.cache.frame_cache import FrameCache
+from ...processing.cache.hash_cache_manager import HashCacheManager
 from src.core.logger import Logger
 from src.core.serialization import serialize_numpy_to_json, deserialize_numpy_from_json
 
@@ -192,8 +193,11 @@ class VideoHasher:
         self.plugin_dir = os.path.dirname(__file__)
         self.db = DatabaseManager()
 
-        # Memory cache with automatic eviction (LRU - prevents unbounded growth)
+        # L1 cache: Memory cache with automatic eviction (LRU - prevents unbounded growth)
         self.hash_cache = HashCache(max_items=max_cache_videos)  # file_path -> {'hash', 'duration', 'mtime', 'file_size'}
+
+        # L2 cache: Persistent file-based cache (survives restarts)
+        self.file_cache = HashCacheManager()
 
         # LRU cache for comparisons (limited to 10000 most recent)
         # Prevents unlimited memory growth while keeping hot comparisons fast
@@ -210,7 +214,7 @@ class VideoHasher:
         else:
             logger.debug("Cache preloading disabled")
 
-        logger.debug("VideoHasher initialized with permanent memory cache")
+        logger.debug("VideoHasher initialized with L1 (memory) + L2 (file) cache")
 
     def _preload_cache(self, max_items=1000, progress_callback=None):
         """Smart cache preloading with limits and file existence checks.
@@ -239,20 +243,23 @@ class VideoHasher:
                 cursor = conn.cursor()
 
                 # Load hashes - SMART: Only most recent items
+                # FIX: Use dense_hashes table instead of removed hash_data column
                 if max_items > 0:
                     query = '''
-                        SELECT file_path, hash_data, duration, modification_time, file_size
-                        FROM video_files
-                        ORDER BY updated_at DESC
+                        SELECT vf.file_path, dh.dense_hash, vf.duration, vf.modification_time, vf.file_size
+                        FROM video_files vf
+                        JOIN dense_hashes dh ON vf.id = dh.video_id
+                        ORDER BY vf.last_scanned DESC
                         LIMIT ?
                     '''
                     cursor.execute(query, (max_items,))
                 else:
                     # Unlimited - use with caution
                     query = '''
-                        SELECT file_path, hash_data, duration, modification_time, file_size
-                        FROM video_files
-                        ORDER BY updated_at DESC
+                        SELECT vf.file_path, dh.dense_hash, vf.duration, vf.modification_time, vf.file_size
+                        FROM video_files vf
+                        JOIN dense_hashes dh ON vf.id = dh.video_id
+                        ORDER BY vf.last_scanned DESC
                     '''
                     cursor.execute(query)
 
@@ -447,7 +454,7 @@ class VideoHasher:
             Exception: If the video cannot be opened or processed.
         """
         try:
-            # 1. Check memory cache (ultra fast)
+            # 1. Check L1 cache (memory - ultra fast)
             if video_path in self.hash_cache:
                 cache_entry = self.hash_cache[video_path]
                 current_mtime = os.path.getmtime(video_path)
@@ -459,13 +466,29 @@ class VideoHasher:
                 size_match = current_size == cache_entry.get('file_size', current_size)
 
                 if mtime_match and size_match:
-                    logger.debug(f"Cache hit (memory): {os.path.basename(video_path)}")
+                    logger.debug(f"Cache hit (L1 memory): {os.path.basename(video_path)}")
                     return cache_entry['hash'], cache_entry['duration']
                 else:
                     logger.debug(f"Cache invalidated: {os.path.basename(video_path)} "
                                f"(mtime_match={mtime_match}, size_match={size_match})")
 
-            # 2. Hash computation required
+            # 2. Check L2 cache (file - fast, survives restarts)
+            cached_hash = self.file_cache.get_hash(video_path, method=self.method)
+            if cached_hash is not None:
+                hash_array, duration = cached_hash
+                # Promote to L1 cache for faster future access
+                current_mtime = os.path.getmtime(video_path)
+                current_size = os.path.getsize(video_path)
+                self.hash_cache[video_path] = {
+                    'hash': hash_array,
+                    'duration': duration,
+                    'mtime': current_mtime,
+                    'file_size': current_size
+                }
+                logger.debug(f"Cache hit (L2 file): {os.path.basename(video_path)}")
+                return hash_array, duration
+
+            # 3. Hash computation required
             cv2.setLogLevel(0)
             cap = cv2.VideoCapture(video_path)
             
@@ -565,6 +588,7 @@ class VideoHasher:
                 # Note: current_mtime already obtained earlier for frame cache
                 file_size = os.path.getsize(video_path)
 
+                # L1 cache (memory)
                 self.hash_cache[video_path] = {
                     'hash': final_hash,
                     'duration': duration,
@@ -572,7 +596,16 @@ class VideoHasher:
                     'file_size': file_size  # OPTIMIZATION: Cache for early exit
                 }
 
-                # Store in DB for persistence
+                # L2 cache (file - persistent across restarts)
+                self.file_cache.store_hash(
+                    video_path,
+                    final_hash,
+                    duration,
+                    method=self.method,
+                    parameters=None
+                )
+
+                # Store in DB for persistence (deprecated - will be removed after migration)
                 width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                 height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
