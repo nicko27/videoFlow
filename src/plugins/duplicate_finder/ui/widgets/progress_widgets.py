@@ -2273,7 +2273,8 @@ class AudioFingerprintDebugger(QFrame):
     def _extract_fingerprints(self):
         """Extract audio fingerprints from all videos."""
         from PyQt6.QtWidgets import QMessageBox, QProgressDialog
-        from .core.detection.audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
+        # OBSOLETE: Legacy detection code removed, use DuplicateFlow algorithms instead
+        # from .core.detection.audio_fingerprinting import AudioFingerprintDetector, PrecisionMode
 
         # Get precision mode
         precision_mode_name = self.precision_combo.currentData()
