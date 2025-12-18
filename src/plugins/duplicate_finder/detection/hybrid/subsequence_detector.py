@@ -8,9 +8,9 @@ import cv2
 import numpy as np
 import os
 from typing import Optional, Tuple, List, Dict
-from .detection.video.video_hasher import VideoHasher
-from .core.database_manager import VideoDatabase
-from .lru_cache import MemoryBoundedLRUCache
+from ...detection.video.video_hasher import VideoHasher
+from ...core.database_manager import VideoDatabase
+from ...lru_cache import MemoryBoundedLRUCache
 # Removed: from .analysis.subsequence_verification import SubsequenceVerificationMethods (obsolete)
 from src.core.logger import Logger
 
@@ -122,7 +122,7 @@ class SubsequenceDetector:
         self.enable_verification = self.enable_phase2
 
         # Initialize verification methods
-        # Use pipeline if provided, otherwise fall back to old Phase 2 system
+        # Use pipeline if provided (modern approach)
         if self.verification_pipeline is not None:
             self.verifier = None  # Pipeline replaces verifier
             logger.info(f"SubsequenceDetector initialized with VerificationPipeline: "
@@ -130,15 +130,10 @@ class SubsequenceDetector:
                        f"{sample_interval_seconds}s intervals, {max_cache_memory_mb}MB cache, "
                        f"{min_match_ratio*100}% min match")
         elif self.enable_phase2:
-            self.verifier = SubsequenceVerificationMethods(
-                dct_threshold=verification_dct_threshold,
-                sequence_threshold=verification_sequence_threshold,
-                max_workers=verification_workers
-            )
-            logger.info(f"SubsequenceDetector initialized: Phase1={phase1_method if enable_phase1 else 'disabled'}, "
-                       f"Phase2={phase2_method if self.enable_phase2 else 'disabled'}, "
-                       f"{sample_interval_seconds}s intervals, {max_cache_memory_mb}MB cache, "
-                       f"{min_match_ratio*100}% min match")
+            # Phase 2 enabled but no pipeline provided - this is an error
+            self.verifier = None
+            logger.error(f"SubsequenceDetector: Phase 2 verification enabled but no VerificationPipeline provided! "
+                        f"Verification will be disabled. Please provide verification_pipeline parameter.")
         else:
             self.verifier = None
             logger.info(f"SubsequenceDetector initialized (no verification): "

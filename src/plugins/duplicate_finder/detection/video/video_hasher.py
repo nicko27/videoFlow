@@ -10,9 +10,9 @@ import numpy as np
 import os
 import time
 from enum import Enum
-from .core.database_manager import VideoDatabase
-from .lru_cache import LRUCache
-from .frame_cache import FrameCache
+from ...database_manager import VideoDatabase
+from ...lru_cache import LRUCache
+from ...frame_cache import FrameCache
 from src.core.logger import Logger
 
 logger = Logger.get_logger('DuplicateFinder.VideoHasher')

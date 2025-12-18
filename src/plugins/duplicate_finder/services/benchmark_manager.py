@@ -547,7 +547,10 @@ class BenchmarkRunner(QThread):
                 executor.shutdown(wait=False)
 
             # Étape 2 : signatures légères selon le pipeline (frame_hash, DCT, SSIM, optflow, motion, features, color, edge)
-            if (wants_frame_hash or wants_dct or wants_ssim or wants_optflow or wants_motion or wants_feature or wants_color or wants_edge) and not self._stop:
+            # NOTE: This feature is currently disabled - it used VideoAnalysisMethods which has been replaced by DuplicateFlow
+            # TODO: Reimplement signature precomputation using DuplicateFlow API
+            if False and (wants_frame_hash or wants_dct or wants_ssim or wants_optflow or wants_motion or wants_feature or wants_color or wants_edge) and not self._stop:
+                logger.warning("Signature precomputation is disabled - VideoAnalysisMethods has been replaced by DuplicateFlow")
                 # Configurer un VideoAnalysisMethods minimal pour réutiliser les caches
                 vam_kwargs = {}
                 feature_params = {}
