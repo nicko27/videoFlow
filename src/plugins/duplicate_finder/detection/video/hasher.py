@@ -12,7 +12,7 @@ import time
 import json
 import hashlib
 from enum import Enum
-from ...data import DatabaseManager
+from ...database_manager import VideoDatabase as DatabaseManager
 from ...processing.cache.lru_cache import LRUCache
 from ...processing.cache.frame_cache import FrameCache
 from ...processing.cache.hash_cache_manager import HashCacheManager

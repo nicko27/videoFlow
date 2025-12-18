@@ -16,7 +16,7 @@ from PyQt6.QtGui import QFont
 from datetime import datetime
 from typing import Optional, Dict, List
 
-from ..data import DatabaseManager
+from ..database_manager import VideoDatabase as DatabaseManager
 from src.core.logger import Logger
 
 logger = Logger.get_logger(__name__)

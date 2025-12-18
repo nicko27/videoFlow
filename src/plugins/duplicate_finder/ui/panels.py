@@ -23,7 +23,7 @@ from ..validators import ConfigValidator
 from src.core.i18n import t
 import cv2
 from ..verification_pipeline import VerificationPipeline
-from ..data import DatabaseManager
+from ..database_manager import VideoDatabase as DatabaseManager
 from .benchmark_widgets import BenchmarkTabWidget
 
 

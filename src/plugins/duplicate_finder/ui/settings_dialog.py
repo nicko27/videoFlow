@@ -22,7 +22,7 @@ try:
         CacheConfig, SubsequenceConfig
     )
     from ..infrastructure.config.profile_manager import ProfileManager, get_profile_manager
-    from ..data import DatabaseManager
+    from ..database_manager import VideoDatabase as DatabaseManager
 except ImportError:
     from ..orchestration.unified_config_manager import (
         UnifiedConfigManager, UnifiedConfig,
@@ -30,7 +30,7 @@ except ImportError:
         CacheConfig, SubsequenceConfig
     )
     from ..infrastructure.config.profile_manager import ProfileManager, get_profile_manager
-    from ..data import DatabaseManager
+    from ..database_manager import VideoDatabase as DatabaseManager
 
 logger = Logger.get_logger('DuplicateFinder.SettingsDialog')
 
