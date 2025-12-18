@@ -46,7 +46,7 @@ try:
     from .infrastructure.config.design_system import get_current_theme
     from .infrastructure.config.layouts import LayoutManager, LayoutType
     from .ui.dialogs.advanced_progress_dialog import AdvancedProgressDialog
-    from .analysis.advanced_pipeline import AdvancedDuplicatePipeline
+    from .adapters.advanced_pipeline_adapter import AdvancedDuplicatePipelineAdapter
 except ImportError:
     # Fallback for direct imports
     from .database_manager import VideoDatabase
@@ -72,7 +72,7 @@ except ImportError:
     from .infrastructure.config.design_system import get_current_theme
     from .infrastructure.config.layouts import LayoutManager, LayoutType
     from .ui.dialogs.advanced_progress_dialog import AdvancedProgressDialog
-    from .analysis.advanced_pipeline import AdvancedDuplicatePipeline
+    from .adapters.advanced_pipeline_adapter import AdvancedDuplicatePipelineAdapter
 
 from src.core.logger import Logger
 from src.core.i18n import t
@@ -1314,8 +1314,8 @@ class DuplicateFinderWindow(QMainWindow):
         logger.info(f"Advanced config: {advanced_config}")
 
         try:
-            # Create the advanced pipeline
-            pipeline = AdvancedDuplicatePipeline(
+            # Create the advanced pipeline (using DuplicateFlow adapter)
+            pipeline = AdvancedDuplicatePipelineAdapter(
                 config=advanced_config,
                 db_manager=self.db
             )

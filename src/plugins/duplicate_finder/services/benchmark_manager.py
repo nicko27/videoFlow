@@ -14,7 +14,6 @@ from PyQt6.QtCore import pyqtSignal, QThread
 
 from src.core.logger import Logger
 from ..verification_pipeline import VerificationPipeline
-from ..analysis.phash_visual import PHashComparator
 from ..utils.timeout import timeout, TimeoutError
 from ..utils.worker_optimization import calculate_benchmark_workers
 from .benchmark_exporter import BenchmarkJSONExporter

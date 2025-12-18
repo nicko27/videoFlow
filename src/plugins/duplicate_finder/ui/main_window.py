@@ -46,7 +46,7 @@ from .handlers.duplicate_handler import DuplicateHandler
 from .infrastructure.config.design_system import get_current_theme
 from .infrastructure.config.layouts import LayoutManager, LayoutType
 from .ui.dialogs.advanced_progress_dialog import AdvancedProgressDialog
-from .detection.hybrid import AdvancedDuplicatePipeline
+from .detection.hybrid import AdvancedDuplicatePipelineAdapter
 
 from src.core.logger import Logger
 from src.core.i18n import t

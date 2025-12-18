@@ -1,5 +1,5 @@
 """Hybrid detection module for duplicate finder."""
 
-from ...analysis.advanced_pipeline import AdvancedDuplicatePipeline
+from ...adapters.advanced_pipeline_adapter import AdvancedDuplicatePipelineAdapter
 
-__all__ = ['AdvancedDuplicatePipeline']
+__all__ = ['AdvancedDuplicatePipelineAdapter']
