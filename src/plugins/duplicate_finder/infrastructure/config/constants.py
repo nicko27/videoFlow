@@ -83,48 +83,8 @@ class VideoComparison:
     """DCT high frequency factor for pHash"""
 
 
-@dataclass
-
-class AudioFingerprinting:
-    """Audio fingerprinting and comparison parameters.
-
-    Based on the Shazam algorithm with MFCC features.
-    Hop lengths control speed vs accuracy tradeoff.
-    """
-
-    # Mode-specific hop lengths (seconds between fingerprints)
-    FAST_HOP_LENGTH: ClassVar[float] = 5.0
-    """Fast mode: 5s hop → ~95% precision, 3x faster"""
-
-    BALANCED_HOP_LENGTH: ClassVar[float] = 2.5
-    """Balanced mode: 2.5s hop → ~98% precision (default)"""
-
-    MAXIMUM_HOP_LENGTH: ClassVar[float] = 1.0
-    """Maximum mode: 1s hop → ~99.9% precision, slowest"""
-
-    # MFCC parameters
-    SAMPLE_RATE: ClassVar[int] = 22050
-    """Audio sample rate (Hz) - standard for music analysis"""
-
-    N_MFCC: ClassVar[int] = 20
-    """Number of MFCC coefficients to extract"""
-
-    N_FFT: ClassVar[int] = 2048
-    """FFT window size (samples)"""
-
-    HOP_LENGTH_SAMPLES: ClassVar[int] = 512
-    """Hop length in samples (not seconds)"""
-
-    # Matching parameters
-    MIN_MATCH_LENGTH: ClassVar[int] = 5
-    """Minimum consecutive matching frames for detection"""
-
-    MATCH_THRESHOLD: ClassVar[float] = 0.85
-    """Similarity threshold for frame matching (85%)"""
-
-    # Cache parameters
-    CACHE_VERSION: ClassVar[int] = 2
-    """Audio cache version (increment on format changes)"""
+# OBSOLETE: AudioFingerprinting class removed - was never used (legacy Shazam/MFCC system deleted)
+# Audio fingerprinting now uses DuplicateFlow algorithms
 
 
 @dataclass

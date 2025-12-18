@@ -6,10 +6,10 @@ This module exports configuration constants, settings, and design system.
 from .constants import (
     Paths,
     VideoComparison,
-    AudioFingerprinting,
     Performance,
     Timeouts,
 )
+# OBSOLETE: AudioFingerprinting removed - was never used
 from .design_system import Colors, Spacing, Typography, Styles, SimpleTheme, get_current_theme, get_status_colors
 from .audio_config import AudioFirstConfig
 from .layouts import LayoutManager, LayoutType
@@ -20,8 +20,6 @@ from .profile_manager import ProfileManager, ConfigProfile, get_profile_manager
 __all__ = [
     'Paths',
     'VideoComparison',
-    '',
-    'AudioFingerprinting',
     'Performance',
     'Timeouts',
     'Colors',
