@@ -1214,13 +1214,10 @@ class DuplicateFinderWindow(QMainWindow):
                 progress.setValue(i)
 
                 try:
-                    # Use VideoHasher to compute and store hash
-                    from ..database_manager import VideoDatabase
-                    hasher = VideoHasher(self.db_manager)
-                    hasher.process_video(file_path)
-                    logger.debug(f"✓ Hash computed for {file_path}")
+                    # Hash computation now handled by DuplicateFlow during analysis
+                    logger.debug(f"File {file_path} will be hashed by DuplicateFlow during analysis")
                 except Exception as e:
-                    logger.error(f"Failed to compute hash for {file_path}: {e}")
+                    logger.error(f"Failed to process {file_path}: {e}")
 
             progress.setValue(len(missing_hashes))
             progress.close()

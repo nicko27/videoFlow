@@ -865,6 +865,27 @@ class VideoDatabase:
             logger.error(f"Error storing hash {file_path}: {e}")
             return False
     
+    def has_video(self, file_path):
+        """
+        Check if a video exists in the database.
+
+        Args:
+            file_path (str): Path to the video file.
+
+        Returns:
+            bool: True if video exists in database, False otherwise.
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT 1 FROM video_files WHERE file_path = ? LIMIT 1
+                ''', (file_path,))
+                return cursor.fetchone() is not None
+        except Exception as e:
+            logger.error(f"Error checking if video exists {file_path}: {e}")
+            return False
+
     def get_video_hash(self, file_path):
         """
         Retrieve video hash from database.
