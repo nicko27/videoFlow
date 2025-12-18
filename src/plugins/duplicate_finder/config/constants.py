@@ -77,6 +77,7 @@ class VideoComparison:
 
 
 @dataclass
+# DEPRECATED: Strategy3 is obsolete - use DuplicateFlow algorithms instead
 class Strategy3Verification:
     """Strategy 3 subsequence verification thresholds.
 

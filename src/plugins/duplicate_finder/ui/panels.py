@@ -1111,7 +1111,6 @@ class UIPanels:
                     {'name': 'color_histogram', 'enabled': True, 'parameters': {'threshold': 92.0}, 'weight': 1.5},
                     {'name': 'motion_analysis', 'enabled': True, 'parameters': {'correlation_threshold': 90.0, 'sample_interval': 3}, 'weight': 1.5},
                     {'name': 'dct_coefficients', 'enabled': True, 'parameters': {'threshold': 85.0, 'num_coeffs': 15}, 'weight': 2.0},
-                    {'name': 'strategy3', 'enabled': True, 'parameters': {'scene_threshold': 60.0, 'dct_threshold': 85.0, 'sequence_threshold': 97.0, 'num_samples': 15, 'warmup_seconds': 0.0, 'max_workers': 8}, 'weight': 3.0}
                 ]
             },
             'balanced': {
@@ -1122,7 +1121,6 @@ class UIPanels:
                     {'name': 'color_histogram', 'enabled': True, 'parameters': {'threshold': 85.0}, 'weight': 1.0},
                     {'name': 'motion_analysis', 'enabled': True, 'parameters': {'correlation_threshold': 85.0, 'sample_interval': 3}, 'weight': 1.0},
                     {'name': 'dct_coefficients', 'enabled': True, 'parameters': {'threshold': 75.0, 'num_coeffs': 15}, 'weight': 1.5},
-                    {'name': 'strategy3', 'enabled': True, 'parameters': {'scene_threshold': 50.0, 'dct_threshold': 75.0, 'sequence_threshold': 95.0, 'num_samples': 10, 'warmup_seconds': 0.0, 'max_workers': 8}, 'weight': 2.0}
                 ]
             },
             'high_precision': {
@@ -1135,7 +1133,6 @@ class UIPanels:
                     {'name': 'motion_analysis', 'enabled': True, 'parameters': {'correlation_threshold': 90.0, 'sample_interval': 2}, 'weight': 1.5},
                     {'name': 'dct_coefficients', 'enabled': True, 'parameters': {'threshold': 85.0, 'num_coeffs': 20}, 'weight': 2.0},
                     {'name': 'ssim', 'enabled': True, 'parameters': {'threshold': 0.90}, 'weight': 1.5},
-                    {'name': 'strategy3', 'enabled': True, 'parameters': {'scene_threshold': 60.0, 'dct_threshold': 88.0, 'sequence_threshold': 98.0, 'num_samples': 20, 'warmup_seconds': 0.0, 'max_workers': 8}, 'weight': 3.0}
                 ]
             },
             'fast': {
@@ -1145,7 +1142,6 @@ class UIPanels:
                 'methods': [
                     {'name': 'color_histogram', 'enabled': True, 'parameters': {'threshold': 80.0}, 'weight': 1.0},
                     {'name': 'dct_coefficients', 'enabled': True, 'parameters': {'threshold': 70.0, 'num_coeffs': 10}, 'weight': 1.0},
-                    {'name': 'strategy3', 'enabled': True, 'parameters': {'scene_threshold': 45.0, 'dct_threshold': 70.0, 'sequence_threshold': 90.0, 'num_samples': 8, 'warmup_seconds': 0.0, 'max_workers': 8}, 'weight': 1.5}
                 ]
             },
             'dct_only': {
@@ -1183,7 +1179,6 @@ class UIPanels:
                 'methods': [
                     {'name': 'dct_coefficients', 'enabled': True, 'parameters': {'threshold': 68.0, 'num_coeffs': 20}, 'weight': 2.0},
                     {'name': 'motion_analysis', 'enabled': True, 'parameters': {'correlation_threshold': 75.0, 'sample_interval': 2}, 'weight': 1.5},
-                    {'name': 'strategy3', 'enabled': True, 'parameters': {'scene_threshold': 40.0, 'dct_threshold': 68.0, 'sequence_threshold': 88.0, 'num_samples': 12, 'warmup_seconds': 0.0, 'max_workers': 8}, 'weight': 2.5}
                 ]
             },
             'ultra_permissive': {
@@ -1204,7 +1199,6 @@ class UIPanels:
                     {'name': 'color_histogram', 'enabled': True, 'parameters': {'threshold': 82.0}, 'weight': 1.0},
                     {'name': 'motion_analysis', 'enabled': True, 'parameters': {'correlation_threshold': 82.0, 'sample_interval': 3}, 'weight': 1.2},
                     {'name': 'dct_coefficients', 'enabled': True, 'parameters': {'threshold': 72.0, 'num_coeffs': 15}, 'weight': 1.8},
-                    {'name': 'strategy3', 'enabled': True, 'parameters': {'scene_threshold': 48.0, 'dct_threshold': 75.0, 'sequence_threshold': 92.0, 'num_samples': 12, 'warmup_seconds': 0.0, 'max_workers': 8}, 'weight': 2.0}
                 ]
             }
         }
@@ -1508,7 +1502,6 @@ class UIPanels:
                     pipeline.add_method('color_histogram', enabled=True, parameters={'threshold': 92.0}, weight=1.5)
                     pipeline.add_method('motion_analysis', enabled=True, parameters={'correlation_threshold': 90.0, 'sample_interval': 3}, weight=1.5)
                     pipeline.add_method('dct_coefficients', enabled=True, parameters={'threshold': 85.0, 'num_coeffs': 15}, weight=2.0)
-                    pipeline.add_method('strategy3', enabled=True, parameters={'scene_threshold': 60.0, 'dct_threshold': 85.0, 'sequence_threshold': 97.0, 'num_samples': 15, 'warmup_seconds': 0.0, 'max_workers': 8}, weight=3.0)
 
             metrics = {'tp': 0, 'fp': 0, 'tn': 0, 'fn': 0}
             human_rows = []

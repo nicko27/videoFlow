@@ -105,14 +105,6 @@ class MethodEditorDialog(QDialog):
             "threshold": "param_help.framehash.threshold",
             "sample_rate": "param_help.framehash.sample_rate",
             "max_samples": "param_help.framehash.max_samples"
-        },
-        "strategy3": {
-            "scene_threshold": "param_help.strategy3.scene_threshold",
-            "dct_threshold": "param_help.strategy3.dct_threshold",
-            "sequence_threshold": "param_help.strategy3.sequence_threshold",
-            "num_samples": "param_help.strategy3.num_samples",
-            "warmup_seconds": "param_help.strategy3.warmup_seconds",
-            "max_workers": "param_help.strategy3.max_workers"
         }
     }
 

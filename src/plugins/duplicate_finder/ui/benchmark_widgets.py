@@ -1205,16 +1205,17 @@ class PipelineEditorWidget(QWidget):
         self.methods_table.setColumnWidth(3, 60)
         self.methods_table.setMaximumHeight(250)
 
-        # Available methods
-        self.available_methods = [
-            ("color_histogram", "Histogramme couleur", "Compare la distribution des couleurs"),
-            ("edge_pattern", "Détection contours", "Analyse les contours et formes"),
-            ("motion_analysis", "Analyse mouvement", "Détecte les différences de mouvement"),
-            ("dct_coefficients", "Coefficients DCT", "Transformée en cosinus discrète"),
-            ("ssim", "SSIM", "Similarité structurelle d'image"),
-            ("feature_matching", "Correspondance features", "Points d'intérêt SIFT/ORB"),
-            ("strategy3", "Strategy 3 (Avancé)", "Stratégie avancée multi-critères")
-        ]
+        # Get available methods dynamically from DuplicateFlow
+        from ..verification_pipeline import VerificationPipeline
+        pipeline = VerificationPipeline()
+        available_algorithms = pipeline.get_available_methods()
+
+        # Build method list from DuplicateFlow algorithms
+        self.available_methods = []
+        for algo_name, algo_info in available_algorithms.items():
+            display_name = algo_info.get('display_name', algo_name.replace('_', ' ').title())
+            description = algo_info.get('description', f'DuplicateFlow {algo_name} algorithm')
+            self.available_methods.append((algo_name, display_name, description))
 
         for row, (method, name, desc) in enumerate(self.available_methods):
             self.methods_table.insertRow(row)

@@ -54,7 +54,7 @@ class SubsequenceDetector:
         enable_phase1: bool = True,  # NEW: Enable/disable Phase 1
         phase1_method: str = "dense_hash",  # NEW: Phase 1 method (dense_hash, signature_adaptive, fast_scan)
         enable_phase2: bool = True,  # NEW: Enable/disable Phase 2
-        phase2_method: str = "strategy3",  # NEW: Phase 2 method (strategy3, dct_only, frame_diff, multipoint)
+        phase2_method: str = "motion_analysis"  # Changed from obsolete "strategy3",  # NEW: Phase 2 method (strategy3, dct_only, frame_diff, multipoint)
         # Phase 2 parameters
         verification_dct_threshold: float = 75.0,  # DCT threshold for verification
         verification_sequence_threshold: float = 95.0,  # Sequence threshold for verification
@@ -77,7 +77,7 @@ class SubsequenceDetector:
             enable_phase1: Enable Phase 1 detection (default: True)
             phase1_method: Phase 1 detection method - "dense_hash", "signature_adaptive", "fast_scan"
             enable_phase2: Enable Phase 2 verification (default: True)
-            phase2_method: Phase 2 verification method - "strategy3", "dct_only", "frame_diff", "multipoint"
+            phase2_method: Phase 2 verification method - "motion_analysis" (recommended), "dct_only", "frame_diff", "multipoint"
             verification_dct_threshold: DCT threshold for verification (default: 75.0%)
             verification_sequence_threshold: Sequence threshold for verification (default: 95.0%)
             verification_correlation_threshold: Correlation threshold for frame_diff (default: 90.0%)

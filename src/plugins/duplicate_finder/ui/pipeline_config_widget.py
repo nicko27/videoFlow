@@ -539,101 +539,6 @@ class PipelineMethodItem(QWidget):
             self.frame_hash_max_windows.valueChanged.connect(lambda v: self._update_param('max_windows', v))
             layout.addWidget(self.frame_hash_max_windows, row, 1)
 
-        elif self.method_name == 'strategy3':
-            layout.addWidget(QLabel("Seuil scènes:"), row, 0)
-            self.scene_spin = QDoubleSpinBox()
-            self.scene_spin.setRange(10.0, 200.0)
-            self.scene_spin.setValue(self.parameters.get('scene_threshold', 50.0))
-            self.scene_spin.setSuffix(" Δ")
-            self.scene_spin.setToolTip(
-                "Détecte les coupures de scènes en mesurant les changements entre frames.\n\n"
-                "• Plus haut = nécessite des coupures nettes (moins de faux positifs)\n"
-                "• Plus bas = accepte des transitions douces (plus permissif)\n"
-                "• Recommandé: 50 par défaut. Monte à 70 si beaucoup de faux positifs, baisse à 40 si clips très doux"
-            )
-            self.scene_spin.valueChanged.connect(lambda v: self._update_param('scene_threshold', v))
-            layout.addWidget(self.scene_spin, row, 1)
-
-            row += 1
-            layout.addWidget(QLabel("Seuil DCT:"), row, 0)
-            self.dct_spin = QDoubleSpinBox()
-            self.dct_spin.setRange(50.0, 99.0)
-            self.dct_spin.setValue(self.parameters.get('dct_threshold', 75.0))
-            self.dct_spin.setSuffix(" %")
-            self.dct_spin.setToolTip(
-                "Seuil DCT pour validation frame-par-frame (50-99%)\n\n"
-                "• Utilisé dans la phase de validation détaillée\n"
-                "• Compare les signatures DCT de frames individuelles\n"
-                "• Valeur haute (>85%): Validation très stricte, peu de faux positifs\n"
-                "• Valeur basse (<70%): Plus permissif, tolère variations d'encodage\n"
-                "• Recommandé: 75% - bon équilibre pour détection robuste\n"
-                "• Impact: affecte la précision de la détection finale"
-            )
-            self.dct_spin.valueChanged.connect(lambda v: self._update_param('dct_threshold', v))
-            layout.addWidget(self.dct_spin, row, 1)
-
-            row += 1
-            layout.addWidget(QLabel("Seuil séquence:"), row, 0)
-            self.seq_spin = QDoubleSpinBox()
-            self.seq_spin.setRange(85.0, 99.0)
-            self.seq_spin.setValue(self.parameters.get('sequence_threshold', 95.0))
-            self.seq_spin.setSuffix(" %")
-            self.seq_spin.setToolTip(
-                "Seuil global de similarité de séquence (85-99%)\n\n"
-                "• Pourcentage minimal de frames similaires pour accepter le match\n"
-                "• Validation finale sur toute la séquence détectée\n"
-                "• Valeur haute (>95%): Quasi toutes les frames doivent matcher\n"
-                "• Valeur basse (<90%): Tolère quelques frames différentes\n"
-                "• Recommandé: 95% - assure haute qualité des détections\n"
-                "• Impact: seuil de décision final (accept/reject)"
-            )
-            self.seq_spin.valueChanged.connect(lambda v: self._update_param('sequence_threshold', v))
-            layout.addWidget(self.seq_spin, row, 1)
-
-            row += 1
-            layout.addWidget(QLabel("Frames DCT:"), row, 0)
-            self.samples_spin = QSpinBox()
-            self.samples_spin.setRange(3, 30)
-            self.samples_spin.setValue(self.parameters.get('num_samples', 10))
-            self.samples_spin.setToolTip(
-                "Nombre de frames échantillonnées pour la comparaison DCT (3-30).\n\n"
-                "• Plus haut = plus précis mais plus lent\n"
-                "• Plus bas = plus rapide mais peut rater des différences fines\n"
-                "• Recommandé: 10 pour équilibré, 15+ pour validation maximale"
-            )
-            self.samples_spin.valueChanged.connect(lambda v: self._update_param('num_samples', v))
-            layout.addWidget(self.samples_spin, row, 1)
-
-            row += 1
-            layout.addWidget(QLabel("Ignorer début (s):"), row, 0)
-            self.warmup_spin = QDoubleSpinBox()
-            self.warmup_spin.setRange(0.0, 10.0)
-            self.warmup_spin.setDecimals(1)
-            self.warmup_spin.setSingleStep(0.5)
-            self.warmup_spin.setValue(self.parameters.get('warmup_seconds', 0.0))
-            self.warmup_spin.setToolTip(
-                "Ignore les premières secondes (génériques noirs) avant d'analyser scènes/DCT.\n"
-                "Utile si les clips commencent par du noir ou un fondu."
-            )
-            self.warmup_spin.valueChanged.connect(lambda v: self._update_param('warmup_seconds', v))
-            layout.addWidget(self.warmup_spin, row, 1)
-
-            row += 1
-            layout.addWidget(QLabel("Workers:"), row, 0)
-            self.workers_spin = QSpinBox()
-            self.workers_spin.setRange(1, 16)
-            self.workers_spin.setValue(self.parameters.get('max_workers', 8))
-            self.workers_spin.setToolTip(
-                "Nombre de threads de traitement parallèle (1-16)\n\n"
-                "• Contrôle le nombre de comparaisons simultanées\n"
-                "• Valeur basse (1-4): Moins de charge CPU, plus lent\n"
-                "• Valeur haute (12-16): Utilise tous les cœurs, très rapide\n"
-                "• Recommandé: 8 - bon équilibre pour la plupart des systèmes\n"
-                "• Règle: ne pas dépasser le nombre de cœurs logiques de votre CPU\n"
-                "• Impact: vitesse de traitement (linéaire jusqu'au nb de cœurs)"
-            )
-            self.workers_spin.valueChanged.connect(lambda v: self._update_param('max_workers', v))
-            layout.addWidget(self.workers_spin, row, 1)
 
     def _update_param(self, key, value):
         """Update a parameter and emit signal."""
@@ -900,21 +805,12 @@ class PipelineConfigWidget(QWidget):
             self._add_method('dct_coefficients', {'threshold': 75.0})
             self._add_method('ssim', {'threshold': 0.85})
             self._add_method('feature_matching', {'detector': 'ORB', 'threshold': 70.0})
-            self._add_method('strategy3', {'dct_threshold': 75.0, 'sequence_threshold': 95.0, 'max_workers': 8})
 
         elif preset_name == 'scenes':
             # Orienté détection de sous-séquences / scènes
             self._add_method('motion_analysis', {'correlation_threshold': 82.0, 'sample_interval': 2})
             self._add_method('dct_coefficients', {'threshold': 75.0, 'num_coeffs': 16})
             self._add_method('feature_matching', {'detector': 'ORB', 'threshold': 68.0})
-            self._add_method('strategy3', {
-                'scene_threshold': 50.0,
-                'dct_threshold': 75.0,
-                'sequence_threshold': 95.0,
-                'num_samples': 12,
-                'warmup_seconds': 0.5,
-                'max_workers': 8
-            })
 
     def _clear_methods(self):
         """Remove all methods."""
@@ -1232,7 +1128,7 @@ class PipelineConfigWidget(QWidget):
         self.summary_label.setText(
             f"Mode: {mode_text} | Méthodes actives: {len(enabled_methods)} | Temps estimé/pair: ~{est_time:.1f}s. "
             f"Seuil global: {self.global_threshold_spin.value():.0f}% (pondération/hybride). "
-            "Astuce: garde les méthodes lentes/fiables (Strategy3) en fin."
+            "Astuce: garde les méthodes lentes/fiables (deprecated) en fin."
         )
 
 
