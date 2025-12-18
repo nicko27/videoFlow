@@ -31,7 +31,7 @@ class DuplicateFinderPlugin(PluginInterface):
     def show_window(self):
         """Show the plugin window"""
         if not self.window:
-            from .window import DuplicateFinderWindow
+            from .main_window import DuplicateFinderWindow
             self.window = DuplicateFinderWindow()
             # Connect close signal
             self.window.closed.connect(self.handle_window_closed)
