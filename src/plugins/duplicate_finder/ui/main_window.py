@@ -1511,7 +1511,7 @@ class DuplicateFinderWindow(QMainWindow):
         """
         try:
             from .workers.subsequence_worker import SubsequenceDetectionWorker
-            from .detection.subsequence import SubsequenceDetector
+            from ..subsequence_detector import SubsequenceDetector
             from .verification_pipeline import VerificationPipeline
 
             # Get parameters tab with all configuration widgets

@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
-from .widgets.progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator, HashDebuggerV2, AudioFingerprintDebugger
+from .widgets.progress_widgets import ModernProgressWidget, FileListWidget, StatusIndicator, HashDebuggerV2
 from ..infrastructure.config.design_system import get_current_theme
 from ..validators import ConfigValidator
 from src.core.i18n import t
@@ -663,9 +663,6 @@ class UIPanels:
         hash_debugger_v2 = HashDebuggerV2()
         layout.addWidget(hash_debugger_v2)
 
-        # Create audio fingerprint debugger (scene detection)
-        audio_debugger = AudioFingerprintDebugger()
-        layout.addWidget(audio_debugger)
 
         # ═══════════════════════════════════════════════════════════
         # MAIN FILE LIST DISPLAY
