@@ -1510,7 +1510,7 @@ class DuplicateFinderWindow(QMainWindow):
         This is the same approach used in the test scripts for maximum effectiveness.
         """
         try:
-            from .processing.workers.subsequence_worker import SubsequenceDetectionWorker
+            from .workers.subsequence_worker import SubsequenceDetectionWorker
             from .detection.subsequence import SubsequenceDetector
             from .verification_pipeline import VerificationPipeline
 
@@ -1754,7 +1754,7 @@ class DuplicateFinderWindow(QMainWindow):
             scenes: List of scene detection results to verify
         """
         try:
-            from ..processing.workers.verification_worker import VerificationWorker
+            from ..workers.verification_worker import VerificationWorker
             from ..verification_pipeline import VerificationPipeline
 
             # Get verification parameters from config
