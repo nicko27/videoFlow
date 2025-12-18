@@ -2,7 +2,7 @@
 Worker thread for subsequence verification with caching and progress.
 
 This worker handles verification of subsequence matches in the background,
-using VerificationPipeline (DuplicateFlow facade) for verification.
+with intelligent caching to avoid re-verification of unchanged files.
 """
 
 import os
@@ -19,9 +19,9 @@ class VerificationWorker(QThread):
     """
     Background worker for verifying subsequence matches.
 
-    Uses VerificationPipeline (DuplicateFlow facade) with intelligent caching:
-    - Checks cache first (DB with config hash)
-    - Only re-verifies if pipeline config changed
+    Uses Strategy 3 (Scene Cuts Veto + DCT) with intelligent caching:
+    - Checks cache first (DB with mtime + file_size)
+    - Only re-verifies if files modified
     - Stores results for future runs
     - Provides real-time progress updates
 
@@ -40,23 +40,25 @@ class VerificationWorker(QThread):
     error = pyqtSignal(str)  # error message
     finished = pyqtSignal()  # worker finished
 
-    def __init__(self, verification_pipeline, matches, parent=None):
+    def __init__(self, verifier, matches, db, parent=None):
         """
         Initialize verification worker.
 
         Args:
-            verification_pipeline: VerificationPipeline instance (DuplicateFlow facade)
+            verifier: SubsequenceVerificationMethods instance
             matches: List of match dicts with:
                 - short_video: str
                 - long_video: str
                 - start_time: float
                 - duration: float
                 - sequence_score: float
+            db: VideoDatabase instance for caching
             parent: Parent QObject (optional)
         """
         super().__init__(parent)
-        self.pipeline = verification_pipeline
+        self.verifier = verifier
         self.matches = matches
+        self.db = db
         self._stop_requested = False
         self._stop_flag = threading.Event()
         self.results = []
@@ -84,62 +86,68 @@ class VerificationWorker(QThread):
                 short_name = os.path.basename(match['short_video'])
                 current = i + 1
 
-                # Update progress
-                self.progress.emit(current, total, f"🔬 Verifying: {short_name}")
+                # Check cache first
+                self.progress.emit(current, total, f"🔍 Checking cache: {short_name}")
 
-                logger.info(f"Verifying {short_name} @ {match['start_time']:.1f}s")
+                cached_result = self.db.get_cached_verification(
+                    match['short_video'],
+                    match['long_video'],
+                    match['start_time']
+                )
 
-                # Run verification via VerificationPipeline (delegates to DuplicateFlow)
-                try:
-                    verification_result = self.pipeline.verify(
+                if cached_result:
+                    # Use cached result
+                    cache_hits += 1
+                    self.progress.emit(
+                        current, total,
+                        f"✓ Cached ({cache_hits} hits): {short_name}"
+                    )
+
+                    logger.debug(f"Using cached verification for {short_name}")
+
+                    # Emit cached result
+                    self.verification_complete.emit(match, cached_result)
+                    self.results.append({
+                        'match': match,
+                        'result': cached_result,
+                        'from_cache': True
+                    })
+
+                else:
+                    # Verify from scratch
+                    verifications += 1
+                    self.progress.emit(
+                        current, total,
+                        f"🔬 Verifying ({verifications} new): {short_name}"
+                    )
+
+                    logger.info(f"Verifying {short_name} @ {match['start_time']:.1f}s")
+
+                    # Run verification with stop flag
+                    verification_result = self.verifier.verify_with_strategy3(
                         short_video=match['short_video'],
                         long_video=match['long_video'],
                         start_time=match['start_time'],
                         duration=match['duration'],
-                        sequence_score=match['sequence_score']
+                        sequence_score=match['sequence_score'],
+                        stop_flag=self._stop_flag
                     )
 
-                    # Check if result came from cache
-                    from_cache = verification_result.get('from_cache', False)
-                    if from_cache:
-                        cache_hits += 1
-                        self.progress.emit(
-                            current, total,
-                            f"✓ Cached ({cache_hits} hits): {short_name}"
-                        )
-                    else:
-                        verifications += 1
-                        self.progress.emit(
-                            current, total,
-                            f"✓ Verified ({verifications} new): {short_name}"
-                        )
+                    # Store in cache for future runs
+                    self.db.store_verification_result(
+                        match['short_video'],
+                        match['long_video'],
+                        match['start_time'],
+                        match['duration'],
+                        match['sequence_score'],
+                        verification_result
+                    )
 
                     # Emit result
                     self.verification_complete.emit(match, verification_result)
                     self.results.append({
                         'match': match,
                         'result': verification_result,
-                        'from_cache': from_cache
-                    })
-
-                except Exception as e:
-                    logger.error(f"Verification failed for {short_name}: {e}", exc_info=True)
-                    # Create error result
-                    error_result = {
-                        'accepted': False,
-                        'similarity': 0.0,
-                        'confidence': 'none',
-                        'methods_executed': 0,
-                        'method_results': [],
-                        'final_scores': {},
-                        'execution_time': 0.0,
-                        'rejection_reason': f'Verification error: {str(e)}',
-                        'config_hash': ''
-                    }
-                    self.verification_complete.emit(match, error_result)
-                    self.results.append({
-                        'match': match,
-                        'result': error_result,
                         'from_cache': False
                     })
 
