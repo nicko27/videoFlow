@@ -7,15 +7,13 @@ and duplicateFlow's backend algorithms and pipelines.
 Modules:
     - duplicateflow_adapter: Main adapter for duplicateFlow API
     - progress_bridge: Bridge Qt signals ← duplicateFlow callbacks
-    - results_transformer: Transform duplicateFlow results to GUI format
+    - advanced_pipeline_adapter: 3-level pipeline using DuplicateFlow
 """
 
 from .duplicateflow_adapter import DuplicateFlowAdapter
 from .progress_bridge import ProgressBridge
-from .results_transformer import ResultsTransformer
 
 __all__ = [
     'DuplicateFlowAdapter',
     'ProgressBridge',
-    'ResultsTransformer',
 ]

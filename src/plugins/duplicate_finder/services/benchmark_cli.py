@@ -45,7 +45,7 @@ from typing import List, Dict, Any
 import cv2
 
 from .verification_pipeline import VerificationPipeline
-from .core.database_manager import VideoDatabase
+from ..database_manager import VideoDatabase
 
 
 def _load_json(path: str) -> Any:

@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 
 from src.core.logger import Logger
 from .hash_cache_manager import HashCacheManager
-from .verification_result_cache import VerificationResultCache
+# from .verification_result_cache import VerificationResultCache  # Removed with core/models.py
 
 logger = Logger.get_logger('DuplicateFinder.CacheCleaner')
 
