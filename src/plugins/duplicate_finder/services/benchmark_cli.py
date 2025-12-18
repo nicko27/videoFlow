@@ -26,8 +26,6 @@ Format pipeline.json :
     {"name": "color_histogram", "enabled": true, "parameters": {"threshold": 85.0}, "weight": 1.0},
     {"name": "motion_analysis", "enabled": true, "parameters": {"correlation_threshold": 85.0, "sample_interval": 3}, "weight": 1.0},
     {"name": "dct_coefficients", "enabled": true, "parameters": {"threshold": 75.0, "num_coeffs": 15}, "weight": 1.0},
-    {"name": "strategy3", "enabled": true, "parameters": {"scene_threshold": 50.0, "dct_threshold": 75.0, "sequence_threshold": 95.0, "num_samples": 10, "warmup_seconds": 0.0, "max_workers": 8}, "weight": 1.0}
-  ]
 }
 
 Ce script :
@@ -60,7 +58,6 @@ def _default_pipeline(db: VideoDatabase) -> VerificationPipeline:
     pipeline.add_method('color_histogram', enabled=True, parameters={'threshold': 85.0}, weight=1.0)
     pipeline.add_method('motion_analysis', enabled=True, parameters={'correlation_threshold': 85.0, 'sample_interval': 3}, weight=1.0)
     pipeline.add_method('dct_coefficients', enabled=True, parameters={'threshold': 75.0, 'num_coeffs': 15}, weight=1.0)
-    pipeline.add_method('strategy3', enabled=True, parameters={'scene_threshold': 50.0, 'dct_threshold': 75.0, 'sequence_threshold': 95.0, 'num_samples': 10, 'warmup_seconds': 0.0, 'max_workers': 8}, weight=1.0)
     return pipeline
 
 
@@ -96,7 +93,6 @@ def run_cli():
             enable_caching=not args.no_cache,
             mode=cfg.get('mode', 'filtering')
         )
-        pipeline.load_config(cfg.get('methods', []))
     else:
         pipeline = _default_pipeline(db)
         pipeline.enable_caching = not args.no_cache

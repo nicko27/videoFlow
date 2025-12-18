@@ -923,31 +923,7 @@ class I18n:
             "fr": "Ratio test de Lowe (0-1). Plus petit = plus strict.",
             "en": "Lowe ratio test (0-1). Smaller = stricter."
         },
-        "param_help.strategy3.scene_threshold": {
-            "fr": "Seuil de détection de scènes (plus haut = moins de splits).",
-            "en": "Scene detection threshold (higher = fewer splits)."
-        },
-        "param_help.strategy3.dct_threshold": {
-            "fr": "Seuil DCT utilisé en vérification.",
-            "en": "DCT threshold used in verification."
-        },
-        "param_help.strategy3.sequence_threshold": {
-            "fr": "Seuil global séquence (0-100).",
-            "en": "Global sequence threshold (0-100)."
-        },
-        "param_help.strategy3.num_samples": {
-            "fr": "Nombre d'échantillons dans la séquence.",
-            "en": "Number of samples in the sequence."
-        },
-        "param_help.strategy3.warmup_seconds": {
-            "fr": "Temps ignoré en début de vidéo.",
-            "en": "Time ignored at start of video."
-        },
-        "param_help.strategy3.max_workers": {
-            "fr": "Workers parallèles pour cette méthode.",
-            "en": "Parallel workers for this method."
-        },
-        "param_help.optical_flow.threshold": {
+                                                        "param_help.optical_flow.threshold": {
             "fr": "Seuil de similarité du flux optique (0-100).",
             "en": "Optical flow similarity threshold (0-100)."
         },

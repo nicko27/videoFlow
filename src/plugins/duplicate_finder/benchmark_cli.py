@@ -26,9 +26,7 @@ Format pipeline.json :
     {"name": "color_histogram", "enabled": true, "parameters": {"threshold": 85.0}, "weight": 1.0},
     {"name": "motion_analysis", "enabled": true, "parameters": {"correlation_threshold": 85.0, "sample_interval": 3}, "weight": 1.0},
     {"name": "dct_coefficients", "enabled": true, "parameters": {"threshold": 75.0, "num_coeffs": 15}, "weight": 1.0},
-    {"name": "strategy3", "enabled": true, "parameters": {"scene_threshold": 50.0, "dct_threshold": 75.0, "sequence_threshold": 95.0, "num_samples": 10, "warmup_seconds": 0.0, "max_workers": 8}, "weight": 1.0}
   ]
-}
 
 Ce script :
 - construit un VerificationPipeline à partir du fichier pipeline.json (sinon preset équilibré par défaut) ;
@@ -60,7 +58,6 @@ def _default_pipeline(db: VideoDatabase) -> VerificationPipeline:
     pipeline.add_method('color_histogram', enabled=True, parameters={'threshold': 85.0}, weight=1.0)
     pipeline.add_method('motion_analysis', enabled=True, parameters={'correlation_threshold': 85.0, 'sample_interval': 3}, weight=1.0)
     pipeline.add_method('dct_coefficients', enabled=True, parameters={'threshold': 75.0, 'num_coeffs': 15}, weight=1.0)
-    pipeline.add_method('strategy3', enabled=True, parameters={'scene_threshold': 50.0, 'dct_threshold': 75.0, 'sequence_threshold': 95.0, 'num_samples': 10, 'warmup_seconds': 0.0, 'max_workers': 8}, weight=1.0)
     return pipeline
 
 
@@ -103,7 +100,6 @@ def run_cli():
 
     pairs: List[Dict[str, Any]] = _load_json(args.pairs)
 
-    metrics = {'tp': 0, 'fp': 0, 'tn': 0, 'fn': 0}
     details = []
 
     for item in pairs:

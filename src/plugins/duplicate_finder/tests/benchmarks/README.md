@@ -4,19 +4,12 @@ Benchmarks prêts à l'emploi
 Fichiers fournis :
 
 - `pairs_scenes_example.json` : 4 paires avec attentes (positive/negative) et préférence FP/FN, séquence_score inclus.
-- `pipeline_scene_strict.json` : pipeline filtrage strict (précision, limite les faux positifs).
-- `pipeline_scene_recall.json` : pipeline hybride orienté rappel (plus permissif, Strategy3 pondérée).
 
-Exécution depuis l’onglet Debug :
-- Onglet Debug → section "Benchmarks pipeline" → choisir `pairs_scenes_example.json` + un pipeline (strict ou recall) → saisir un label → bouton Lancer.
+**Note:** Les configurations de pipeline sont maintenant stockées en base de données.
+Utilisez l'interface graphique pour créer et gérer vos pipelines de test.
 
-Exécution en CLI :
-```bash
-python -m src.plugins.duplicate_finder.benchmark_cli \
-  --pairs src/plugins/duplicate_finder/tests/benchmarks/pairs_scenes_example.json \
-  --pipeline-config src/plugins/duplicate_finder/tests/benchmarks/pipeline_scene_strict.json \
-  --label bench_strict --debug
-```
+Exécution depuis l'onglet Debug :
+- Onglet Debug → section "Benchmarks pipeline" → choisir `pairs_scenes_example.json` + un pipeline depuis la base → saisir un label → bouton Lancer.
 
 Préférences FP/FN :
 - `preference: "fp"` = tolérer les faux positifs (favorise le rappel).

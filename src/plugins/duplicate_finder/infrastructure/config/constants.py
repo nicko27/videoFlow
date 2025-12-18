@@ -84,60 +84,7 @@ class VideoComparison:
 
 
 @dataclass
-class Strategy3Verification:
-    """Strategy 3 subsequence verification thresholds.
 
-    Strategy 3 is the most accurate verification method, using:
-    1. Scene cut detection (veto if cuts found)
-    2. DCT similarity computation
-    3. Temporal sequence consistency check
-
-    Thresholds calibrated from 100+ test video pairs with known ground truth.
-    """
-
-    # Scene detection
-    SCENE_CUT_THRESHOLD: ClassVar[float] = 30.0
-    """Pixel difference threshold for scene cut detection.
-
-    Why 30.0?
-    - Calibrated from 100 test videos
-    - < 30: Too sensitive, detects noise/compression as cuts
-    - > 30: Misses actual scene changes
-    - Balances false positives vs false negatives
-    """
-
-    MAX_SCENE_CUTS_ALLOWED: ClassVar[int] = 0
-    """Maximum scene cuts allowed (0 = veto any cuts)"""
-
-    # DCT similarity
-    DCT_THRESHOLD: ClassVar[float] = 75.0
-    """Minimum DCT similarity percentage for acceptance.
-
-    Why 75%?
-    - Catches re-encodes (typically 80-95% similar)
-    - Rejects edited videos (typically < 70% similar)
-    - Robust to compression artifacts
-    """
-
-    # Sequence consistency
-    SEQUENCE_THRESHOLD: ClassVar[float] = 95.0
-    """Minimum temporal sequence consistency percentage.
-
-    Why 95%?
-    - Ensures frames are in correct order
-    - Allows 5% tolerance for frame drops/duplication
-    - Rejects shuffled/reversed sequences
-    """
-
-    # Frame sampling
-    FRAMES_TO_COMPARE: ClassVar[int] = 30
-    """Number of frames to compare for verification"""
-
-    FRAME_SAMPLE_STEP: ClassVar[int] = 1
-    """Step between sampled frames (1 = every frame)"""
-
-
-@dataclass
 class AudioFingerprinting:
     """Audio fingerprinting and comparison parameters.
 
@@ -302,9 +249,6 @@ DURATION_TOLERANCE = VideoComparison.DURATION_TOLERANCE
 FRAME_EXTRACTION_COUNT = VideoComparison.FRAME_EXTRACTION_COUNT
 
 # Strategy 3
-SCENE_CUT_THRESHOLD = Strategy3Verification.SCENE_CUT_THRESHOLD
-DCT_THRESHOLD = Strategy3Verification.DCT_THRESHOLD
-SEQUENCE_THRESHOLD = Strategy3Verification.SEQUENCE_THRESHOLD
 
 # Audio
 FAST_HOP_LENGTH = AudioFingerprinting.FAST_HOP_LENGTH

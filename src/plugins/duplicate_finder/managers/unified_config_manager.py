@@ -82,7 +82,7 @@ class SubsequenceConfig:
     enabled: bool = False
     phase1_method: str = 'dense_hash'  # dense_hash, signature_adaptive, fast_scan
     phase2_enabled: bool = True
-    phase2_method: str = 'strategy3'  # strategy3, dct_only, frame_diff, multipoint
+    phase2_method: str = 'motion_analysis'  # motion_analysis, dct_only, frame_diff, multipoint
     sample_interval: float = 0.75  # seconds
     min_match_ratio: float = 0.70  # 70% minimum match
     temporal_window: int = 5  # frames

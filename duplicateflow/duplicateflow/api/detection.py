@@ -169,7 +169,9 @@ class DetectionEngine:
         max_pairs: int = 10000,
         threshold: Optional[float] = None,
         use_lsh: bool = True,
-        lsh_threshold: int = 100
+        lsh_threshold: int = 100,
+        lsh_num_perm: int = 128,
+        lsh_num_bands: int = 16
     ) -> DetectionResult:
         """
         Find all duplicates in a directory (N-to-N detection).
@@ -184,6 +186,8 @@ class DetectionEngine:
             threshold: Detection threshold (algorithm-specific)
             use_lsh: Use LSH acceleration (fingerprint mode only)
             lsh_threshold: LSH activation threshold (fingerprint mode only)
+            lsh_num_perm: Number of MinHash permutations (more = more accurate, slower)
+            lsh_num_bands: Number of LSH bands (more = more sensitive, more false positives)
 
         Returns:
             DetectionResult with all matches and statistics
@@ -197,7 +201,7 @@ class DetectionEngine:
         if self.mode == DetectionMode.FINGERPRINT:
             matches = self._find_duplicates_fingerprint(
                 directory, recursive, workers, min_votes, min_confidence,
-                max_pairs, use_lsh, lsh_threshold
+                max_pairs, use_lsh, lsh_threshold, lsh_num_perm, lsh_num_bands
             )
         elif self.mode == DetectionMode.ALGORITHM:
             matches = self._find_duplicates_algorithm(
@@ -231,7 +235,11 @@ class DetectionEngine:
                 'workers': workers,
                 'min_confidence': min_confidence,
                 'algorithm': self.algorithm,
-                'pipeline': self.pipeline
+                'pipeline': self.pipeline,
+                'use_lsh': use_lsh,
+                'lsh_threshold': lsh_threshold,
+                'lsh_num_perm': lsh_num_perm,
+                'lsh_num_bands': lsh_num_bands
             }
         )
 
@@ -296,7 +304,7 @@ class DetectionEngine:
 
     def _find_duplicates_fingerprint(self, directory, recursive, workers,
                                      min_votes, min_confidence, max_pairs,
-                                     use_lsh, lsh_threshold) -> List[MatchResult]:
+                                     use_lsh, lsh_threshold, lsh_num_perm, lsh_num_bands) -> List[MatchResult]:
         """Fingerprint mode implementation."""
         from duplicateflow.processing.fingerprint_index import FingerprintIndex
         from duplicateflow.algorithms import get_algorithm
@@ -331,7 +339,7 @@ class DetectionEngine:
             from duplicateflow.processing.lsh_index import LSHFingerprintIndex
             import sqlite3
 
-            lsh_index = LSHFingerprintIndex(index, num_perm=128, num_bands=16)
+            lsh_index = LSHFingerprintIndex(index, num_perm=lsh_num_perm, num_bands=lsh_num_bands)
 
             all_matches = []
             conn = sqlite3.connect(str(index.db_path))

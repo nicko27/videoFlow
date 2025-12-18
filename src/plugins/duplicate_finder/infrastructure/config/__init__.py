@@ -6,7 +6,6 @@ This module exports configuration constants, settings, and design system.
 from .constants import (
     Paths,
     VideoComparison,
-    Strategy3Verification,
     AudioFingerprinting,
     Performance,
     Timeouts,
@@ -21,7 +20,7 @@ from .profile_manager import ProfileManager, ConfigProfile, get_profile_manager
 __all__ = [
     'Paths',
     'VideoComparison',
-    'Strategy3Verification',
+    '',
     'AudioFingerprinting',
     'Performance',
     'Timeouts',
