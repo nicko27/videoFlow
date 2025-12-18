@@ -180,15 +180,17 @@ class DuplicateFinderWindow(QMainWindow):
             self.db = VideoDatabase()
 
         # Set video hasher on hash debugger widget
+        # Note: Hash debugger should work with DatabaseManager directly
+        # video_hasher is now an internal implementation detail of AnalysisHandler
         if self.hash_debugger_v2:
-            self.hash_debugger_v2.set_video_hasher(self.video_hasher)
+            # Skip video_hasher setup - it's handled internally by AnalysisHandler
             self.hash_debugger_v2.settings_manager = self.settings_manager
 
-        # Initialize handlers after video_hasher is created
+        # Initialize handlers after database is created
         self.file_handler = FileHandler(self.file_list_widget)
-        self.analysis_handler = AnalysisHandler(self.video_hasher)
-        self.duplicate_handler = DuplicateHandler(self.video_hasher, self.file_handler)
-        self.audio_first_handler = AudioFirstHandler(self.video_hasher, self.analysis_handler)
+        self.analysis_handler = AnalysisHandler(self.db)
+        self.duplicate_handler = DuplicateHandler(self.db, self.file_handler)
+        self.audio_first_handler = AudioFirstHandler(self.db, self.analysis_handler)
 
         # Connect analysis handler signals
         self._connect_analysis_signals()
@@ -2457,7 +2459,7 @@ class DuplicateFinderWindow(QMainWindow):
                 self.audio_first_handler.stop_analysis()
 
             # Close database connections
-            if self.video_hasher and self.db:
+            if self.db:
                 logger.info("Closing database connections...")
                 self.db.close()
 

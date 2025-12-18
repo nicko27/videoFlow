@@ -56,6 +56,11 @@ class AnalysisHandler(QObject):
         """
         super().__init__()
         self.db = db_manager
+
+        # Create VideoHasher for hash computation (internal implementation detail)
+        from ..detection.video import VideoHasher
+        self.video_hasher = VideoHasher()
+
         self.hash_worker: Optional[ParallelHashWorker] = None
         self.comparison_worker: Optional[DuplicateFlowWorker] = None
         self.start_time: Optional[float] = None
