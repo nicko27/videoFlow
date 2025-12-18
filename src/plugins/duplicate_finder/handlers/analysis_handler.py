@@ -8,9 +8,10 @@ import time
 from typing import List, Optional, Dict, Any, Callable
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 
-from ..workers.hash_worker import ParallelHashWorker
 from ..workers.duplicateflow_worker import DuplicateFlowWorker
 from src.core.logger import Logger
+
+# OBSOLETE: ParallelHashWorker import removed - was never used
 
 logger = Logger.get_logger('DuplicateFinder.AnalysisHandler')
 
@@ -57,77 +58,13 @@ class AnalysisHandler(QObject):
         super().__init__()
         self.db = db_manager
 
-        # Create VideoHasher for hash computation (internal implementation detail)
-        from ..detection.video import VideoHasher
-        self.video_hasher = VideoHasher()
-
-        self.hash_worker: Optional[ParallelHashWorker] = None
         self.comparison_worker: Optional[DuplicateFlowWorker] = None
         self.start_time: Optional[float] = None
         self.failed_files: List[str] = []
         logger.info("Analysis handler initialized (using DuplicateFlow for comparisons)")
 
-    def start_hash_analysis(
-        self,
-        files: List[str],
-        config: Dict[str, Any],
-        progress_callback: Optional[Callable] = None,
-        file_processed_callback: Optional[Callable] = None,
-        current_file_callback: Optional[Callable] = None,
-        progress_details_callback: Optional[Callable] = None,
-        subsequence_detector = None
-    ) -> None:
-        """
-        Start hash computation for video files.
-
-        Args:
-            files: List of file paths to process.
-            config: Configuration dictionary with analysis parameters.
-            progress_callback: Optional callback for progress updates.
-            file_processed_callback: Optional callback when a file is processed.
-            current_file_callback: Optional callback for current file updates.
-            progress_details_callback: Optional callback for detailed progress.
-            subsequence_detector: Optional SubsequenceDetector for pre-computing dense hashes.
-        """
-        self.start_time = time.time()
-        self.failed_files = []
-
-        # Identify files that need processing
-        files_to_hash = [f for f in files if not self.db.has_video(f)]
-
-        if not files_to_hash:
-            logger.info("All files already cached, skipping hash computation")
-            QTimer.singleShot(100, self.hash_finished.emit)
-            return
-
-        # Create and configure worker (with optional dense hash pre-computation)
-        self.hash_worker = ParallelHashWorker(
-            files,
-            self.video_hasher,
-            config['hash_workers'],
-            config['hash_timeout'],
-            subsequence_detector=subsequence_detector
-        )
-
-        # Connect signals
-        self.hash_worker.progress.connect(self._on_hash_progress)
-        self.hash_worker.finished.connect(self._on_hash_finished)
-        self.hash_worker.error.connect(self._on_hash_error)
-
-        if progress_callback:
-            self.hash_worker.progress.connect(progress_callback)
-        if file_processed_callback:
-            self.hash_worker.file_processed.connect(file_processed_callback)
-        if current_file_callback:
-            self.hash_worker.current_file.connect(current_file_callback)
-        if progress_details_callback:
-            self.hash_worker.progress_details.connect(progress_details_callback)
-
-        logger.info(
-            f"Starting hash analysis: {len(files)} total files, "
-            f"{len(files_to_hash)} to process"
-        )
-        self.hash_worker.start()
+    # OBSOLETE: start_hash_analysis() removed - was never called, used legacy VideoHasher
+    # Hash computation now happens inside DuplicateFlow algorithms
 
     def start_comparison_analysis(
         self,
@@ -197,18 +134,9 @@ class AnalysisHandler(QObject):
         """
         Stop all running analysis operations.
 
-        This method gracefully stops both hash and comparison workers
+        This method gracefully stops comparison workers
         and waits for them to finish with timeout protection.
         """
-        if self.hash_worker and self.hash_worker.isRunning():
-            logger.info("Stopping hash worker...")
-            self.hash_worker.stop()
-            # Wait with 5 second timeout to prevent indefinite blocking
-            if not self.hash_worker.wait(5000):
-                logger.warning("Hash worker did not stop gracefully, forcing termination")
-                self.hash_worker.terminate()
-            self.hash_worker = None
-
         if self.comparison_worker and self.comparison_worker.isRunning():
             logger.info("Stopping comparison worker...")
             self.comparison_worker.stop()
@@ -225,11 +153,10 @@ class AnalysisHandler(QObject):
         Check if any analysis operation is currently running.
 
         Returns:
-            True if hash or comparison worker is running, False otherwise.
+            True if comparison worker is running, False otherwise.
         """
-        hash_running = self.hash_worker and self.hash_worker.isRunning()
         comparison_running = self.comparison_worker and self.comparison_worker.isRunning()
-        return hash_running or comparison_running
+        return comparison_running
 
     def get_elapsed_time(self) -> float:
         """
@@ -251,31 +178,8 @@ class AnalysisHandler(QObject):
         """
         return self.failed_files.copy()
 
-    def _on_hash_progress(self, current: int) -> None:
-        """
-        Handle hash progress updates.
-
-        Args:
-            current: Current progress count.
-        """
-        self.hash_progress.emit(current)
-
-    def _on_hash_finished(self) -> None:
-        """
-        Handle hash computation completion.
-        """
-        logger.info("Hash computation finished")
-        self.hash_finished.emit()
-
-    def _on_hash_error(self, error_msg: str) -> None:
-        """
-        Handle hash computation errors.
-
-        Args:
-            error_msg: Error message.
-        """
-        logger.error(f"Hash computation error: {error_msg}")
-        self.analysis_error.emit(error_msg)
+    # OBSOLETE: _on_hash_* methods removed - were never called (start_hash_analysis removed)
+    # hash_progress and hash_finished signals are still used by main_window.py for other purposes
 
     def _on_comparison_progress(self, current: int) -> None:
         """
