@@ -1,12 +1,12 @@
 # 🎯 MASTER PLAN - MIGRATION DUPLICATEFLOW COMPLÈTE
 
 **Date**: 2025-12-18
-**Version**: 2.4 - PHASES 1, 2 & 3 TERMINÉES
-**Status**: ✅ Phases 1-3 Complete | ⏳ Phase 4 Pending (60%)
+**Version**: 2.5 - PHASES 1, 2, 3 & 4 (PARTIEL) TERMINÉES
+**Status**: ✅ Phases 1-3 Complete | 🟡 Phase 4 Critical Fixes Done (65%)
 
 ---
 
-## 🎉 PHASES 1, 2 & 3 TERMINÉES (2025-12-18)
+## 🎉 PHASES 1, 2, 3 & 4 (PARTIEL) TERMINÉES (2025-12-18)
 
 ### Phase 1: Suppression Ancien Système ✅
 
@@ -91,13 +91,43 @@ python3 -c "from src.plugins.duplicate_finder.verification_pipeline import Verif
 
 **Backup**: `obsolete_files_duplicateflow_migration/verification_worker.py.backup`
 
+### Phase 4 (Partiel): UI Critical Fixes ✅
+
+**3 UI files with critical algorithm name issues fixed**:
+
+| File | Issue | Fix | Status |
+|------|-------|-----|--------|
+| `main_window.py` | Used `dct_perceptual`, `temporal_consistency` | Changed to `dct_coefficients`, `motion_analysis` | ✅ Fixed |
+| `ui/main_window.py` | Used `dct_perceptual`, `temporal_consistency` | Changed to `dct_coefficients`, `motion_analysis` | ✅ Fixed |
+| `verification_pipeline.py` | Docstring had old algorithm names | Updated to correct names | ✅ Fixed |
+
+**Critical Changes**:
+- ❌ Removed: Obsolete algorithm names (`dct_perceptual`, `temporal_consistency`)
+- ✅ Added: Correct DuplicateFlow names (`dct_coefficients`, `motion_analysis`)
+- ✅ Fixed: VerificationWorker API usage (`verification_pipeline` parameter instead of `verifier`)
+- ✅ Fixed: Removed obsolete `db` parameter from VerificationWorker
+
+**Impact**:
+- Before: Verification ran with 0 methods (all failed to add with warnings)
+- After: Verification runs with configured methods
+
+**Remaining UI Work** (Low Priority):
+- Replace "strategy3" in UI preset files (ui/pipeline_config_widget.py, etc.)
+- Update benchmark widgets
+- Estimated: 2-3 hours
+
+**Tests**:
+- ✅ New algorithm names work correctly
+- ✅ Old algorithm names correctly fail with warnings
+- ✅ Pipeline configuration successful
+
 ---
 
 ## 📊 VUE D'ENSEMBLE
 
 ### Résumé Exécutif
 
-✅ **Phases 1, 2 & 3 terminées** : Les fichiers obsolètes sont supprimés, `verification_pipeline.py` est maintenant une **facade pure à DuplicateFlow**, et tous les workers sont migrés/validés.
+✅ **Phases 1, 2, 3 & 4 (critical) terminées** : Les fichiers obsolètes sont supprimés, `verification_pipeline.py` est maintenant une **facade pure à DuplicateFlow**, tous les workers sont migrés/validés, et les noms d'algorithmes obsolètes dans l'UI sont corrigés.
 
 **Progrès actuel** :
 - ✅ Ancien système custom supprimé (video_analysis_methods.py, subsequence_verification.py)
@@ -105,7 +135,9 @@ python3 -c "from src.plugins.duplicate_finder.verification_pipeline import Verif
 - ✅ verification_worker.py réécrit pour utiliser VerificationPipeline (169 → 161 lignes, -4.7%)
 - ✅ comparison_worker.py validé (utilise VideoHasher - système séparé)
 - ✅ subsequence_worker.py validé (compatible avec nouveaux changements)
-- ⏳ UI et benchmarks à nettoyer (Phase 4)
+- ✅ UI critical: Noms d'algorithmes obsolètes corrigés (main_window.py, ui/main_window.py)
+- ✅ UI critical: VerificationWorker API mise à jour dans l'UI
+- ⏳ UI non-critical: Presets "strategy3" à remplacer (Phase 4 continuation)
 
 ### Statistiques Globales
 
@@ -118,7 +150,7 @@ python3 -c "from src.plugins.duplicate_finder.verification_pipeline import Verif
 | **P2 - À Vérifier** | 7 | ~2,000 | ⏳ À faire |
 | **P2 - Compatibles** | 6 | ~1,500 | ✅ OK |
 | **P2 - Migrés** | 6 | ~2,500 | ✅ Fait |
-| **TOTAL** | **33** | **~17,828** | **~60% fait** ⬆️ |
+| **TOTAL** | **33** | **~17,828** | **~65% fait** ⬆️ |
 
 ---
 
