@@ -45,7 +45,6 @@ from .handlers.analysis_handler import AnalysisHandler
 from .handlers.duplicate_handler import DuplicateHandler
 from .infrastructure.config.design_system import get_current_theme
 from .infrastructure.config.layouts import LayoutManager, LayoutType
-from .detection.audio import AudioFingerprintDetector, PrecisionMode
 from .ui.dialogs.advanced_progress_dialog import AdvancedProgressDialog
 from .detection.hybrid import AdvancedDuplicatePipeline
 

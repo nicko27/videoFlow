@@ -413,7 +413,7 @@ class UnifiedConfigManager:
         Returns:
             AudioFirstConfig from audio_config module (backward compatible)
         """
-        from ..audio_config import AudioFirstConfig as LegacyAudioFirstConfig
+        from ..infrastructure.config.audio_config import AudioFirstConfig as LegacyAudioFirstConfig
 
         # Convert our dataclass to legacy config
         return LegacyAudioFirstConfig(

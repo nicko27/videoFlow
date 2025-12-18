@@ -43,11 +43,8 @@ try:
     from .handlers.file_handler import FileHandler
     from .handlers.analysis_handler import AnalysisHandler
     from .handlers.duplicate_handler import DuplicateHandler
-    from .handlers.audio_first_handler import AudioFirstHandler
-    from .infrastructure.config.audio_config import AudioFirstConfig
     from .infrastructure.config.design_system import get_current_theme
     from .infrastructure.config.layouts import LayoutManager, LayoutType
-    from .detection.audio import AudioFingerprintDetector, PrecisionMode
     from .ui.dialogs.advanced_progress_dialog import AdvancedProgressDialog
     from .analysis.advanced_pipeline import AdvancedDuplicatePipeline
 except ImportError:
@@ -72,11 +69,8 @@ except ImportError:
     from .handlers.file_handler import FileHandler
     from .handlers.analysis_handler import AnalysisHandler
     from .handlers.duplicate_handler import DuplicateHandler
-    from .handlers.audio_first_handler import AudioFirstHandler
-    from .infrastructure.config.audio_config import AudioFirstConfig
     from .infrastructure.config.design_system import get_current_theme
     from .infrastructure.config.layouts import LayoutManager, LayoutType
-    from .detection.audio import AudioFingerprintDetector, PrecisionMode
     from .ui.dialogs.advanced_progress_dialog import AdvancedProgressDialog
     from .analysis.advanced_pipeline import AdvancedDuplicatePipeline
 
