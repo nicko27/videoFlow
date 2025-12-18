@@ -30,16 +30,13 @@ from .ui.widgets.progress_widgets import FileListWidget
 from .ui.panels import UIPanels
 from .ui.widget_registry import WidgetRegistry, get_widget_registry
 from .ui.settings_dialog import SettingsDialog
-from .ui.batch_queue_widget import BatchQueueWidget
 from .ui.cluster_view_dialog import ClusterViewDialog
 from .ui.report_dialog import ReportDialog
 from .ui.themes import Theme, ThemeType
-from .controllers.batch_controller import BatchController, get_batch_controller
 from .analysis.cluster_detector import detect_clusters_from_db
 from .infrastructure.config.settings_manager import SettingsManager
 from .orchestration.unified_config_manager import UnifiedConfigManager
 from .orchestration.progress_manager import ProgressManager, get_progress_manager
-from .controllers.workflow_controller import WorkflowController, WorkflowState, get_workflow_controller
 from .handlers.file_handler import FileHandler
 from .handlers.analysis_handler import AnalysisHandler
 from .handlers.duplicate_handler import DuplicateHandler
@@ -141,8 +138,6 @@ class DuplicateFinderWindow(QMainWindow):
         # Initialize new abstraction managers
         self.widget_registry = WidgetRegistry()
         self.progress_manager = ProgressManager()
-        self.workflow_controller = WorkflowController()
-        self.batch_controller = BatchController()
 
         self.file_handler: Optional[FileHandler] = None
         self.analysis_handler: Optional[AnalysisHandler] = None
@@ -544,12 +539,7 @@ class DuplicateFinderWindow(QMainWindow):
         else:
             logger.error("params_tab is None! Cannot extract widget references")
 
-        # Get Batch Queue tab and set config_manager
-        batch_queue_tab = self._find_tab_by_name(config_tabs, "batch_queue_tab")
-        if batch_queue_tab:
-            batch_queue_tab.config_manager = self.unified_config_manager
-            batch_queue_tab.execute_job_requested.connect(self._execute_batch_job)
-            logger.info("Batch Queue tab configured in left panel")
+        # Batch Queue removed - no longer needed
 
         # Get Benchmark tab and connect signal
         if hasattr(config_tabs, 'benchmark_widget') and config_tabs.benchmark_widget:
@@ -987,19 +977,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.duplicate_handler.processing_stopped = False
 
         # Transition workflow to HASHING state
-        try:
-            self.workflow_controller.transition_to(WorkflowState.HASHING, {
-                'file_count': file_count,
-                'valid_files': len(valid_files)
-            })
-        except ValueError as e:
-            logger.warning(f"Workflow transition warning: {e}")
-            # Reset workflow if in invalid state
-            self.workflow_controller.reset()
-            self.workflow_controller.transition_to(WorkflowState.HASHING, {
-                'file_count': file_count,
-                'valid_files': len(valid_files)
-            })
+        # Workflow controller removed - state management simplified
 
         # Reset stats counters
         self.stats_counter.reset()

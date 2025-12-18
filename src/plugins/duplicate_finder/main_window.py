@@ -39,7 +39,6 @@ try:
     from .infrastructure.config.settings_manager import SettingsManager
     from .orchestration.unified_config_manager import UnifiedConfigManager
     from .orchestration.progress_manager import ProgressManager, get_progress_manager
-    from .controllers.workflow_controller import WorkflowController, WorkflowState, get_workflow_controller
     from .handlers.file_handler import FileHandler
     from .handlers.analysis_handler import AnalysisHandler
     from .handlers.duplicate_handler import DuplicateHandler
@@ -65,7 +64,6 @@ except ImportError:
     from .infrastructure.config.settings_manager import SettingsManager
     from .orchestration.unified_config_manager import UnifiedConfigManager
     from .orchestration.progress_manager import ProgressManager, get_progress_manager
-    from .controllers.workflow_controller import WorkflowController, WorkflowState, get_workflow_controller
     from .handlers.file_handler import FileHandler
     from .handlers.analysis_handler import AnalysisHandler
     from .handlers.duplicate_handler import DuplicateHandler
@@ -166,8 +164,6 @@ class DuplicateFinderWindow(QMainWindow):
         # Initialize new abstraction managers
         self.widget_registry = WidgetRegistry()
         self.progress_manager = ProgressManager()
-        self.workflow_controller = WorkflowController()
-        self.batch_controller = BatchController()
 
         self.file_handler: Optional[FileHandler] = None
         self.analysis_handler: Optional[AnalysisHandler] = None
@@ -1017,20 +1013,7 @@ class DuplicateFinderWindow(QMainWindow):
         self.set_analysis_mode(True)
         self.duplicate_handler.processing_stopped = False
 
-        # Transition workflow to HASHING state
-        try:
-            self.workflow_controller.transition_to(WorkflowState.HASHING, {
-                'file_count': file_count,
-                'valid_files': len(valid_files)
-            })
-        except ValueError as e:
-            logger.warning(f"Workflow transition warning: {e}")
-            # Reset workflow if in invalid state
-            self.workflow_controller.reset()
-            self.workflow_controller.transition_to(WorkflowState.HASHING, {
-                'file_count': file_count,
-                'valid_files': len(valid_files)
-            })
+        # Workflow controller removed - state management simplified
 
         # Reset stats counters
         self.stats_counter.reset()
