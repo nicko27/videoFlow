@@ -43,8 +43,6 @@ from .controllers.workflow_controller import WorkflowController, WorkflowState, 
 from .handlers.file_handler import FileHandler
 from .handlers.analysis_handler import AnalysisHandler
 from .handlers.duplicate_handler import DuplicateHandler
-from .handlers.audio_first_handler import AudioFirstHandler
-from .infrastructure.config.audio_config import AudioFirstConfig
 from .infrastructure.config.design_system import get_current_theme
 from .infrastructure.config.layouts import LayoutManager, LayoutType
 from .detection.audio import AudioFingerprintDetector, PrecisionMode
@@ -177,7 +175,7 @@ class DuplicateFinderWindow(QMainWindow):
         # Recreate video hasher with selected method if different
         hash_method = self.hash_method_combo.currentData() if self.hash_method_combo else 'pHash'
         # Hash method no longer checked (DuplicateFlow handles hashing)
-            self.db = VideoDatabase()
+        self.db = VideoDatabase()
 
         # Set video hasher on hash debugger widget
         # Note: Hash debugger should work with DatabaseManager directly
@@ -190,16 +188,12 @@ class DuplicateFinderWindow(QMainWindow):
         self.file_handler = FileHandler(self.file_list_widget)
         self.analysis_handler = AnalysisHandler(self.db)
         self.duplicate_handler = DuplicateHandler(self.db, self.file_handler)
-        self.audio_first_handler = AudioFirstHandler(self.db, self.analysis_handler)
 
         # Connect analysis handler signals
         self._connect_analysis_signals()
 
         # Connect duplicate handler signals
         self._connect_duplicate_handler_signals()
-
-        # Connect audio-first handler signals
-        self._connect_audio_first_signals()
 
         # Connect settings change signals
         self._connect_settings_signals()
@@ -596,24 +590,6 @@ class DuplicateFinderWindow(QMainWindow):
             self.duplicate_handler.all_duplicates_processed.connect(self._on_all_duplicates_processed)
             self.duplicate_handler.all_subsequences_processed.connect(self._on_all_subsequences_processed)
 
-    def _connect_audio_first_signals(self) -> None:
-        """Connect audio-first handler signals to UI updates."""
-        if self.audio_first_handler:
-            # Phase 1: Audio extraction
-            self.audio_first_handler.audio_progress.connect(self._on_audio_extraction_progress)
-            self.audio_first_handler.audio_finished.connect(self._on_audio_extraction_finished)
-
-            # Phase 2: Audio comparison
-            self.audio_first_handler.audio_comparison_progress.connect(self._on_audio_comparison_progress)
-            self.audio_first_handler.audio_comparison_finished.connect(self._on_audio_comparison_finished)
-
-            # Phase 3: Video hashing
-            self.audio_first_handler.video_hash_progress.connect(self._on_video_hash_progress)
-            self.audio_first_handler.video_hash_finished.connect(self._on_video_hash_finished)
-
-            # Errors and status
-            self.audio_first_handler.analysis_error.connect(self.handle_error)
-            self.audio_first_handler.status_update.connect(self._on_status_update)
 
     def _connect_settings_signals(self) -> None:
         """
@@ -1046,57 +1022,21 @@ class DuplicateFinderWindow(QMainWindow):
         # Get analysis configuration
         config = self.get_analysis_config()
 
-        # Get configuration from UI for audio-first analysis
-        params_tab = self._get_params_tab()
-        if params_tab is None:
-            logger.error("Could not find parameters tab")
-            QMessageBox.critical(self, "Erreur", "Impossible de charger les paramètres d'analyse")
-            self.set_analysis_mode(False)
-            return
-
-        audio_config = AudioFirstConfig.from_ui_widgets(params_tab)
-
-        # Create verification pipeline from UI configuration
-        verification_pipeline = None
-        if hasattr(params_tab, 'pipeline_config_widget'):
-            try:
-                full_config = params_tab.pipeline_config_widget.get_pipeline_config()
-                mode = full_config.get('mode', 'filtering')
-                methods_config = full_config.get('methods', [])
-                global_threshold = full_config.get('global_threshold')
-
-                if methods_config:  # Only create pipeline if methods are configured
-                    from .verification_pipeline import VerificationPipeline
-                    verification_pipeline = VerificationPipeline(
-                        db_manager=self.db,
-                        max_workers=8,
-                        enable_caching=True,
-                        mode=mode
-                    )
-                    if global_threshold is not None:
-                        verification_pipeline.global_threshold = float(global_threshold)
-                    verification_pipeline.load_config(methods_config)
-                    logger.info(f"Pipeline configuré pour audio-first: mode={mode}, {len(methods_config)} méthodes")
-            except Exception as e:
-                logger.warning(f"Impossible de charger le pipeline configuré: {e}")
-
-        # Store pipeline for use in comparison
-        self.current_verification_pipeline = verification_pipeline
-
-        # Start audio-first analysis
-        logger.info("Starting audio-first workflow")
-        self.audio_first_handler.start_analysis(
-            valid_files,
-            audio_config,
-            progress_callbacks={
-                'audio_progress': self._on_audio_extraction_progress
-            }
+        # Audio-first functionality has been replaced by DuplicateFlow pipelines
+        # Users should configure pipelines with audio_fingerprint method and sample_duration parameter
+        logger.warning("Audio-first analysis deprecated - use DuplicateFlow pipelines instead")
+        QMessageBox.information(
+            self,
+            "Feature Deprecated",
+            "Audio-first analysis has been replaced by DuplicateFlow pipelines.\n\n"
+            "To achieve similar functionality:\n"
+            "1. Go to Advanced Settings → Pipeline Configuration\n"
+            "2. Add 'audio_fingerprint' method\n"
+            "3. Set 'sample_duration' parameter (e.g., 10.0 for first 10 seconds)\n"
+            "4. Enable LSH for large datasets\n\n"
+            "This provides the same optimization with more flexibility."
         )
-
-        # Initialize progress displays
-        if self.audio_progress:
-            self.audio_progress.update_progress(0, len(valid_files), "Starting audio extraction...")
-            self.audio_progress.set_status("Starting", "#FFC107")
+        self.set_analysis_mode(False)
 
     def stop_analysis(self) -> None:
         """
@@ -1115,10 +1055,6 @@ class DuplicateFinderWindow(QMainWindow):
 
             # Stop hash and comparison workers
             self.analysis_handler.stop_analysis()
-
-            # Stop audio-first handler
-            if self.audio_first_handler:
-                self.audio_first_handler.stop_analysis()
 
             # Stop scene detection worker
             if self.scene_worker and self.scene_worker.isRunning():
@@ -2079,49 +2015,11 @@ class DuplicateFinderWindow(QMainWindow):
         if self.stats_counter:
             self.stats_counter.update_duplicates(count)
 
-    # Audio-first callbacks
-    def _on_audio_extraction_progress(self, current: int, total: int, video_path: str) -> None:
-        """Update audio extraction progress."""
-        if self.audio_progress:
-            self.audio_progress.update_progress(current, total, f"🎵 {current}/{total}")
-            short_name = os.path.basename(video_path)[:30]
-            if len(short_name) < len(os.path.basename(video_path)):
-                short_name += "..."
-            self.audio_progress.set_status(f"🎵 {short_name}", "#17A2B8")
-
-    def _on_audio_extraction_finished(self) -> None:
-        """Handle audio extraction completion."""
-        if self.audio_progress:
-            self.audio_progress.set_status(
-                t('duplicate_finder.ui.progress.audio_complete', 'Audio extraction complete'),
-                "#28A745"
-            )
-        logger.info("Phase 1 complete: Audio extraction finished")
-
-    def _on_audio_comparison_progress(self, current: int, total: int) -> None:
-        """Update audio comparison progress."""
-        if self.duplicate_progress:
-            # Initialiser le maximum une seule fois
-            if self.duplicate_progress.progress_bar.maximum() != total:
-                self.duplicate_progress.progress_bar.setMaximum(total)
-
-            self.duplicate_progress.update_progress(current, total, f"🔍 {current}/{total}")
-
-            # Feedback textuel avec pourcentage
-            pct = (current / total * 100) if total > 0 else 0
-            self.duplicate_progress.set_status(
-                t('duplicate_finder.ui.progress.audio_comparison', 'Audio comparison... {percent}%', percent=f"{pct:.0f}"),
-                "#007BFF"
-            )
-
-    def _on_audio_comparison_finished(self, matches: list) -> None:
-        """Handle audio comparison completion."""
-        logger.info(f"Phase 2 complete: {len(matches)} audio candidates found")
-        if self.duplicate_progress:
-            self.duplicate_progress.set_status(
-                t('duplicate_finder.ui.progress.audio_matches_found', 'Audio candidates found'),
-                "#17A2B8"
-            )
+    # Audio-first callbacks removed - functionality replaced by DuplicateFlow pipelines
+    # def _on_audio_extraction_progress(self, current: int, total: int, video_path: str) -> None:
+    # def _on_audio_extraction_finished(self) -> None:
+    # def _on_audio_comparison_progress(self, current: int, total: int) -> None:
+    # def _on_audio_comparison_finished(self, matches: list) -> None:
 
     def _on_video_hash_progress(self, current: int, total: int) -> None:
         """Update video hash progress."""
@@ -2139,58 +2037,15 @@ class DuplicateFinderWindow(QMainWindow):
             )
 
     def _on_video_hash_finished(self) -> None:
-        """Handle selective video hashing completion."""
-        logger.info("Phase 3 complete: Selective video hashing finished")
-        if self.file_progress:
-            self.file_progress.set_status(
-                t('duplicate_finder.ui.progress.video_hashing_complete', 'Hashing complete'),
-                "#28A745"
-            )
-        # Now start video comparison on candidates
-        self._start_video_comparison_on_candidates()
+        """Handle selective video hashing completion (audio-first deprecated)."""
+        logger.warning("_on_video_hash_finished called but audio-first is deprecated")
+        # Audio-first workflow has been replaced by DuplicateFlow pipelines
+        self._finish_analysis()
 
-    def _on_status_update(self, status: str) -> None:
-        """Handle status updates from audio-first handler."""
-        if self.status_indicator:
-            self.status_indicator.update_status("🎵", status, "#17A2B8", "#D1ECF1", "#17A2B8")
-
-    def _start_video_comparison_on_candidates(self) -> None:
-        """Start video comparison on audio candidates."""
-        candidates = self.audio_first_handler.audio_candidates
-
-        if not candidates:
-            logger.info("No audio candidates, finishing analysis")
-            self._finish_analysis()
-            return
-
-        logger.info(f"Phase 4: Starting video comparison on {len(candidates)} candidate pairs")
-
-        # Extract unique videos that need comparison
-        unique_videos = set()
-        for v1, v2, _ in candidates:
-            unique_videos.add(v1)
-            unique_videos.add(v2)
-
-        # Use existing comparison logic with SPECIFIC PAIRS (audio-first optimization)
-        config = self.get_analysis_config()
-        self.analysis_handler.start_comparison_analysis(
-            list(unique_videos),
-            config,
-            duplicate_callback=self._on_duplicate_found,
-            progress_callback=self.update_duplicate_progress,
-            status_callback=self.update_comparison_status,
-            total_comparisons_callback=self.set_comparison_total,
-            comparison_details_callback=self.update_comparison_details,
-            specific_pairs=candidates  # FIXED: Pass audio candidates to avoid N² comparison
-        )
-
-    def _get_params_tab(self):
-        """Get parameters tab widget with all the audio-first parameters."""
-        # Find the params tab from config tabs
-        for child in self.findChildren(QWidget):
-            if hasattr(child, 'audio_threshold_spin'):
-                return child
-        return None
+    # Audio-first methods removed - functionality replaced by DuplicateFlow pipelines
+    # def _on_status_update(self, status: str) -> None:
+    # def _start_video_comparison_on_candidates(self) -> None:
+    # def _get_params_tab(self):
 
     # Progress update methods
     def update_file_progress(self, current: int) -> None:
@@ -2454,10 +2309,6 @@ class DuplicateFinderWindow(QMainWindow):
             if self.analysis_handler:
                 self.analysis_handler.cleanup()
 
-            # Cleanup audio-first handler
-            if self.audio_first_handler:
-                self.audio_first_handler.stop_analysis()
-
             # Close database connections
             if self.db:
                 logger.info("Closing database connections...")
@@ -2710,8 +2561,16 @@ class DuplicateFinderWindow(QMainWindow):
             from .controllers.batch_controller import JobType
 
             if job.job_type == JobType.AUDIO_FIRST_ANALYSIS:
-                # Start audio-first analysis
-                self.start_audio_first_analysis()
+                # Audio-first analysis deprecated - use DuplicateFlow pipelines instead
+                logger.warning(f"Job {job_id} uses deprecated AUDIO_FIRST_ANALYSIS type")
+                QMessageBox.warning(
+                    self,
+                    "Deprecated Job Type",
+                    f"Job '{job.name}' uses deprecated audio-first analysis.\n\n"
+                    "Please update the job to use standard analysis with DuplicateFlow pipelines."
+                )
+                self.batch_controller.update_job_progress(job_id, 100, "Skipped (deprecated)")
+                return
             elif job.job_type == JobType.SUBSEQUENCE_DETECTION:
                 # Start with subsequence detection enabled
                 # Note: This would require enabling subsequence detection in config

@@ -18,7 +18,7 @@ from src.core.logger import Logger
 try:
     from ..orchestration.unified_config_manager import (
         UnifiedConfigManager, UnifiedConfig,
-        VideoHashingConfig, ComparisonConfig, AudioFirstConfig,
+        VideoHashingConfig, ComparisonConfig,
         CacheConfig, SubsequenceConfig
     )
     from ..infrastructure.config.profile_manager import ProfileManager, get_profile_manager
@@ -26,7 +26,7 @@ try:
 except ImportError:
     from ..orchestration.unified_config_manager import (
         UnifiedConfigManager, UnifiedConfig,
-        VideoHashingConfig, ComparisonConfig, AudioFirstConfig,
+        VideoHashingConfig, ComparisonConfig,
         CacheConfig, SubsequenceConfig
     )
     from ..infrastructure.config.profile_manager import ProfileManager, get_profile_manager
@@ -120,13 +120,13 @@ class SettingsDialog(QDialog):
         # Create tabs
         self.hashing_tab = self._create_hashing_tab()
         self.comparison_tab = self._create_comparison_tab()
-        self.audio_first_tab = self._create_audio_first_tab()
+        # Audio-first tab removed - functionality replaced by DuplicateFlow pipelines
         self.cache_tab = self._create_cache_tab()
         self.subsequence_tab = self._create_subsequence_tab()
 
         self.tabs.addTab(self.hashing_tab, "Hashing")
         self.tabs.addTab(self.comparison_tab, "Comparison")
-        self.tabs.addTab(self.audio_first_tab, "Audio-First")
+        # self.tabs.addTab(self.audio_first_tab, "Audio-First")  # Deprecated
         self.tabs.addTab(self.cache_tab, "Cache")
         self.tabs.addTab(self.subsequence_tab, "Subsequence")
 
@@ -328,48 +328,8 @@ class SettingsDialog(QDialog):
 
         return widget
 
-    def _create_audio_first_tab(self) -> QWidget:
-        """Create the audio-first configuration tab."""
-        widget = QWidget()
-        layout = QVBoxLayout(widget)
-
-        # Audio-first group
-        group = QGroupBox("Audio-First Analysis Configuration")
-        form = QFormLayout()
-
-        # Enable audio-first
-        self.enable_audio_first = QCheckBox("Enable audio-first analysis")
-        form.addRow("", self.enable_audio_first)
-
-        # Threshold
-        self.audio_threshold_spin = QDoubleSpinBox()
-        self.audio_threshold_spin.setRange(0.0, 1.0)
-        self.audio_threshold_spin.setSingleStep(0.05)
-        self.audio_threshold_spin.setDecimals(2)
-        form.addRow("Audio Similarity Threshold:", self.audio_threshold_spin)
-
-        # Precision mode
-        self.audio_precision_combo = QComboBox()
-        self.audio_precision_combo.addItem("Fast", "fast")
-        self.audio_precision_combo.addItem("Balanced", "balanced")
-        self.audio_precision_combo.addItem("Accurate", "accurate")
-        form.addRow("Precision Mode:", self.audio_precision_combo)
-
-        # Workers
-        self.audio_workers_spin = QSpinBox()
-        self.audio_workers_spin.setRange(1, 16)
-        self.audio_workers_spin.setSuffix(" workers")
-        form.addRow("Parallel Workers:", self.audio_workers_spin)
-
-        # Fallback
-        self.enable_no_audio_fallback = QCheckBox("Fallback to visual comparison if no audio")
-        form.addRow("", self.enable_no_audio_fallback)
-
-        group.setLayout(form)
-        layout.addWidget(group)
-        layout.addStretch()
-
-        return widget
+    # Audio-first tab removed - functionality replaced by DuplicateFlow pipelines
+    # def _create_audio_first_tab(self) -> QWidget:
 
     def _create_cache_tab(self) -> QWidget:
         """Create the cache configuration tab."""
@@ -488,14 +448,7 @@ class SettingsDialog(QDialog):
         self.enable_metadata_filter.setChecked(config.comparison.enable_metadata_filter)
         self.enable_flip_detection.setChecked(config.comparison.enable_flip_detection)
 
-        # Audio-First
-        self.enable_audio_first.setChecked(config.audio_first.enabled)
-        self.audio_threshold_spin.setValue(config.audio_first.audio_threshold)
-        index = self.audio_precision_combo.findData(config.audio_first.precision_mode)
-        if index >= 0:
-            self.audio_precision_combo.setCurrentIndex(index)
-        self.audio_workers_spin.setValue(config.audio_first.audio_workers)
-        self.enable_no_audio_fallback.setChecked(config.audio_first.enable_no_audio_fallback)
+        # Audio-first removed - functionality replaced by DuplicateFlow pipelines
 
         # Cache
         self.frame_cache_size_spin.setValue(config.cache.frame_cache_size)
@@ -531,13 +484,8 @@ class SettingsDialog(QDialog):
                 enable_metadata_filter=self.enable_metadata_filter.isChecked(),
                 enable_flip_detection=self.enable_flip_detection.isChecked()
             ),
-            audio_first=AudioFirstConfig(
-                enabled=self.enable_audio_first.isChecked(),
-                audio_threshold=self.audio_threshold_spin.value(),
-                precision_mode=self.audio_precision_combo.currentData(),
-                audio_workers=self.audio_workers_spin.value(),
-                enable_no_audio_fallback=self.enable_no_audio_fallback.isChecked()
-            ),
+            # Audio-first removed - functionality replaced by DuplicateFlow pipelines
+            # audio_first=AudioFirstConfig(...),
             cache=CacheConfig(
                 frame_cache_size=self.frame_cache_size_spin.value(),
                 video_cache_size=self.video_cache_size_spin.value(),
