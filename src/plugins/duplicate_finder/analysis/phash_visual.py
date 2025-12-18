@@ -52,14 +52,22 @@ class PHashComparator:
             f"frame_rate={frame_rate_threshold:.0%}, n_frames={n_frames}"
         )
 
-    def extract_frames(self, video_path: str) -> Tuple[List[np.ndarray], List[int]]:
+    def extract_frames(
+        self,
+        video_path: str,
+        window_start: Optional[float] = None,
+        window_end: Optional[float] = None
+    ) -> Tuple[List[np.ndarray], List[int]]:
         """
         Extract evenly-spaced frames from a video.
 
         Samples frames at regular intervals (0%, 10%, 20%, ..., 90% of duration).
+        If window parameters are provided, samples only within the time window.
 
         Args:
             video_path: Path to the video file
+            window_start: Start time in seconds (None = from beginning)
+            window_end: End time in seconds (None = to end)
 
         Returns:
             Tuple of (frames_list, frame_indices)
@@ -80,16 +88,37 @@ class PHashComparator:
                 return [], []
 
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps = cap.get(cv2.CAP_PROP_FPS)
+
             if total_frames == 0:
                 logger.error(f"Video has 0 frames: {video_path}")
                 cap.release()
                 cv2.setLogLevel(1)
                 return [], []
 
+            # Calculate frame range based on time window
+            if window_start is not None or window_end is not None:
+                # Convert time window to frame indices
+                start_frame = int(window_start * fps) if window_start is not None else 0
+                end_frame = int(window_end * fps) if window_end is not None else total_frames - 1
+
+                # Clamp to valid range
+                start_frame = max(0, min(start_frame, total_frames - 1))
+                end_frame = max(start_frame, min(end_frame, total_frames - 1))
+
+                logger.debug(
+                    f"Windowed extraction: {window_start:.1f}s-{window_end:.1f}s "
+                    f"(frames {start_frame}-{end_frame})"
+                )
+            else:
+                start_frame = 0
+                end_frame = total_frames - 1
+
             # Calculate frame positions (0%, 10%, 20%, ..., 90%)
             # Avoid the very end (100%) as it might be black/corrupted
+            frame_range = end_frame - start_frame
             positions = np.linspace(0, 0.9, self.n_frames)
-            target_indices = [int(pos * (total_frames - 1)) for pos in positions]
+            target_indices = [start_frame + int(pos * frame_range) for pos in positions]
 
             # Extract frames
             for idx in target_indices:

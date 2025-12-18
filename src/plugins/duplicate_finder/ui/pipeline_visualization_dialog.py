@@ -9,8 +9,9 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor, QPalette
 
 from src.core.logger import Logger
-from ..verification import VerificationPipeline
+from ..verification_pipeline import VerificationPipeline
 from ..infrastructure.i18n import I18n
+from ..integration import get_all_algorithms_dict
 
 logger = Logger.get_logger('DuplicateFinder.PipelineVisualization')
 
@@ -192,7 +193,8 @@ class PipelineVisualizationDialog(QDialog):
 
         layout = QVBoxLayout(frame)
 
-        meta = VerificationPipeline.AVAILABLE_METHODS.get(method.get('name'), {})
+        available_methods = get_all_algorithms_dict()
+        meta = available_methods.get(method.get('name'), {})
 
         # Method name
         display_name = meta.get("display_name", method.get("name"))

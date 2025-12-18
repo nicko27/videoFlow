@@ -1,0 +1,22 @@
+{
+  "testset": "Default",
+  "pipeline": "🚀 Fast (DuplicateFlow)",
+  "timestamp": "2025-12-18T10:00:11.718143",
+  "processed_count": 10,
+  "remaining_count": 110,
+  "metrics": {
+    "tp": 0,
+    "fp": 0,
+    "tn": 10,
+    "fn": 0,
+    "errors": 0
+  },
+  "elapsed_time": 0.013352155685424805,
+  "processed_pairs": [
+    {
+      "pair_id": 605,
+      "video1": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "video2": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "expected": "negative",
+      "score": 44.29619094787068,
+      "is_match": 

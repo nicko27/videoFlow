@@ -13,11 +13,18 @@ from threading import Lock
 from PyQt6.QtCore import pyqtSignal, QThread
 
 from src.core.logger import Logger
-from ..verification import VerificationPipeline
+from ..verification_pipeline import VerificationPipeline
 from ..analysis.phash_visual import PHashComparator
 from ..utils.timeout import timeout, TimeoutError
 from ..utils.worker_optimization import calculate_benchmark_workers
 from .benchmark_exporter import BenchmarkJSONExporter
+
+# Import DuplicateFlow adapter for new pipeline system
+try:
+    from ..adapters.duplicateflow_adapter import DuplicateFlowAdapter, DUPLICATEFLOW_AVAILABLE
+except ImportError:
+    DUPLICATEFLOW_AVAILABLE = False
+    DuplicateFlowAdapter = None
 
 logger = Logger.get_logger('DuplicateFinder.BenchmarkManager')
 
@@ -134,6 +141,7 @@ class BenchmarkRunner(QThread):
     hashing_progress = pyqtSignal(int, int, str)  # current, total, name
     hash_type_progress = pyqtSignal(str, int, int, str)  # hash_type, current, total, pipeline_name
     pipeline_metrics_updated = pyqtSignal(str, dict)  # name, metrics (tp, fp, tn, fn, p, r, f1, speed, eta)
+    pair_result_ready = pyqtSignal(str, dict)  # pipeline_name, individual_result (for export monitor)
     pipeline_completed = pyqtSignal(str, dict)  # name, results
     finished = pyqtSignal(int)  # run_id
     error = pyqtSignal(str)
@@ -755,8 +763,8 @@ class BenchmarkRunner(QThread):
         Returns:
             Dict avec {tp, fp, tn, fn, precision, recall, f1, total_time, per_pair_results}
         """
-        # Créer le pipeline
-        pipeline = self._create_pipeline(pipeline_config)
+        # Créer l'adapter DuplicateFlow
+        adapter = self._create_adapter(pipeline_config)
 
         # Métriques (thread-safe)
         metrics_lock = Lock()
@@ -769,18 +777,9 @@ class BenchmarkRunner(QThread):
         per_pair_results = []
         pairs_processed = [0]  # Liste pour mutabilité dans la closure
         pipeline_start_time = time.time()
-        confirmation_cfg = pipeline_config.get('confirmation') or {}
-        confirmation_enabled = confirmation_cfg.get('enabled', False)
-        phash_params = confirmation_cfg.get('parameters', {})
-        phash_comparator = None
-        if confirmation_enabled:
-            phash_comparator = PHashComparator(
-                phash_threshold=int(phash_params.get('phash_threshold', 10)),
-                frame_rate_threshold=float(phash_params.get('frame_rate_threshold', 0.8)),
-                n_frames=int(phash_params.get('n_frames', 10)),
-                step_seconds=float(phash_params.get('step_seconds', 1.0)),
-                max_offsets=30
-            )
+
+        # Note: Confirmation is now handled internally by DuplicateFlowAdapter
+        # No need to create PHashComparator manually
 
         total_pairs = len(self.test_pairs)
 
@@ -855,70 +854,24 @@ class BenchmarkRunner(QThread):
             logger.info(f"🔍 [DIAG] Emitting metrics: {processed}/{total_pairs} pairs")
             logger.info(f"🔍 [DIAG] per_pair_results count: {len(per_pair_results)}")
 
-            # Calculer stats par méthode depuis les résultats
+            # Extract method stats from DuplicateFlow metadata
+            # DuplicateFlowAdapter provides timing info in metadata
             method_stats = {}
-            legacy_format_count = 0
 
             for result in per_pair_results:
-                # TIER 1: Check for VerificationResult first (preferred - OPTIMIZED PATH)
-                # NOTE: We don't skip 'from_cache' results here because cached VerificationResults
-                # still have complete method_results that we want to include in stats
-                verification_result = result.get('verification_result')
-                if verification_result:
-                    # Use VerificationResult.method_results (list of MethodResult)
-                    for method_result in verification_result.method_results:
-                        method_name = method_result.method_name
-                        exec_time = method_result.execution_time_ms / 1000.0  # Convert to seconds
+                # Extract stage results for staged pipelines
+                stage_results = result.get('stage_results', [])
+                for stage_result in stage_results:
+                    stage_name = stage_result.get('stage_name', 'unknown')
+                    exec_time = stage_result.get('execution_time', 0)
 
-                        if method_name not in method_stats:
-                            method_stats[method_name] = {'calls': 0, 'total_time': 0.0, 'times': []}
+                    if exec_time > 0:
+                        if stage_name not in method_stats:
+                            method_stats[stage_name] = {'calls': 0, 'total_time': 0.0, 'times': []}
 
-                        method_stats[method_name]['calls'] += 1
-                        method_stats[method_name]['total_time'] += exec_time
-                        method_stats[method_name]['times'].append(exec_time)
-                    continue
-
-                # TIER 2: Handle LIST format (current after VerificationResult integration)
-                # DEPRECATED: This path will be removed in future versions
-                # Skip cached results in legacy format - they don't have detailed stats
-                if result.get('from_cache', False):
-                    continue
-
-                pipeline_results = result.get('pipeline_results', [])
-
-                if isinstance(pipeline_results, list):
-                    legacy_format_count += 1
-                    for method_result in pipeline_results:
-                        if isinstance(method_result, dict):
-                            method_name = method_result.get('method_name', 'unknown')
-                            exec_time = method_result.get('execution_time', 0)
-
-                            if exec_time > 0:
-                                if method_name not in method_stats:
-                                    method_stats[method_name] = {'calls': 0, 'total_time': 0.0, 'times': []}
-
-                                method_stats[method_name]['calls'] += 1
-                                method_stats[method_name]['total_time'] += exec_time
-                                method_stats[method_name]['times'].append(exec_time)
-
-                # TIER 3: Handle DICT format (legacy backward compatibility)
-                # DEPRECATED: This path will be removed in future versions
-                elif isinstance(pipeline_results, dict):
-                    legacy_format_count += 1
-                    for method_name, method_result in pipeline_results.items():
-                        if isinstance(method_result, dict):
-                            exec_time = method_result.get('execution_time', 0)
-                            if exec_time > 0:
-                                if method_name not in method_stats:
-                                    method_stats[method_name] = {'calls': 0, 'total_time': 0.0, 'times': []}
-                                method_stats[method_name]['calls'] += 1
-                                method_stats[method_name]['total_time'] += exec_time
-                                method_stats[method_name]['times'].append(exec_time)
-
-            # Log warning if legacy formats used
-            if legacy_format_count > 0:
-                logger.warning(f"⚠️ {legacy_format_count} results using legacy format (not VerificationResult). "
-                             f"Consider migrating to VerificationResult for better performance and features.")
+                        method_stats[stage_name]['calls'] += 1
+                        method_stats[stage_name]['total_time'] += exec_time
+                        method_stats[stage_name]['times'].append(exec_time)
 
             # 🔍 DIAGNOSTIC
             logger.info(f"🔍 [DIAG] method_stats calculated: {list(method_stats.keys())}")
@@ -969,17 +922,16 @@ class BenchmarkRunner(QThread):
                 duration = pair.get('duration') if pair.get('duration') is not None else 0.0
                 sequence_score = pair.get('sequence_score') if pair.get('sequence_score') is not None else 100.0
 
-                logger.debug(f"  [{pipeline_name}] Calling pipeline.verify() for pair {pair_idx}...")
+                logger.debug(f"  [{pipeline_name}] Calling adapter.compare_videos_with_pipeline() for pair {pair_idx}...")
 
                 # NOTE: Timeout individuel désactivé car signal.SIGALRM ne fonctionne pas dans les threads workers
                 # Le timeout global de 180s (no_progress_timeout) gère les blocages
                 try:
-                    result = pipeline.verify(
-                        short_video=video1,
-                        long_video=video2,
-                        start_time=start_time,
-                        duration=duration,
-                        sequence_score=sequence_score
+                    # Use DuplicateFlow adapter instead of old VerificationPipeline
+                    result = adapter.compare_videos_with_pipeline(
+                        video1=video1,
+                        video2=video2,
+                        pipeline_config=pipeline_config
                     )
                 except Exception as e:
                     pair_time = time.time() - pair_start
@@ -995,35 +947,14 @@ class BenchmarkRunner(QThread):
                         'total_time': pair_time
                     }
 
-                logger.debug(f"  [{pipeline_name}] pipeline.verify() returned for pair {pair_idx}")
+                logger.debug(f"  [{pipeline_name}] adapter.compare_videos_with_pipeline() returned for pair {pair_idx}")
 
                 pair_time = time.time() - pair_start
                 accepted = result['accepted']
 
-                # Confirmation visuelle optionnelle (pHash) sur les paires acceptées
-                confirmation_info = None
-                if accepted and confirmation_enabled and phash_comparator:
-                    try:
-                        confirm_res = phash_comparator.verify_visual_similarity(
-                            short_video_path=video1,
-                            long_video_path=video2,
-                            start_time=start_time,
-                            duration=duration,
-                            search_window=phash_params.get('search_window', True)
-                        )
-                        confirmation_info = {
-                            'phash_distance': confirm_res.get('avg_distance'),
-                            'phash_similarity_rate': confirm_res.get('similarity_rate'),
-                            'phash_frames_similar': confirm_res.get('frames_similar'),
-                            'phash_frames_compared': confirm_res.get('frames_compared'),
-                            'phash_confirmed': confirm_res.get('is_duplicate', False),
-                            'phash_best_offset': confirm_res.get('best_offset')
-                        }
-                        # Si la confirmation infirme, marquer rejet
-                        if not confirm_res.get('is_duplicate', False):
-                            accepted = False
-                    except Exception as e:
-                        logger.error(f"PHash confirmation failed for {video1} vs {video2}: {e}", exc_info=True)
+                # Extract confirmation info from result metadata if present
+                # DuplicateFlowAdapter handles confirmation internally for staged pipelines
+                confirmation_info = result.get('metadata', {}).get('confirmation_result')
 
                 logger.info(f"✅ [{pipeline_name}] PAIR {pair_idx}/{total_pairs} COMPLETED in {pair_time:.2f}s → {('ACCEPTED' if accepted else 'REJECTED')} (expected: {expected})")
 
@@ -1057,8 +988,17 @@ class BenchmarkRunner(QThread):
                         metrics['unlabeled_count'] += 1
 
                 # Retourner résultat détaillé
-                # Note: cached results use 'execution_time', fresh results use 'total_time'
-                total_time = result.get('total_time', result.get('execution_time', 0.0))
+                # DuplicateFlowAdapter returns: similarity, accepted, metadata, stage_results (for staged)
+                similarity = result.get('similarity', 0.0)
+                metadata = result.get('metadata', {})
+
+                # Calculate classification (tp/fp/tn/fn) for export
+                if normalized_expected == 'positive':
+                    classification = 'tp' if accepted else 'fn'
+                elif normalized_expected == 'negative':
+                    classification = 'tn' if not accepted else 'fp'
+                else:
+                    classification = 'unknown'
 
                 return {
                     'video1': video1,
@@ -1066,15 +1006,16 @@ class BenchmarkRunner(QThread):
                     'expected': expected,
                     'accepted': accepted,
                     'is_match': accepted,  # alias for downstream tools expecting is_match
-                    'rejection_method': result.get('rejection_method'),
-                    'pipeline_results': result.get('pipeline_results'),
-                    'mode': result.get('mode'),
-                    'weighted_score': result.get('weighted_score'),
-                    'total_time': total_time,
-                    'from_cache': result.get('from_cache', False),
+                    'similarity': similarity,
+                    'weighted_score': similarity,  # alias for compatibility
+                    'classification': classification,  # tp/fp/tn/fn for export
+                    'total_time': pair_time,
                     'start_time': start_time,
                     'duration': duration,
-                    'confirmation': confirmation_info
+                    'confirmation': confirmation_info,
+                    'metadata': metadata,
+                    'stage_results': result.get('stage_results', []),  # for staged pipelines
+                    'detected_offset': result.get('detected_offset')  # for staged pipelines
                 }
 
             except Exception as e:
@@ -1172,6 +1113,9 @@ class BenchmarkRunner(QThread):
                             result = future.result(timeout=1)
                             if result:
                                 per_pair_results.append(result)
+
+                                # Emit individual result for monitor export
+                                self.pair_result_ready.emit(pipeline_name, result)
 
                                 # CORRECTION: Émettre métriques après chaque paire (throttled)
                                 emit_intermediate_metrics()
@@ -1274,41 +1218,44 @@ class BenchmarkRunner(QThread):
             'unlabeled_count': unlabeled_count
         }
 
-    def _create_pipeline(self, pipeline_config: Dict) -> VerificationPipeline:
-        """Crée une instance VerificationPipeline depuis la config."""
-        pipeline_name = pipeline_config.get('name', 'Unknown')
-        mode = pipeline_config['mode']
-        methods = pipeline_config['methods']
-        # Extract max_workers from config if provided, otherwise default to 8
-        max_workers = pipeline_config.get('max_workers', 8)
+    def _create_adapter(self, pipeline_config: Dict) -> DuplicateFlowAdapter:
+        """
+        Crée une instance DuplicateFlowAdapter pour le nouveau système.
 
-        logger.info(f"🔧 [CREATING PIPELINE] {pipeline_name} (mode: {mode}, max_workers: {max_workers})")
+        Args:
+            pipeline_config: Configuration du pipeline avec mode, methods, stages, etc.
+
+        Returns:
+            DuplicateFlowAdapter instance
+        """
+        pipeline_name = pipeline_config.get('name', 'Unknown')
+        mode = pipeline_config.get('mode', 'weighting')
+
+        logger.info(f"🔧 [CREATING ADAPTER] {pipeline_name} (mode: {mode})")
 
         try:
-            pipeline = VerificationPipeline(
-                db_manager=self.db,
-                max_workers=max_workers,
-                enable_caching=True,
-                mode=mode
-            )
+            if not DUPLICATEFLOW_AVAILABLE or DuplicateFlowAdapter is None:
+                raise RuntimeError(
+                    "DuplicateFlow is not available. Please install duplicateflow package:\n"
+                    "pip install duplicateflow"
+                )
 
-            enabled_methods = []
-            for method in methods:
-                if method.get('enabled', True):
-                    method_name = method['name']
-                    enabled_methods.append(method_name)
-                    pipeline.add_method(
-                        method_name,
-                        enabled=True,
-                        parameters=method.get('parameters', {}),
-                        weight=method.get('weight', 1.0)
-                    )
+            # Create adapter instance
+            adapter = DuplicateFlowAdapter()
 
-            logger.info(f"✅ [PIPELINE CREATED] {pipeline_name} with {len(enabled_methods)} methods: {', '.join(enabled_methods)}")
-            return pipeline
+            # Log configuration details
+            if mode == 'staged':
+                stages = pipeline_config.get('stages', [])
+                logger.info(f"✅ [ADAPTER CREATED] {pipeline_name} with {len(stages)} stages (staged mode)")
+            else:
+                methods = pipeline_config.get('methods', [])
+                enabled_methods = [m['name'] for m in methods if m.get('enabled', True)]
+                logger.info(f"✅ [ADAPTER CREATED] {pipeline_name} with {len(enabled_methods)} methods: {', '.join(enabled_methods)}")
+
+            return adapter
 
         except Exception as e:
-            logger.error(f"❌ [PIPELINE CREATION FAILED] {pipeline_name}: {e}", exc_info=True)
+            logger.error(f"❌ [ADAPTER CREATION FAILED] {pipeline_name}: {e}", exc_info=True)
             raise
 
     def _store_pipeline_results(self, run_id: int, pipeline_config: Dict, results: Dict):

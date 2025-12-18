@@ -16,7 +16,8 @@ from PyQt6.QtGui import QFont
 import json
 
 # Import method definitions from pipeline
-from ..verification import VerificationPipeline
+from ..verification_pipeline import VerificationPipeline
+from ..integration import get_all_algorithms_dict
 
 
 class PipelineMethodItem(QWidget):
@@ -664,9 +665,6 @@ class PipelineMethodItem(QWidget):
 class PipelineConfigWidget(QWidget):
     """Widget for configuring the verification pipeline."""
 
-    # Use method definitions from VerificationPipeline (with clear French names)
-    AVAILABLE_METHODS = VerificationPipeline.AVAILABLE_METHODS
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.method_widgets = []
@@ -928,10 +926,11 @@ class PipelineConfigWidget(QWidget):
 
     def _add_method(self, method_name, parameters=None, weight=1.0):
         """Add a method to the pipeline."""
-        if method_name not in self.AVAILABLE_METHODS:
+        available_methods = get_all_algorithms_dict()
+        if method_name not in available_methods:
             return
 
-        method_info = self.AVAILABLE_METHODS[method_name]
+        method_info = available_methods[method_name]
         params = method_info['default_params'].copy()
         if parameters:
             params.update(parameters)
@@ -1034,7 +1033,8 @@ class PipelineConfigWidget(QWidget):
         layout.addWidget(info)
 
         list_widget = QListWidget()
-        for key, meta in self.AVAILABLE_METHODS.items():
+        available_methods = get_all_algorithms_dict()
+        for key, meta in available_methods.items():
             item = QListWidgetItem(f"{meta['display_name']} — {meta.get('speed', '')}")
             item.setData(Qt.ItemDataRole.UserRole, key)
             item.setToolTip(meta.get('detailed_explanation', meta.get('description', '')))
@@ -1217,9 +1217,10 @@ class PipelineConfigWidget(QWidget):
             'Très Lent': 3.0
         }
 
+        available_methods = get_all_algorithms_dict()
         est_time = 0.0
         for m in enabled_methods:
-            meta = self.AVAILABLE_METHODS.get(m['name'], {})
+            meta = available_methods.get(m['name'], {})
             est_time += speed_map.get(meta.get('speed', ''), 1.0)
 
         mode_text = {
@@ -1354,9 +1355,10 @@ class PipelineConfigDialog(QDialog):
         preview_text += f"**Méthodes actives:** {len(enabled)}/{len(methods)}\n\n"
 
         if enabled:
+            available_methods = get_all_algorithms_dict()
             preview_text += "**Ordre d'exécution:**\n"
             for i, method in enumerate(enabled, 1):
-                meta = self.pipeline_widget.AVAILABLE_METHODS.get(method['name'], {})
+                meta = available_methods.get(method['name'], {})
                 preview_text += f"{i}. {meta.get('display_name', method['name'])} (poids: {method.get('weight', 1.0)})\n"
 
         QMessageBox.information(self, "Aperçu de la Configuration", preview_text)

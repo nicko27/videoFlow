@@ -1,0 +1,17 @@
+# DuplicateFlow - Deep Learning Requirements
+# Install with: pip install -r requirements-dl.txt
+# This adds 3 deep learning algorithms (total: 19 algorithms)
+# ⚠️  Warning: Large download (~2-5 GB for models), GPU recommended
+
+# PyTorch (CPU version - for GPU, install manually)
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Transformers (CLIP)
+transformers>=4.30.0
+
+# Video models
+pytorchvideo>=0.1.5
+
+# Note: For GPU support, install PyTorch with CUDA manually:
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118

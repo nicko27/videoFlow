@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from managers.settings_manager import SettingsManager
 from managers.unified_config_manager import UnifiedConfigManager
-from managers.pipeline_manager import PipelineManager
+from orchestration.pipeline_manager import PipelineManager  # Updated to use DuplicateFlow-only manager
 from managers.test_set_manager import TestSetManager
 from managers.benchmark_manager import BenchmarkManager
 from database_manager import DatabaseManager

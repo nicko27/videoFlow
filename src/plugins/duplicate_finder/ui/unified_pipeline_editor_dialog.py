@@ -33,9 +33,10 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 from src.core.logger import Logger
-from ..verification import VerificationPipeline
+from ..verification_pipeline import VerificationPipeline
 from ..orchestration.pipeline_manager import PipelineManager
 from ..infrastructure.i18n import I18n
+from ..integration import get_all_algorithms_dict
 
 logger = Logger.get_logger("DuplicateFinder.UnifiedPipelineEditor")
 
@@ -135,7 +136,9 @@ class MethodEditorDialog(QDialog):
         form = QFormLayout()
 
         self.name_combo = QComboBox()
-        for name, meta in VerificationPipeline.AVAILABLE_METHODS.items():
+        # Load algorithms from DuplicateFlow API (always fresh)
+        available_methods = get_all_algorithms_dict()
+        for name, meta in available_methods.items():
             self.name_combo.addItem(meta.get("display_name", name), userData=name)
         form.addRow(I18n.t("field_method"), self.name_combo)
 
@@ -192,7 +195,8 @@ class MethodEditorDialog(QDialog):
         self.param_fields.clear()
 
         method_key = self.name_combo.currentData()
-        meta = VerificationPipeline.AVAILABLE_METHODS.get(method_key, {})
+        available_methods = get_all_algorithms_dict()
+        meta = available_methods.get(method_key, {})
         default_params = deepcopy(meta.get("default_params", {}))
         current_params = deepcopy(self._method.get("parameters", {})) if self._method else {}
 
@@ -312,7 +316,7 @@ class UnifiedPipelineEditorDialog(QDialog):
         self.desc_edit.setMaximumHeight(80)
 
         self.mode_combo = QComboBox()
-        self.mode_combo.addItems(["filtering", "weighting", "hybrid"])
+        self.mode_combo.addItems(["filtering", "weighting", "hybrid", "staged"])
 
         self.global_threshold_spin = QDoubleSpinBox()
         self.global_threshold_spin.setRange(50.0, 99.0)
@@ -475,11 +479,12 @@ class UnifiedPipelineEditorDialog(QDialog):
 
     def _refresh_methods_list(self):
         self.methods_list.clear()
+        available_methods = get_all_algorithms_dict()
         for method in self.methods:
             status = "✅" if method.get("enabled", True) else "⏸️"
             weight = method.get("weight", 1.0)
             params = method.get("parameters", {})
-            display_name = VerificationPipeline.AVAILABLE_METHODS.get(method.get("name"), {}).get("display_name", method.get("name"))
+            display_name = available_methods.get(method.get("name"), {}).get("display_name", method.get("name"))
             item = QListWidgetItem(f"{status} {display_name} (w={weight}) – {list(params.keys())}")
             item.setData(Qt.ItemDataRole.UserRole, method)
             self.methods_list.addItem(item)
@@ -555,6 +560,7 @@ class UnifiedPipelineEditorDialog(QDialog):
 
     def _update_preview(self):
         cfg = self._build_config()
+        available_methods = get_all_algorithms_dict()
         lines = [
             f"{I18n.t('name')}: {self.name_edit.text().strip() or '<...>'}",
             f"{I18n.t('mode')}: {cfg['mode']}",
@@ -563,7 +569,7 @@ class UnifiedPipelineEditorDialog(QDialog):
             I18n.t("pipeline_methods") + ":"
         ]
         for idx, m in enumerate(cfg["methods"], 1):
-            disp = VerificationPipeline.AVAILABLE_METHODS.get(m["name"], {}).get("display_name", m["name"])
+            disp = available_methods.get(m["name"], {}).get("display_name", m["name"])
             params = ", ".join([f"{k}={v}" for k, v in m.get("parameters", {}).items()])
             lines.append(f"  {idx}. {disp} (w={m.get('weight',1.0)}, on={m.get('enabled', True)}) [{params}]")
         if cfg.get("confirmation"):

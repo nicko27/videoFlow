@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from managers.unified_config_manager import UnifiedConfigManager
-from managers.pipeline_manager import PipelineManager
+from orchestration.pipeline_manager import PipelineManager  # Updated to use DuplicateFlow-only manager
 from managers.test_set_manager import TestSetManager
 from managers.benchmark_manager import BenchmarkManager
 from managers.progress_manager import ProgressManager

@@ -1,0 +1,2189 @@
+{
+  "testset": "default",
+  "pipeline": "multimodal",
+  "timestamp": "2025-12-18T12:34:53.132958",
+  "processed_count": 10,
+  "remaining_count": 110,
+  "metrics": {
+    "tp": 0,
+    "fp": 0,
+    "tn": 10,
+    "fn": 0,
+    "errors": 0
+  },
+  "elapsed_time": 1928.2002651691437,
+  "processed_pairs": [
+    {
+      "pair_id": 605,
+      "video1": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "video2": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "expected": "negative",
+      "score": 28.305874786431396,
+      "is_match": "False",
+      "classification": "tn",
+      "time_seconds": 227.5678551197052,
+      "status": "success",
+      "metadata": {
+        "individual_results": [
+          {
+            "algorithm": "frame_hash",
+            "similarity": 49.560546875,
+            "accepted": false,
+            "weight": 0.1,
+            "metadata": {
+              "num_hashes_1": 8,
+              "num_hashes_2": 8,
+              "num_comparisons": 64,
+              "min_similarity": 34.375,
+              "max_similarity": 67.1875
+            }
+          },
+          {
+            "algorithm": "color_histogram",
+            "similarity": 25.164007784583077,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "num_hists_1": 5,
+              "num_hists_2": 5,
+              "num_comparisons": 25,
+              "min_similarity": 0.0,
+              "max_similarity": 99.99999987282902
+            }
+          },
+          {
+            "algorithm": "motion_analysis",
+            "similarity": 0.0,
+            "accepted": false,
+            "weight": 0.15,
+            "metadata": {
+              "len_1": 1685,
+              "len_2": 893,
+              "std_1": 14.563179016113281,
+              "std_2": 7.975815773010254,
+              "static_1": "False",
+              "static_2": "False"
+            }
+          },
+          {
+            "algorithm": "feature_matching",
+            "similarity": 0.7779317892954513,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 481,
+              "num_frames_2": 266,
+              "num_comparisons": 127946,
+              "avg_matches": 2.573171494224126,
+              "min_match_ratio": 0.0,
+              "max_match_ratio": 27.586206896551722,
+              "detector": "ORB"
+            }
+          },
+          {
+            "algorithm": "ssim",
+            "similarity": 0.20312807688514428,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 149,
+              "num_frames_2": 149,
+              "num_comparisons": 22201,
+              "min_similarity": 0.0002901329928233349,
+              "max_similarity": 0.9999981426709186,
+              "avg_similarity_percent": 20.31280768851443
+            }
+          },
+          {
+            "algorithm": "audio_spectrum",
+            "similarity": 96.89503479003906,
+            "accepted": true,
+            "weight": 0.2,
+            "metadata": {
+              "num_spectra_1": 10,
+              "num_spectra_2": 10,
+              "norm_1": 13.572054862976074,
+              "norm_2": 25.817604064941406
+            }
+          }
+        ]
+      }
+    },
+    {
+      "pair_id": 606,
+      "video1": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "video2": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "expected": "negative",
+      "score": 28.75680533232904,
+      "is_match": "False",
+      "classification": "tn",
+      "time_seconds": 391.70699882507324,
+      "status": "success",
+      "metadata": {
+        "individual_results": [
+          {
+            "algorithm": "frame_hash",
+            "similarity": 49.072265625,
+            "accepted": false,
+            "weight": 0.1,
+            "metadata": {
+              "num_hashes_1": 8,
+              "num_hashes_2": 8,
+              "num_comparisons": 64,
+              "min_similarity": 39.0625,
+              "max_similarity": 62.5
+            }
+          },
+          {
+            "algorithm": "color_histogram",
+            "similarity": 25.15340977069948,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "num_hists_1": 5,
+              "num_hists_2": 5,
+              "num_comparisons": 25,
+              "min_similarity": 0.0,
+              "max_similarity": 99.99998828750438
+            }
+          },
+          {
+            "algorithm": "motion_analysis",
+            "similarity": 0.0,
+            "accepted": false,
+            "weight": 0.15,
+            "metadata": {
+              "len_1": 1685,
+              "len_2": 892,
+              "std_1": 14.563179016113281,
+              "std_2": 7.60183572769165,
+              "static_1": "False",
+              "static_2": "False"
+            }
+          },
+          {
+            "algorithm": "feature_matching",
+            "similarity": 0.8860093571710919,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 481,
+              "num_frames_2": 266,
+              "num_comparisons": 127946,
+              "avg_matches": 2.9036390352179824,
+              "min_match_ratio": 0.0,
+              "max_match_ratio": 27.27272727272727,
+              "detector": "ORB"
+            }
+          },
+          {
+            "algorithm": "ssim",
+            "similarity": 0.20633796717214914,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 149,
+              "num_frames_2": 149,
+              "num_comparisons": 22201,
+              "min_similarity": 0.0002485480540329745,
+              "max_similarity": 0.9953275090464997,
+              "avg_similarity_percent": 20.633796717214913
+            }
+          },
+          {
+            "algorithm": "audio_spectrum",
+            "similarity": 99.29048919677734,
+            "accepted": true,
+            "weight": 0.2,
+            "metadata": {
+              "num_spectra_1": 10,
+              "num_spectra_2": 10,
+              "norm_1": 13.572054862976074,
+              "norm_2": 14.33465576171875
+            }
+          }
+        ]
+      }
+    },
+    {
+      "pair_id": 607,
+      "video1": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "video2": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "negative",
+      "score": 25.079563121513747,
+      "is_match": "False",
+      "classification": "tn",
+      "time_seconds": 419.57199716567993,
+      "status": "success",
+      "metadata": {
+        "individual_results": [
+          {
+            "algorithm": "frame_hash",
+            "similarity": 55.126953125,
+            "accepted": false,
+            "weight": 0.1,
+            "metadata": {
+              "num_hashes_1": 8,
+              "num_hashes_2": 8,
+              "num_comparisons": 64,
+              "min_similarity": 39.0625,
+              "max_similarity": 79.6875
+            }
+          },
+          {
+            "algorithm": "color_histogram",
+            "similarity": 0.41465295138734104,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "num_hists_1": 5,
+              "num_hists_2": 5,
+              "num_comparisons": 25,
+              "min_similarity": 0.0,
+              "max_similarity": 2.3232486957876066
+            }
+          },
+          {
+            "algorithm": "motion_analysis",
+            "similarity": 0.0,
+            "accepted": false,
+            "weight": 0.15,
+            "metadata": {
+              "len_1": 1685,
+              "len_2": 2691,
+              "std_1": 14.563179016113281,
+              "std_2": 10.90848159790039,
+              "static_1": "False",
+              "static_2": "False"
+            }
+          },
+          {
+            "algorithm": "feature_matching",
+            "similarity": 1.0714095062395996,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 481,
+              "num_frames_2": 790,
+              "num_comparisons": 379990,
+              "avg_matches": 3.5545698571015025,
+              "min_match_ratio": 0.0,
+              "max_match_ratio": 38.46153846153847,
+              "detector": "ORB"
+            }
+          },
+          {
+            "algorithm": "ssim",
+            "similarity": 0.23812604355034056,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 149,
+              "num_frames_2": 149,
+              "num_comparisons": 22201,
+              "min_similarity": 0.003371837823489413,
+              "max_similarity": 0.7420035146748636,
+              "avg_similarity_percent": 23.812604355034058
+            }
+          },
+          {
+            "algorithm": "audio_spectrum",
+            "similarity": 96.21381378173828,
+            "accepted": true,
+            "weight": 0.2,
+            "metadata": {
+              "num_spectra_1": 10,
+              "num_spectra_2": 10,
+              "norm_1": 13.572054862976074,
+              "norm_2": 49.18590545654297
+            }
+          }
+        ]
+      }
+    },
+    {
+      "pair_id": 608,
+      "video1": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "video2": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "expected": "negative",
+      "score": 23.926553389722923,
+      "is_match": "False",
+      "classification": "tn",
+      "time_seconds": 241.35266089439392,
+      "status": "success",
+      "metadata": {
+        "individual_results": [
+          {
+            "algorithm": "frame_hash",
+            "similarity": 52.001953125,
+            "accepted": false,
+            "weight": 0.1,
+            "metadata": {
+              "num_hashes_1": 8,
+              "num_hashes_2": 8,
+              "num_comparisons": 64,
+              "min_similarity": 31.25,
+              "max_similarity": 79.6875
+            }
+          },
+          {
+            "algorithm": "color_histogram",
+            "similarity": 0.7355092410821086,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "num_hists_1": 5,
+              "num_hists_2": 5,
+              "num_comparisons": 25,
+              "min_similarity": 0.0,
+              "max_similarity": 4.902566613258011
+            }
+          },
+          {
+            "algorithm": "motion_analysis",
+            "similarity": 0.0,
+            "accepted": false,
+            "weight": 0.15,
+            "metadata": {
+              "len_1": 1685,
+              "len_2": 826,
+              "std_1": 14.563179016113281,
+              "std_2": 11.79040241241455,
+              "static_1": "False",
+              "static_2": "False"
+            }
+          },
+          {
+            "algorithm": "feature_matching",
+            "similarity": 1.0414752287482325,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 481,
+              "num_frames_2": 241,
+              "num_comparisons": 115921,
+              "avg_matches": 3.4536624080192544,
+              "min_match_ratio": 0.0,
+              "max_match_ratio": 46.15384615384615,
+              "detector": "ORB"
+            }
+          },
+          {
+            "algorithm": "ssim",
+            "similarity": 0.23799352928917936,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 149,
+              "num_frames_2": 149,
+              "num_comparisons": 22201,
+              "min_similarity": 0.003315216870220818,
+              "max_similarity": 0.7420035146748636,
+              "avg_similarity_percent": 23.799352928917937
+            }
+          },
+          {
+            "algorithm": "audio_spectrum",
+            "similarity": 91.80068969726562,
+            "accepted": true,
+            "weight": 0.2,
+            "metadata": {
+              "num_spectra_1": 10,
+              "num_spectra_2": 10,
+              "norm_1": 13.572054862976074,
+              "norm_2": 70.32077026367188
+            }
+          }
+        ]
+      }
+    },
+    {
+      "pair_id": 609,
+      "video1": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "video2": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "score": 25.711817023852042,
+      "is_match": "False",
+      "classification": "tn",
+      "time_seconds": 231.70175695419312,
+      "status": "success",
+      "metadata": {
+        "individual_results": [
+          {
+            "algorithm": "frame_hash",
+            "similarity": 53.515625,
+            "accepted": false,
+            "weight": 0.1,
+            "metadata": {
+              "num_hashes_1": 8,
+              "num_hashes_2": 8,
+              "num_comparisons": 64,
+              "min_similarity": 35.9375,
+              "max_similarity": 67.1875
+            }
+          },
+          {
+            "algorithm": "color_histogram",
+            "similarity": 1.0003119656883763,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "num_hists_1": 5,
+              "num_hists_2": 5,
+              "num_comparisons": 25,
+              "min_similarity": 0.0,
+              "max_similarity": 5.351206086057741
+            }
+          },
+          {
+            "algorithm": "motion_analysis",
+            "similarity": 4.9774391904960895,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "len_1": 1685,
+              "len_2": 778,
+              "std_1": 14.563179016113281,
+              "std_2": 11.064271926879883,
+              "static_1": "False",
+              "static_2": "False"
+            }
+          },
+          {
+            "algorithm": "feature_matching",
+            "similarity": 1.121507754873622,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 481,
+              "num_frames_2": 227,
+              "num_comparisons": 109187,
+              "avg_matches": 3.7168985318765055,
+              "min_match_ratio": 0.0,
+              "max_match_ratio": 35.0,
+              "detector": "ORB"
+            }
+          },
+          {
+            "algorithm": "ssim",
+            "similarity": 0.23192055242400897,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 149,
+              "num_frames_2": 149,
+              "num_comparisons": 22201,
+              "min_similarity": 0.0030191110161555197,
+              "max_similarity": 0.6547407272622977,
+              "avg_similarity_percent": 23.192055242400897
+            }
+          },
+          {
+            "algorithm": "audio_spectrum",
+            "similarity": 95.96453094482422,
+            "accepted": true,
+            "weight": 0.2,
+            "metadata": {
+              "num_spectra_1": 10,
+              "num_spectra_2": 10,
+              "norm_1": 13.572054862976074,
+              "norm_2": 25.746755599975586
+            }
+          }
+        ]
+      }
+    },
+    {
+      "pair_id": 610,
+      "video1": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "video2": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "score": 24.857558811721027,
+      "is_match": "False",
+      "classification": "tn",
+      "time_seconds": 224.39279007911682,
+      "status": "success",
+      "metadata": {
+        "individual_results": [
+          {
+            "algorithm": "frame_hash",
+            "similarity": 53.955078125,
+            "accepted": false,
+            "weight": 0.1,
+            "metadata": {
+              "num_hashes_1": 8,
+              "num_hashes_2": 8,
+              "num_comparisons": 64,
+              "min_similarity": 40.625,
+              "max_similarity": 67.1875
+            }
+          },
+          {
+            "algorithm": "color_histogram",
+            "similarity": 0.9101196933171974,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "num_hists_1": 5,
+              "num_hists_2": 5,
+              "num_comparisons": 25,
+              "min_similarity": 0.0,
+              "max_similarity": 5.515094446243344
+            }
+          },
+          {
+            "algorithm": "motion_analysis",
+            "similarity": 4.210188453942146,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "len_1": 1685,
+              "len_2": 1084,
+              "std_1": 14.563179016113281,
+              "std_2": 9.756574630737305,
+              "static_1": "False",
+              "static_2": "False"
+            }
+          },
+          {
+            "algorithm": "feature_matching",
+            "similarity": 1.0891183327688982,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 481,
+              "num_frames_2": 320,
+              "num_comparisons": 153920,
+              "avg_matches": 3.6088162681912683,
+              "min_match_ratio": 0.0,
+              "max_match_ratio": 42.10526315789473,
+              "detector": "ORB"
+            }
+          },
+          {
+            "algorithm": "ssim",
+            "similarity": 0.23129312613390904,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 149,
+              "num_frames_2": 149,
+              "num_comparisons": 22201,
+              "min_similarity": 0.0032416630707981617,
+              "max_similarity": 0.5814853298087704,
+              "avg_similarity_percent": 23.129312613390905
+            }
+          },
+          {
+            "algorithm": "audio_spectrum",
+            "similarity": 92.14961242675781,
+            "accepted": true,
+            "weight": 0.2,
+            "metadata": {
+              "num_spectra_1": 10,
+              "num_spectra_2": 10,
+              "norm_1": 13.572054862976074,
+              "norm_2": 38.59170150756836
+            }
+          }
+        ]
+      }
+    },
+    {
+      "pair_id": 611,
+      "video1": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "expected": "negative",
+      "score": 30.115099820267723,
+      "is_match": "False",
+      "classification": "tn",
+      "time_seconds": 63.294734954833984,
+      "status": "success",
+      "metadata": {
+        "individual_results": [
+          {
+            "algorithm": "frame_hash",
+            "similarity": 52.294921875,
+            "accepted": false,
+            "weight": 0.1,
+            "metadata": {
+              "num_hashes_1": 8,
+              "num_hashes_2": 8,
+              "num_comparisons": 64,
+              "min_similarity": 35.9375,
+              "max_similarity": 65.625
+            }
+          },
+          {
+            "algorithm": "color_histogram",
+            "similarity": 31.994362574985285,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "num_hists_1": 5,
+              "num_hists_2": 5,
+              "num_comparisons": 25,
+              "min_similarity": 0.0,
+              "max_similarity": 99.40551932132256
+            }
+          },
+          {
+            "algorithm": "motion_analysis",
+            "similarity": 0.0,
+            "accepted": false,
+            "weight": 0.15,
+            "metadata": {
+              "len_1": 205,
+              "len_2": 271,
+              "std_1": 19.500307083129883,
+              "std_2": 11.739606857299805,
+              "static_1": "False",
+              "static_2": "False"
+            }
+          },
+          {
+            "algorithm": "feature_matching",
+            "similarity": 0.9500324854513755,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 55,
+              "num_frames_2": 75,
+              "num_comparisons": 4125,
+              "avg_matches": 3.4875151515151517,
+              "min_match_ratio": 0.0,
+              "max_match_ratio": 63.0,
+              "detector": "ORB"
+            }
+          },
+          {
+            "algorithm": "ssim",
+            "similarity": 0.1953456245896739,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 123,
+              "num_frames_2": 149,
+              "num_comparisons": 18327,
+              "min_similarity": 0.004128939003153325,
+              "max_similarity": 0.9464320596215128,
+              "avg_similarity_percent": 19.53456245896739
+            }
+          },
+          {
+            "algorithm": "audio_spectrum",
+            "similarity": 99.2868881225586,
+            "accepted": true,
+            "weight": 0.2,
+            "metadata": {
+              "num_spectra_1": 10,
+              "num_spectra_2": 10,
+              "norm_1": 13.842223167419434,
+              "norm_2": 18.581880569458008
+            }
+          }
+        ]
+      }
+    },
+    {
+      "pair_id": 612,
+      "video1": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "expected": "negative",
+      "score": 27.446951305363246,
+      "is_match": "False",
+      "classification": "tn",
+      "time_seconds": 29.875403881072998,
+      "status": "success",
+      "metadata": {
+        "individual_results": [
+          {
+            "algorithm": "frame_hash",
+            "similarity": 52.1484375,
+            "accepted": false,
+            "weight": 0.1,
+            "metadata": {
+              "num_hashes_1": 8,
+              "num_hashes_2": 8,
+              "num_comparisons": 64,
+              "min_similarity": 32.8125,
+              "max_similarity": 67.1875
+            }
+          },
+          {
+            "algorithm": "color_histogram",
+            "similarity": 13.829175473376484,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "num_hists_1": 5,
+              "num_hists_2": 5,
+              "num_comparisons": 25,
+              "min_similarity": 0.0,
+              "max_similarity": 46.501651139684476
+            }
+          },
+          {
+            "algorithm": "motion_analysis",
+            "similarity": 0.0,
+            "accepted": false,
+            "weight": 0.15,
+            "metadata": {
+              "len_1": 205,
+              "len_2": 118,
+              "std_1": 19.500307083129883,
+              "std_2": 14.791801452636719,
+              "static_1": "False",
+              "static_2": "False"
+            }
+          },
+          {
+            "algorithm": "feature_matching",
+            "similarity": 0.9910312915405574,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 55,
+              "num_frames_2": 34,
+              "num_comparisons": 1870,
+              "avg_matches": 3.483957219251337,
+              "min_match_ratio": 0.0,
+              "max_match_ratio": 18.75,
+              "detector": "ORB"
+            }
+          },
+          {
+            "algorithm": "ssim",
+            "similarity": 0.2104437889347133,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 123,
+              "num_frames_2": 71,
+              "num_comparisons": 8733,
+              "min_similarity": 0.0003650619152168535,
+              "max_similarity": 1.0,
+              "avg_similarity_percent": 21.04437889347133
+            }
+          },
+          {
+            "algorithm": "audio_spectrum",
+            "similarity": 99.5871810913086,
+            "accepted": true,
+            "weight": 0.2,
+            "metadata": {
+              "num_spectra_1": 10,
+              "num_spectra_2": 10,
+              "norm_1": 13.842223167419434,
+              "norm_2": 12.172551155090332
+            }
+          }
+        ]
+      }
+    },
+    {
+      "pair_id": 613,
+      "video1": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "expected": "negative",
+      "score": 30.857309815327774,
+      "is_match": "False",
+      "classification": "tn",
+      "time_seconds": 49.56347966194153,
+      "status": "success",
+      "metadata": {
+        "individual_results": [
+          {
+            "algorithm": "frame_hash",
+            "similarity": 54.39453125,
+            "accepted": false,
+            "weight": 0.1,
+            "metadata": {
+              "num_hashes_1": 8,
+              "num_hashes_2": 8,
+              "num_comparisons": 64,
+              "min_similarity": 35.9375,
+              "max_similarity": 68.75
+            }
+          },
+          {
+            "algorithm": "color_histogram",
+            "similarity": 34.7407899455719,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "num_hists_1": 5,
+              "num_hists_2": 5,
+              "num_comparisons": 25,
+              "min_similarity": 0.0,
+              "max_similarity": 92.50613646576157
+            }
+          },
+          {
+            "algorithm": "motion_analysis",
+            "similarity": 0.0,
+            "accepted": false,
+            "weight": 0.15,
+            "metadata": {
+              "len_1": 205,
+              "len_2": 198,
+              "std_1": 19.500307083129883,
+              "std_2": 13.780329704284668,
+              "static_1": "False",
+              "static_2": "False"
+            }
+          },
+          {
+            "algorithm": "feature_matching",
+            "similarity": 0.9100838299299088,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 55,
+              "num_frames_2": 59,
+              "num_comparisons": 3245,
+              "avg_matches": 3.2813559322033896,
+              "min_match_ratio": 0.0,
+              "max_match_ratio": 11.320754716981133,
+              "detector": "ORB"
+            }
+          },
+          {
+            "algorithm": "ssim",
+            "similarity": 0.2110858002253363,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 123,
+              "num_frames_2": 119,
+              "num_comparisons": 14637,
+              "min_similarity": 0.000492474475326001,
+              "max_similarity": 0.9924690886256925,
+              "avg_similarity_percent": 21.10858002253363
+            }
+          },
+          {
+            "algorithm": "audio_spectrum",
+            "similarity": 99.91252136230469,
+            "accepted": true,
+            "weight": 0.2,
+            "metadata": {
+              "num_spectra_1": 10,
+              "num_spectra_2": 10,
+              "norm_1": 13.842223167419434,
+              "norm_2": 15.111455917358398
+            }
+          }
+        ]
+      }
+    },
+    {
+      "pair_id": 614,
+      "video1": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "expected": "negative",
+      "score": 29.08757339347006,
+      "is_match": "False",
+      "classification": "tn",
+      "time_seconds": 49.17162609100342,
+      "status": "success",
+      "metadata": {
+        "individual_results": [
+          {
+            "algorithm": "frame_hash",
+            "similarity": 54.58984375,
+            "accepted": false,
+            "weight": 0.1,
+            "metadata": {
+              "num_hashes_1": 8,
+              "num_hashes_2": 8,
+              "num_comparisons": 64,
+              "min_similarity": 43.75,
+              "max_similarity": 67.1875
+            }
+          },
+          {
+            "algorithm": "color_histogram",
+            "similarity": 9.956563448356807,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "num_hists_1": 5,
+              "num_hists_2": 5,
+              "num_comparisons": 25,
+              "min_similarity": 0.0,
+              "max_similarity": 36.47610396344888
+            }
+          },
+          {
+            "algorithm": "motion_analysis",
+            "similarity": 13.942127315062066,
+            "accepted": "False",
+            "weight": 0.15,
+            "metadata": {
+              "len_1": 205,
+              "len_2": 198,
+              "std_1": 19.500307083129883,
+              "std_2": 10.961553573608398,
+              "static_1": "False",
+              "static_2": "False"
+            }
+          },
+          {
+            "algorithm": "feature_matching",
+            "similarity": 1.0746498142611083,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 55,
+              "num_frames_2": 56,
+              "num_comparisons": 3080,
+              "avg_matches": 3.8392857142857144,
+              "min_match_ratio": 0.0,
+              "max_match_ratio": 31.25,
+              "detector": "ORB"
+            }
+          },
+          {
+            "algorithm": "ssim",
+            "similarity": 0.23553239351328883,
+            "accepted": false,
+            "weight": 0.2,
+            "metadata": {
+              "num_frames_1": 123,
+              "num_frames_2": 119,
+              "num_comparisons": 14637,
+              "min_similarity": 0.0019657478471033067,
+              "max_similarity": 0.7540314629916877,
+              "avg_similarity_percent": 23.553239351328884
+            }
+          },
+          {
+            "algorithm": "audio_spectrum",
+            "similarity": 98.90874481201172,
+            "accepted": true,
+            "weight": 0.2,
+            "metadata": {
+              "num_spectra_1": 10,
+              "num_spectra_2": 10,
+              "norm_1": 13.842223167419434,
+              "norm_2": 15.471654891967773
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "remaining_pairs": [
+    {
+      "id": 615,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 616,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 617,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 618,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 619,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 620,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 621,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 622,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 623,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 624,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 625,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 626,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 627,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 628,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 629,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 630,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 631,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 632,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 633,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 634,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 635,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 636,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 637,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 638,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 639,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 640,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 641,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 642,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 643,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 644,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 645,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 646,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 647,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 648,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 649,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 650,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 651,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 652,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 653,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 654,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 655,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 656,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 657,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 658,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 659,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 660,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 661,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 662,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 663,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 664,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 665,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 666,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 667,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 668,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 669,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 670,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 671,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 672,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 673,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 674,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 675,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 676,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 677,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 678,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 679,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 680,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 681,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 682,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 683,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 684,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 685,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 686,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 687,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 688,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 689,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 690,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 691,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 692,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 693,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 694,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 695,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 696,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 697,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 698,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 699,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 700,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 701,
+      "video1_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 702,
+      "video1_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 703,
+      "video1_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 704,
+      "video1_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 705,
+      "video1_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 706,
+      "video1_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 707,
+      "video1_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 708,
+      "video1_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 709,
+      "video1_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 710,
+      "video1_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 711,
+      "video1_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "expected": "negative",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "Auto-généré par expansion",
+      "created_at": "2025-12-17 16:12:59"
+    },
+    {
+      "id": 592,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    },
+    {
+      "id": 593,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    },
+    {
+      "id": 594,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_3.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    },
+    {
+      "id": 595,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_4.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    },
+    {
+      "id": 596,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_5.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    },
+    {
+      "id": 597,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_6.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    },
+    {
+      "id": 598,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_7.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    },
+    {
+      "id": 599,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_8.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    },
+    {
+      "id": 600,
+      "video1_path": "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Das Monster und die Schone.mp4",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    },
+    {
+      "id": 601,
+      "video1_path": "/Users/nico/Downloads/tests/Greek gives into Monster Asian Cock 6th.mp4",
+      "video2_path": "/Users/nico/Downloads/tests/Legit Greek RMT 6th Appointment Full.mp4",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    },
+    {
+      "id": 602,
+      "video1_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_debut.avi",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    },
+    {
+      "id": 603,
+      "video1_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_fin.avi",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    },
+    {
+      "id": 604,
+      "video1_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5_milieu.avi",
+      "video2_path": "/Users/nico/Downloads/tests/Rocco's Initiations 5.avi",
+      "expected": "scene_found",
+      "start_time": 0.0,
+      "duration": null,
+      "sequence_score": 100.0,
+      "notes": "",
+      "created_at": "2025-12-17 16:12:47"
+    }
+  ]
+}

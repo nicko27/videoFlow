@@ -49,7 +49,7 @@ try:
     from .infrastructure.config.layouts import LayoutManager, LayoutType
     from .detection.audio import AudioFingerprintDetector, PrecisionMode
     from .ui.dialogs.advanced_progress_dialog import AdvancedProgressDialog
-    from .detection.hybrid.advanced_pipeline import AdvancedDuplicatePipeline
+    from .analysis.advanced_pipeline import AdvancedDuplicatePipeline
 except ImportError:
     # Fallback for direct imports
     from .detection.video import VideoHasher
@@ -62,6 +62,7 @@ except ImportError:
     from .ui.batch_queue_widget import BatchQueueWidget
     from .ui.cluster_view_dialog import ClusterViewDialog
     from .ui.report_dialog import ReportDialog
+    from .ui.themes import Theme, ThemeType
     from .controllers.batch_controller import BatchController, get_batch_controller
     from .analysis.cluster_detector import detect_clusters_from_db
     from .infrastructure.config.settings_manager import SettingsManager
@@ -77,7 +78,7 @@ except ImportError:
     from .infrastructure.config.layouts import LayoutManager, LayoutType
     from .detection.audio import AudioFingerprintDetector, PrecisionMode
     from .ui.dialogs.advanced_progress_dialog import AdvancedProgressDialog
-    from .detection.hybrid.advanced_pipeline import AdvancedDuplicatePipeline
+    from .analysis.advanced_pipeline import AdvancedDuplicatePipeline
 
 from src.core.logger import Logger
 from src.core.i18n import t
@@ -1726,14 +1727,14 @@ class DuplicateFinderWindow(QMainWindow):
 
     def _start_scene_verification(self, scenes: list) -> None:
         """
-        Start verification of detected scenes using Strategy 3.
+        Start verification of detected scenes using VerificationPipeline.
 
         Args:
             scenes: List of scene detection results to verify
         """
         try:
             from .processing.workers.verification_worker import VerificationWorker
-            from .analysis.subsequence_verification import SubsequenceVerificationMethods
+            from .verification_pipeline import VerificationPipeline
 
             # Get verification parameters from config
             config = self.get_analysis_config()
@@ -1741,12 +1742,15 @@ class DuplicateFinderWindow(QMainWindow):
             sequence_threshold = config.get('subseq_sequence_threshold', 95.0)
             workers = config.get('subseq_verification_workers', 2)
 
-            # Create verifier
-            verifier = SubsequenceVerificationMethods(
-                dct_threshold=dct_threshold,
-                sequence_threshold=sequence_threshold,
-                max_workers=workers
+            # Create verification pipeline (replaces old SubsequenceVerificationMethods)
+            verifier = VerificationPipeline(
+                db_manager=self.video_hasher.db,
+                max_workers=workers,
+                mode='filtering'
             )
+            # Add DuplicateFlow algorithms for verification
+            verifier.add_method('dct_perceptual', enabled=True, parameters={'threshold': dct_threshold})
+            verifier.add_method('temporal_consistency', enabled=True, parameters={'threshold': sequence_threshold})
 
             # Create worker
             self.verification_worker = VerificationWorker(

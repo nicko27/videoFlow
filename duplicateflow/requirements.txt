@@ -1,0 +1,19 @@
+# DuplicateFlow - Core Requirements (Minimal Installation)
+# This installs the 9 core algorithms
+
+# Core dependencies
+numpy>=1.24.0
+opencv-python>=4.8.0
+scipy>=1.10.0
+scikit-image>=0.22.0
+imagehash>=4.3.0
+
+# CLI and Progress
+click>=8.1.0
+tqdm>=4.66.0
+pydantic>=2.5.0
+pyyaml>=6.0
+colorama>=0.4.6
+
+# Storage
+# (sqlite3 is included in Python stdlib)

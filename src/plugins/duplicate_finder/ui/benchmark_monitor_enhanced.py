@@ -360,6 +360,7 @@ class EnhancedBenchmarkMonitor(QDialog):
 
         self.start_time = None
         self.pipeline_cards = {}
+        self.pipelines = {}  # {pipeline_name: {'results': [], 'config': {}, ...}}
         self.method_stats = {}  # {method_name: {'calls': 0, 'total_time': 0}}
 
         self.init_ui()
@@ -659,6 +660,7 @@ class EnhancedBenchmarkMonitor(QDialog):
             }
         """)
         self.export_btn.setEnabled(False)
+        self.export_btn.clicked.connect(self.on_export_clicked)
         buttons_layout.addWidget(self.export_btn)
 
         buttons_layout.addStretch()
@@ -1194,6 +1196,115 @@ class EnhancedBenchmarkMonitor(QDialog):
         self.add_log("WARN", "Stop requested by user")
         self.status_label.setText("Status: 🛑 Stopping...")
         self.stop_requested.emit()
+
+    def add_result(self, pipeline_name: str, result: dict):
+        """
+        Enregistre un résultat de comparaison pour un pipeline.
+
+        Args:
+            pipeline_name: Nom du pipeline
+            result: Résultat de la comparaison avec classification (tp/fp/tn/fn)
+        """
+        if pipeline_name not in self.pipelines:
+            self.pipelines[pipeline_name] = {'results': [], 'config': {}}
+
+        if 'results' not in self.pipelines[pipeline_name]:
+            self.pipelines[pipeline_name]['results'] = []
+
+        self.pipelines[pipeline_name]['results'].append(result)
+
+    def on_export_clicked(self):
+        """Gère le clic sur Export Results."""
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+        import json
+
+        # Demander où sauvegarder le fichier
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export Benchmark Results",
+            "benchmark_results.json",
+            "JSON Files (*.json);;All Files (*)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            # Collecter les résultats depuis les pipelines
+            all_results = []
+
+            # Pour chaque pipeline, récupérer ses résultats
+            for pipeline_name, pipeline_data in self.pipelines.items():
+                if 'results' in pipeline_data:
+                    all_results.extend(pipeline_data['results'])
+
+            if not all_results:
+                QMessageBox.warning(
+                    self,
+                    "No Results",
+                    "No benchmark results available to export.\n\n"
+                    "Tip: Results must be collected during benchmark execution.\n"
+                    "Make sure the benchmark runner calls add_result() for each comparison."
+                )
+                self.add_log("WARN", "No results to export")
+                return
+
+            # Calculer les statistiques
+            tp = sum(1 for r in all_results if r.get('classification') == 'tp')
+            fp = sum(1 for r in all_results if r.get('classification') == 'fp')
+            tn = sum(1 for r in all_results if r.get('classification') == 'tn')
+            fn = sum(1 for r in all_results if r.get('classification') == 'fn')
+
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+            accuracy = (tp + tn) / len(all_results) if all_results else 0.0
+
+            # Créer la structure d'export
+            export_data = {
+                'metadata': {
+                    'timestamp': datetime.now().isoformat(),
+                    'total_pairs': len(all_results),
+                    'execution_time_seconds': time.time() - self.start_time if self.start_time else 0
+                },
+                'summary': {
+                    'confusion_matrix': {
+                        'tp': tp,
+                        'fp': fp,
+                        'tn': tn,
+                        'fn': fn
+                    },
+                    'metrics': {
+                        'precision': round(precision, 4),
+                        'recall': round(recall, 4),
+                        'f1_score': round(f1, 4),
+                        'accuracy': round(accuracy, 4)
+                    }
+                },
+                'pipelines': self.pipelines,
+                'results': all_results
+            }
+
+            # Écrire le fichier JSON
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(export_data, f, indent=2, ensure_ascii=False)
+
+            self.add_log("INFO", f"Results exported to {file_path}")
+            QMessageBox.information(
+                self,
+                "Export Complete",
+                f"Results successfully exported to:\n{file_path}\n\n"
+                f"TP={tp} FP={fp} TN={tn} FN={fn}\n"
+                f"Precision={precision:.2%} Recall={recall:.2%} F1={f1:.2%}"
+            )
+
+        except Exception as e:
+            self.add_log("ERROR", f"Export failed: {e}")
+            QMessageBox.critical(
+                self,
+                "Export Failed",
+                f"Failed to export results:\n{str(e)}"
+            )
 
     def start_benchmark(self):
         """Démarre le benchmark (appelé de l'extérieur)."""

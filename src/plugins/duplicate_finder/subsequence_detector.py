@@ -11,7 +11,7 @@ from typing import Optional, Tuple, List, Dict
 from .video_hasher import VideoHasher
 from .database_manager import VideoDatabase
 from .lru_cache import MemoryBoundedLRUCache
-from .analysis.subsequence_verification import SubsequenceVerificationMethods
+# Removed: from .analysis.subsequence_verification import SubsequenceVerificationMethods (obsolete)
 from src.core.logger import Logger
 
 logger = Logger.get_logger('DuplicateFinder.SubsequenceDetector')
@@ -122,25 +122,17 @@ class SubsequenceDetector:
         self.enable_verification = self.enable_phase2
 
         # Initialize verification methods
-        # Use pipeline if provided, otherwise fall back to old Phase 2 system
+        # Use pipeline if provided (old Phase 2 system removed - use VerificationPipeline instead)
+        self.verifier = None  # Obsolete - always use verification_pipeline
         if self.verification_pipeline is not None:
-            self.verifier = None  # Pipeline replaces verifier
             logger.info(f"SubsequenceDetector initialized with VerificationPipeline: "
                        f"{len(self.verification_pipeline.methods)} methods configured, "
                        f"{sample_interval_seconds}s intervals, {max_cache_memory_mb}MB cache, "
                        f"{min_match_ratio*100}% min match")
-        elif self.enable_phase2:
-            self.verifier = SubsequenceVerificationMethods(
-                dct_threshold=verification_dct_threshold,
-                sequence_threshold=verification_sequence_threshold,
-                max_workers=verification_workers
-            )
-            logger.info(f"SubsequenceDetector initialized: Phase1={phase1_method if enable_phase1 else 'disabled'}, "
-                       f"Phase2={phase2_method if self.enable_phase2 else 'disabled'}, "
-                       f"{sample_interval_seconds}s intervals, {max_cache_memory_mb}MB cache, "
-                       f"{min_match_ratio*100}% min match")
         else:
-            self.verifier = None
+            logger.warning(f"SubsequenceDetector initialized WITHOUT verification pipeline! "
+                          f"Phase 2 verification will be skipped. "
+                          f"Please provide a verification_pipeline parameter.")
             logger.info(f"SubsequenceDetector initialized (no verification): "
                        f"{sample_interval_seconds}s intervals, {max_cache_memory_mb}MB cache, "
                        f"{min_match_ratio*100}% min match")

@@ -22,7 +22,7 @@ from ..infrastructure.config.design_system import get_current_theme
 from ..validators import ConfigValidator
 from src.core.i18n import t
 import cv2
-from ..verification import VerificationPipeline
+from ..verification_pipeline import VerificationPipeline
 from ..data import DatabaseManager
 from .benchmark_widgets import BenchmarkTabWidget
 

@@ -1,0 +1,13 @@
+# DuplicateFlow - Audio Algorithms Requirements
+# Install with: pip install -r requirements-audio.txt
+# This adds 3 audio algorithms (total: 12 algorithms)
+
+# Audio processing
+librosa>=0.10.0
+soundfile>=0.12.0
+audioread>=3.0.0
+
+# Note: fpcalc (Chromaprint CLI) must be installed separately:
+# - Ubuntu/Debian: sudo apt-get install libchromaprint-tools
+# - macOS: brew install chromaprint
+# - Windows: Download from https://acoustid.org/chromaprint

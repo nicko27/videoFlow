@@ -1557,11 +1557,12 @@ class TestSetEditorWidget(QWidget):
 
         # Pairs table
         self.pairs_table = QTableWidget()
-        self.pairs_table.setColumnCount(6)
-        self.pairs_table.setHorizontalHeaderLabels(["ID", "Vidéo 1", "Vidéo 2", "Attendu", "Notes", "Actions"])
+        self.pairs_table.setColumnCount(7)
+        self.pairs_table.setHorizontalHeaderLabels(["ID", "Vidéo 1", "Vidéo 2", "Type", "Changer Type", "Notes", "Actions"])
         self.pairs_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.pairs_table.horizontalHeader().setStretchLastSection(False)
-        self.pairs_table.setColumnWidth(5, 100)  # Actions column width
+        self.pairs_table.setColumnWidth(4, 250)  # Change type buttons column width
+        self.pairs_table.setColumnWidth(6, 80)  # Actions column width
         layout.addWidget(self.pairs_table)
 
         # Load test sets
@@ -1592,27 +1593,51 @@ class TestSetEditorWidget(QWidget):
             self.pairs_table.setItem(row, 1, QTableWidgetItem(os.path.basename(pair['video1_path'])))
             self.pairs_table.setItem(row, 2, QTableWidgetItem(os.path.basename(pair['video2_path'])))
             self.pairs_table.setItem(row, 3, QTableWidgetItem(pair['expected']))
-            self.pairs_table.setItem(row, 4, QTableWidgetItem(pair['notes'] or ''))
 
-            # Actions buttons
+            # Quick type change buttons
+            type_widget = QWidget()
+            type_layout = QHBoxLayout(type_widget)
+            type_layout.setContentsMargins(2, 2, 2, 2)
+            type_layout.setSpacing(2)
+
+            # Define type buttons with emojis and labels
+            type_buttons = [
+                ("✅ Positif", "positive", "#4CAF50"),
+                ("❌ Négatif", "negative", "#F44336"),
+                ("❓ Inconnu", "unknown", "#FF9800"),
+            ]
+
+            for label, type_value, color in type_buttons:
+                btn = QPushButton(label)
+                btn.setMaximumHeight(25)
+                # Highlight current type
+                if pair['expected'] == type_value or \
+                   (type_value == 'positive' and pair['expected'] in ['scene_found', 'duplicate']) or \
+                   (type_value == 'negative' and pair['expected'] in ['scene_not_found', 'not_duplicate']):
+                    btn.setStyleSheet(f"background-color: {color}; color: white; font-weight: bold;")
+                else:
+                    btn.setStyleSheet("background-color: #E0E0E0;")
+                btn.setToolTip(f"Changer en {label}")
+                btn.clicked.connect(lambda checked, p=pair, t=type_value: self._change_pair_type_direct(p, t))
+                type_layout.addWidget(btn)
+
+            self.pairs_table.setCellWidget(row, 4, type_widget)
+
+            self.pairs_table.setItem(row, 5, QTableWidgetItem(pair['notes'] or ''))
+
+            # Actions buttons (only delete now)
             actions_widget = QWidget()
             actions_layout = QHBoxLayout(actions_widget)
             actions_layout.setContentsMargins(2, 2, 2, 2)
             actions_layout.setSpacing(2)
 
-            edit_btn = QPushButton("✏️")
-            edit_btn.setMaximumWidth(30)
-            edit_btn.setToolTip("Modifier cette paire")
-            edit_btn.clicked.connect(lambda checked, p=pair: self._on_edit_pair(p))
-            actions_layout.addWidget(edit_btn)
-
             delete_btn = QPushButton("🗑️")
             delete_btn.setMaximumWidth(30)
             delete_btn.setToolTip("Supprimer cette paire")
-            delete_btn.clicked.connect(lambda checked, p=pair: self._on_delete_pair(p))
+            delete_btn.clicked.connect(lambda checked, p=pair: self._on_delete_pair_direct(p))
             actions_layout.addWidget(delete_btn)
 
-            self.pairs_table.setCellWidget(row, 5, actions_widget)
+            self.pairs_table.setCellWidget(row, 6, actions_widget)
 
         # Update stats
         stats = self.test_set_manager.get_stats(test_set_name)
@@ -1744,8 +1769,34 @@ class TestSetEditorWidget(QWidget):
                 QMessageBox.critical(self, "Erreur", f"Erreur lors de l'enrichissement:\n{str(e)}")
                 logger.error(f"Test set negatives enrichment error: {e}", exc_info=True)
 
+    def _change_pair_type_direct(self, pair: dict, new_type: str):
+        """Change pair type directly without confirmation."""
+        success = self.test_set_manager.update_test_pair(
+            pair_id=pair['id'],
+            expected=new_type
+        )
+
+        if success:
+            # Refresh the table
+            test_set_name = self.test_set_combo.currentText()
+            self._on_test_set_changed(test_set_name)
+            logger.info(f"Pair {pair['id']} type changed to {new_type}")
+        else:
+            QMessageBox.warning(self, "Erreur", "Échec de la modification")
+
+    def _on_delete_pair_direct(self, pair: dict):
+        """Delete a specific pair directly without confirmation."""
+        success = self.test_set_manager.delete_test_pair(pair['id'])
+        if success:
+            # Refresh the table
+            test_set_name = self.test_set_combo.currentText()
+            self._on_test_set_changed(test_set_name)
+            logger.info(f"Pair {pair['id']} deleted")
+        else:
+            QMessageBox.warning(self, "Erreur", "Échec de la suppression")
+
     def _on_delete_pair(self, pair: dict):
-        """Delete a specific pair."""
+        """Delete a specific pair (old method with confirmation - kept for compatibility)."""
         reply = QMessageBox.question(
             self, "Confirmation",
             f"Supprimer la paire:\n{os.path.basename(pair['video1_path'])} ↔ {os.path.basename(pair['video2_path'])} ?",

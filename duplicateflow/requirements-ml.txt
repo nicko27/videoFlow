@@ -1,0 +1,9 @@
+# DuplicateFlow - ML Algorithms Requirements
+# Install with: pip install -r requirements-ml.txt
+# This adds 4 lightweight ML algorithms (total: 16 algorithms)
+
+# Wavelet transforms
+pywt>=1.4.0
+
+# Note: Other ML algorithms (NCD, HOG, MS-SSIM) use dependencies already
+# included in requirements.txt (scipy, scikit-image)

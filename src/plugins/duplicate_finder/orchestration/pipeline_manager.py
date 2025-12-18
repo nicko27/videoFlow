@@ -6,271 +6,32 @@ from typing import Dict, List, Optional
 from datetime import datetime
 from src.core.logger import Logger
 
+# Import DuplicateFlow presets
+try:
+    from ..integration import get_duplicateflow_presets, DUPLICATEFLOW_AVAILABLE
+except ImportError:
+    DUPLICATEFLOW_AVAILABLE = False
+
+    def get_duplicateflow_presets():
+        return {}
+
 logger = Logger.get_logger('DuplicateFinder.PipelineManager')
 
 
 class PipelineManager:
     """Gestionnaire pour les pipelines de vérification sauvegardés."""
 
-    # Protocoles prédéfinis - Initialisés automatiquement au premier démarrage
-    # TOUS LES 9 ALGORITHMES DISPONIBLES + COMBINAISONS OPTIMISÉES
-    DEFAULT_PROTOCOLS = {
-        # ═══════════════════════════════════════════════════════════
-        # ALGORITHMES INDIVIDUELS (9 au total)
-        # ═══════════════════════════════════════════════════════════
-        'color_histogram': {
-            'name': '🎨 Color Histogram',
-            'description': 'Compare color distribution using histogram analysis',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'color_histogram',
-                        'enabled': True,
-                        'parameters': {'threshold': 85.0},
-                        'weight': 1.0
-                    }
-                ]
-            }
-        },
-        'edge_pattern': {
-            'name': '📐 Edge Pattern',
-            'description': 'Detect duplicates based on edge detection patterns',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'edge_pattern',
-                        'enabled': True,
-                        'parameters': {'threshold': 80.0, 'canny_low': 50, 'canny_high': 150},
-                        'weight': 1.0
-                    }
-                ]
-            }
-        },
-        'motion_analysis': {
-            'name': '🎬 Motion Analysis',
-            'description': 'Analyze motion vectors and temporal patterns',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'motion_analysis',
-                        'enabled': True,
-                        'parameters': {'correlation_threshold': 85.0, 'sample_interval': 3},
-                        'weight': 1.0
-                    }
-                ]
-            }
-        },
-        'dct_coefficients': {
-            'name': '🔢 DCT Coefficients',
-            'description': 'Use Discrete Cosine Transform for frequency domain comparison',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'dct_coefficients',
-                        'enabled': True,
-                        'parameters': {'threshold': 75.0, 'num_coeffs': 15},
-                        'weight': 1.0
-                    }
-                ]
-            }
-        },
-        'ssim': {
-            'name': '📊 SSIM',
-            'description': 'Structural Similarity Index for perceptual quality comparison',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'ssim',
-                        'enabled': True,
-                        'parameters': {'threshold': 0.85, 'search_step': 3.0, 'max_windows': 200},
-                        'weight': 1.0
-                    }
-                ]
-            }
-        },
-        'feature_matching': {
-            'name': '🔍 Feature Matching',
-            'description': 'Keypoint detection and matching (ORB/SIFT/AKAZE)',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'feature_matching',
-                        'enabled': True,
-                        'parameters': {'threshold': 70.0, 'detector': 'ORB', 'search_step': 3.0, 'max_windows': 100},
-                        'weight': 1.0
-                    }
-                ]
-            }
-        },
-        'optical_flow': {
-            'name': '🌊 Optical Flow',
-            'description': 'Analyze motion patterns using optical flow',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'optical_flow',
-                        'enabled': True,
-                        'parameters': {'threshold': 70.0, 'max_frames': 30, 'frame_step': 3, 'min_variance': 0.0},
-                        'weight': 1.0
-                    }
-                ]
-            }
-        },
-        'frame_hash': {
-            'name': '🔑 Frame Hash',
-            'description': 'Fast perceptual hashing for quick frame comparison',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'frame_hash',
-                        'enabled': True,
-                        'parameters': {'threshold': 75.0, 'hash_size': 16, 'sample_rate': 5, 'search_step': 3.0},
-                        'weight': 1.0
-                    }
-                ]
-            }
-        },
-        'strategy3': {
-            'name': '🎯 Strategy 3',
-            'description': 'Scene-based detection with subsequence matching',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'strategy3',
-                        'enabled': True,
-                        'parameters': {
-                            'scene_threshold': 50.0,
-                            'dct_threshold': 75.0,
-                            'sequence_threshold': 95.0,
-                            'num_samples': 10
-                        },
-                        'weight': 1.0
-                    }
-                ]
-            }
-        },
+    # Protocoles prédéfinis - 100% DuplicateFlow presets ONLY
+    # Native pipelines have been completely removed - DuplicateFlow handles all detection now
+    DEFAULT_PROTOCOLS = {}
 
-        # ═══════════════════════════════════════════════════════════
-        # COMBINAISONS OPTIMISÉES
-        # ═══════════════════════════════════════════════════════════
-        'combined_balanced': {
-            'name': '⚖️ Balanced Combined',
-            'description': 'Balanced mix of multiple algorithms for good accuracy',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'color_histogram',
-                        'enabled': True,
-                        'parameters': {'threshold': 85.0},
-                        'weight': 1.0
-                    },
-                    {
-                        'name': 'motion_analysis',
-                        'enabled': True,
-                        'parameters': {'correlation_threshold': 85.0, 'sample_interval': 3},
-                        'weight': 1.5
-                    },
-                    {
-                        'name': 'dct_coefficients',
-                        'enabled': True,
-                        'parameters': {'threshold': 75.0, 'num_coeffs': 15},
-                        'weight': 1.5
-                    }
-                ]
-            }
-        },
-        'high_precision': {
-            'name': '🎯 High Precision',
-            'description': 'Maximum accuracy with strict thresholds',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'color_histogram',
-                        'enabled': True,
-                        'parameters': {'threshold': 92.0},
-                        'weight': 1.5
-                    },
-                    {
-                        'name': 'motion_analysis',
-                        'enabled': True,
-                        'parameters': {'correlation_threshold': 90.0, 'sample_interval': 3},
-                        'weight': 2.0
-                    },
-                    {
-                        'name': 'dct_coefficients',
-                        'enabled': True,
-                        'parameters': {'threshold': 85.0, 'num_coeffs': 15},
-                        'weight': 2.0
-                    },
-                    {
-                        'name': 'edge_pattern',
-                        'enabled': True,
-                        'parameters': {'threshold': 85.0, 'canny_low': 50, 'canny_high': 150},
-                        'weight': 1.0
-                    }
-                ]
-            }
-        },
-        'fast_screening': {
-            'name': '⚡ Fast Screening',
-            'description': 'Quick screening with frame hash and color',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'frame_hash',
-                        'enabled': True,
-                        'parameters': {'threshold': 75.0, 'hash_size': 16, 'sample_rate': 5, 'search_step': 3.0},
-                        'weight': 1.0
-                    },
-                    {
-                        'name': 'color_histogram',
-                        'enabled': True,
-                        'parameters': {'threshold': 80.0},
-                        'weight': 0.5
-                    }
-                ]
-            }
-        },
-        'perceptual_suite': {
-            'name': '🎨 Perceptual Suite',
-            'description': 'Comprehensive perceptual analysis with SSIM and feature matching',
-            'mode': 'multiple',
-            'methods': {
-                'methods': [
-                    {
-                        'name': 'ssim',
-                        'enabled': True,
-                        'parameters': {'threshold': 0.85, 'search_step': 3.0, 'max_windows': 200},
-                        'weight': 2.0
-                    },
-                    {
-                        'name': 'feature_matching',
-                        'enabled': True,
-                        'parameters': {'threshold': 70.0, 'detector': 'ORB', 'search_step': 3.0, 'max_windows': 100},
-                        'weight': 1.5
-                    },
-                    {
-                        'name': 'color_histogram',
-                        'enabled': True,
-                        'parameters': {'threshold': 85.0},
-                        'weight': 1.0
-                    }
-                ]
-            }
-        }
-    }
+    # Load ONLY DuplicateFlow presets
+    if DUPLICATEFLOW_AVAILABLE:
+        df_presets = get_duplicateflow_presets()
+        DEFAULT_PROTOCOLS.update(df_presets)
+        logger.info(f"✅ Loaded {len(df_presets)} DuplicateFlow presets (native pipelines disabled)")
+    else:
+        logger.warning("⚠️ DuplicateFlow not available - no default pipelines loaded")
 
     def __init__(self, db_manager):
         """
@@ -382,7 +143,7 @@ class PipelineManager:
             ValueError: Si le nom existe déjà ou mode invalide
         """
         # Validation
-        if mode not in ['filtering', 'weighting', 'hybrid']:
+        if mode not in ['filtering', 'weighting', 'hybrid', 'staged']:
             raise ValueError(f"Mode invalide: {mode}")
 
         # Sérialisation (supporte désormais un seuil global)
@@ -457,7 +218,7 @@ class PipelineManager:
                 updates.append("description = ?")
                 params.append(description)
             if mode is not None:
-                if mode not in ['filtering', 'weighting', 'hybrid']:
+                if mode not in ['filtering', 'weighting', 'hybrid', 'staged']:
                     raise ValueError(f"Mode invalide: {mode}")
                 updates.append("mode = ?")
                 params.append(mode)
@@ -680,41 +441,8 @@ class PipelineManager:
     # UTILITAIRES
     # ═══════════════════════════════════════════════════════════
 
-    def get_protocol_config(self, protocol_id: str) -> Optional[Dict]:
-        """
-        Récupère la configuration d'un protocole prédéfini.
-
-        DEPRECATED: Cette méthode est conservée pour rétrocompatibilité.
-        Utiliser get_pipeline_by_name() à la place.
-
-        Args:
-            protocol_id: 'anti_fp', 'balanced', etc. (anciens identifiants)
-
-        Returns:
-            Dict avec {name, description, mode, methods} ou None
-        """
-        # Mapping des anciens protocol_id vers les noms en DB
-        protocol_name_mapping = {
-            'anti_fp': 'Anti-Faux Positifs',
-            'balanced': 'Équilibré',
-            'high_precision': 'Haute Précision',
-            'fast': 'Rapide',
-            'dct_only': 'DCT Seulement',
-            'motion_only': 'Motion Seulement',
-            'weighted_consensus': 'Consensus Pondéré',
-            're_encoded_specialist': 'Spécialiste Réencodage',
-            'ultra_permissive': 'Ultra Permissif',
-            'debug_accept_all': '🚨 DEBUG - Accepte Tout',
-            'hybrid_conservative': 'Hybride Conservateur'
-        }
-
-        protocol_name = protocol_name_mapping.get(protocol_id)
-        if not protocol_name:
-            logger.warning(f"Protocol ID inconnu: {protocol_id}")
-            return None
-
-        # Chercher dans la base de données
-        return self.get_pipeline_by_name(protocol_name)
+    # REMOVED: get_protocol_config() - Native pipeline compatibility removed
+    # Use get_pipeline_by_name() with DuplicateFlow preset names directly
 
     def create_verification_pipeline(self, pipeline_config: Dict):
         """
@@ -726,7 +454,7 @@ class PipelineManager:
         Returns:
             Instance de VerificationPipeline configurée
         """
-        from ..verification import VerificationPipeline
+        from ..verification_pipeline import VerificationPipeline
 
         mode = pipeline_config['mode']
         methods = pipeline_config['methods']

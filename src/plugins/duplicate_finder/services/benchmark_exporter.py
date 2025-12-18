@@ -241,7 +241,7 @@ class BenchmarkJSONExporter:
         for pipeline_result in results:
             for pair in pipeline_result.get('per_pair_results', []):
                 expected_raw = pair['expected']
-                expected = 'duplicate' if expected_raw in ('duplicate', 'positive') else 'not_duplicate'
+                expected = 'duplicate' if expected_raw in ('duplicate', 'positive', 'scene_found') else 'not_duplicate'
                 predicted = 'duplicate' if (pair.get('is_match') or pair.get('accepted')) else 'not_duplicate'
 
                 if expected == 'duplicate' and predicted == 'duplicate':
@@ -297,7 +297,7 @@ class BenchmarkJSONExporter:
         for pipeline_result in results:
             for result in pipeline_result.get('per_pair_results', []):
                 expected_raw = result['expected']
-                expected = 'duplicate' if expected_raw in ('duplicate', 'positive') else 'not_duplicate'
+                expected = 'duplicate' if expected_raw in ('duplicate', 'positive', 'scene_found') else 'not_duplicate'
                 predicted = 'duplicate' if (result.get('is_match') or result.get('accepted')) else 'not_duplicate'
 
                 if expected != predicted:

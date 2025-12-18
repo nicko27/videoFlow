@@ -519,6 +519,7 @@ class MultiPipelineBenchmarkWidget(QWidget):
         self.runner.hash_type_progress.connect(self.monitor_dialog.update_hash_type_progress)  # NEW: Per-algorithm
         self.runner.pipeline_progress.connect(self.monitor_dialog.update_pipeline_progress)
         self.runner.pipeline_metrics_updated.connect(self.monitor_dialog.update_metrics)
+        self.runner.pair_result_ready.connect(self.monitor_dialog.add_result)  # Collect individual results for export
 
         # Connect stop button from monitor to benchmark
         self.monitor_dialog.stop_requested.connect(self.stop_benchmark)
