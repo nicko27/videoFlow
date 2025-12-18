@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any, Callable
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer
 
 from ..workers.hash_worker import ParallelHashWorker
-from ..workers.comparison_worker import OptimizedComparisonWorker
+from ..workers.duplicateflow_worker import DuplicateFlowWorker
 from src.core.logger import Logger
 
 logger = Logger.get_logger('DuplicateFinder.AnalysisHandler')
@@ -52,15 +52,15 @@ class AnalysisHandler(QObject):
         Initialize the analysis handler.
 
         Args:
-            video_hasher: VideoHasher instance for hash operations.
+            video_hasher: VideoHasher instance for hash operations (legacy, for DB access only).
         """
         super().__init__()
-        self.video_hasher = video_hasher
+        self.video_hasher = video_hasher  # Keep for DB access only
         self.hash_worker: Optional[ParallelHashWorker] = None
-        self.comparison_worker: Optional[OptimizedComparisonWorker] = None
+        self.comparison_worker: Optional[DuplicateFlowWorker] = None
         self.start_time: Optional[float] = None
         self.failed_files: List[str] = []
-        logger.info("Analysis handler initialized")
+        logger.info("Analysis handler initialized (using DuplicateFlow for comparisons)")
 
     def start_hash_analysis(
         self,
@@ -149,12 +149,15 @@ class AnalysisHandler(QObject):
             specific_pairs: Optional list of specific (file1, file2) pairs to compare.
                           If provided, only these pairs are compared (audio-first workflow).
         """
-        # Create and configure worker
-        self.comparison_worker = OptimizedComparisonWorker(
-            files,
-            self.video_hasher,
-            config['threshold'],
-            config,
+        # Get preset from config, default to 'balanced'
+        preset = config.get('preset', 'balanced')
+        threshold = config.get('threshold', 70.0)
+
+        # Create and configure DuplicateFlow worker
+        self.comparison_worker = DuplicateFlowWorker(
+            files=files,
+            preset=preset,
+            threshold=threshold,
             specific_pairs=specific_pairs
         )
 
@@ -164,17 +167,25 @@ class AnalysisHandler(QObject):
         self.comparison_worker.error.connect(self._on_comparison_error)
 
         if duplicate_callback:
-            self.comparison_worker.duplicate_found.connect(duplicate_callback)
+            # DuplicateFlowWorker signal: duplicate_found(file1, file2, similarity, metadata)
+            # Legacy expects: duplicate_found(file1, file2, similarity)
+            # Use lambda to adapt the signature
+            self.comparison_worker.duplicate_found.connect(
+                lambda f1, f2, sim, meta: duplicate_callback(f1, f2, sim)
+            )
         if progress_callback:
             self.comparison_worker.progress.connect(progress_callback)
         if status_callback:
             self.comparison_worker.status_update.connect(status_callback)
-        if total_comparisons_callback:
-            self.comparison_worker.total_comparisons_signal.connect(total_comparisons_callback)
         if comparison_details_callback:
             self.comparison_worker.comparison_details.connect(comparison_details_callback)
 
-        logger.info(f"Starting comparison analysis: {len(files)} files")
+        # Note: DuplicateFlowWorker doesn't have total_comparisons_signal
+        # It's computed internally - emit it manually after worker creation
+        if total_comparisons_callback and hasattr(self.comparison_worker, 'total_comparisons'):
+            total_comparisons_callback(self.comparison_worker.total_comparisons)
+
+        logger.info(f"Starting DuplicateFlow comparison: {len(files)} files, preset={preset}")
         self.comparison_worker.start()
 
     def stop_analysis(self) -> None:

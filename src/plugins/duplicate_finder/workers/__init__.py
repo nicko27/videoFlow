@@ -5,13 +5,17 @@ This module contains worker threads for parallel processing.
 """
 
 from .hash_worker import ParallelHashWorker
-from .comparison_worker import OptimizedComparisonWorker
+from .duplicateflow_worker import DuplicateFlowWorker
 from .scene_worker import SceneDetectionWorker
 from .subsequence_worker import SubsequenceDetectionWorker
 
+# Backward compatibility alias
+OptimizedComparisonWorker = DuplicateFlowWorker
+
 __all__ = [
     'ParallelHashWorker',
-    'OptimizedComparisonWorker',
+    'DuplicateFlowWorker',
+    'OptimizedComparisonWorker',  # Deprecated: use DuplicateFlowWorker
     'SceneDetectionWorker',
     'SubsequenceDetectionWorker'
 ]
