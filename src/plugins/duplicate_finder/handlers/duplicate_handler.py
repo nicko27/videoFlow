@@ -31,7 +31,7 @@ class DuplicateHandler(QObject):
 
     Example:
         ```python
-        handler = DuplicateHandler(video_hasher, file_handler)
+        handler = DuplicateHandler(db_manager, file_handler)
         handler.add_duplicate(file1, file2, 95.5)
         handler.process_duplicates(parent_window, comparison_dialog_class)
         ```
@@ -42,16 +42,16 @@ class DuplicateHandler(QObject):
     subsequence_processed = pyqtSignal(str, str, str)  # short_video, long_video, action
     all_subsequences_processed = pyqtSignal()
 
-    def __init__(self, video_hasher, file_handler) -> None:
+    def __init__(self, db_manager, file_handler) -> None:
         """
         Initialize the duplicate handler.
 
         Args:
-            video_hasher: VideoHasher instance for managing duplicate data.
+            db_manager: DatabaseManager instance for database access.
             file_handler: FileHandler instance for file operations.
         """
         super().__init__()
-        self.video_hasher = video_hasher
+        self.db = db_manager
         self.file_handler = file_handler
         self.potential_duplicates: List[Tuple[str, str, float]] = []
         self.pending_subsequences: List[Tuple[str, str, dict]] = []
@@ -70,7 +70,7 @@ class DuplicateHandler(QObject):
             similarity: Similarity percentage (0-100).
         """
         self.potential_duplicates.append((file1, file2, similarity))
-        self.video_hasher.db.store_found_duplicate(file1, file2, similarity)
+        self.db.store_found_duplicate(file1, file2, similarity)
         logger.info(
             f"Duplicate added: {os.path.basename(file1)} <-> "
             f"{os.path.basename(file2)} ({similarity:.1f}%)"
@@ -240,7 +240,7 @@ class DuplicateHandler(QObject):
 
             elif choice == "ignore_perm":
                 # Permanently ignore this pair
-                self.video_hasher.add_ignored_pair(file1, file2)
+                self.db.add_ignored_pair(file1, file2)
                 logger.info(
                     f"Pair permanently ignored: {os.path.basename(file1)} <-> "
                     f"{os.path.basename(file2)}"
@@ -261,7 +261,7 @@ class DuplicateHandler(QObject):
                     "ignore_perm": "ignored_permanently",
                     "ignore_temp": "ignored_temporarily"
                 }
-                self.video_hasher.db.update_duplicate_status(
+                self.db.update_duplicate_status(
                     dup_id,
                     "processed",
                     action_map.get(choice, choice)
@@ -315,7 +315,7 @@ class DuplicateHandler(QObject):
             Number of duplicates loaded.
         """
         try:
-            pending = self.video_hasher.db.get_pending_duplicates()
+            pending = self.db.get_pending_duplicates()
             self.potential_duplicates = list(pending)
             count = len(self.potential_duplicates)
             logger.info(f"Loaded {count} pending duplicates from database")
@@ -479,7 +479,7 @@ class DuplicateHandler(QObject):
                     logger.info(f"Long video deleted: {os.path.basename(long_video)}")
 
                 # Update database
-                self.video_hasher.db.update_subsequence_status(
+                self.db.update_subsequence_status(
                     short_video_path=short_video,
                     long_video_path=long_video,
                     status="processed",
@@ -497,7 +497,7 @@ class DuplicateHandler(QObject):
                     logger.info(f"Short video deleted: {os.path.basename(short_video)}")
 
                 # Update database
-                self.video_hasher.db.update_subsequence_status(
+                self.db.update_subsequence_status(
                     short_video_path=short_video,
                     long_video_path=long_video,
                     status="processed",
@@ -512,7 +512,7 @@ class DuplicateHandler(QObject):
                 )
 
                 # Update database
-                self.video_hasher.db.update_subsequence_status(
+                self.db.update_subsequence_status(
                     short_video_path=short_video,
                     long_video_path=long_video,
                     status="processed",
@@ -534,7 +534,7 @@ class DuplicateHandler(QObject):
             Number of subsequences loaded.
         """
         try:
-            pending = self.video_hasher.db.get_pending_subsequences()
+            pending = self.db.get_pending_subsequences()
             self.pending_subsequences = []
 
             for row in pending:

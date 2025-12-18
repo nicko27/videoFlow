@@ -47,15 +47,15 @@ class AnalysisHandler(QObject):
     analysis_error = pyqtSignal(str)
     status_update = pyqtSignal(str)
 
-    def __init__(self, video_hasher) -> None:
+    def __init__(self, db_manager) -> None:
         """
         Initialize the analysis handler.
 
         Args:
-            video_hasher: VideoHasher instance for hash operations (legacy, for DB access only).
+            db_manager: DatabaseManager instance for database access.
         """
         super().__init__()
-        self.video_hasher = video_hasher  # Keep for DB access only
+        self.db = db_manager
         self.hash_worker: Optional[ParallelHashWorker] = None
         self.comparison_worker: Optional[DuplicateFlowWorker] = None
         self.start_time: Optional[float] = None
@@ -88,7 +88,7 @@ class AnalysisHandler(QObject):
         self.failed_files = []
 
         # Identify files that need processing
-        files_to_hash = [f for f in files if not self.video_hasher.has_hash(f)]
+        files_to_hash = [f for f in files if not self.db.has_video(f)]
 
         if not files_to_hash:
             logger.info("All files already cached, skipping hash computation")

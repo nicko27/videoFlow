@@ -23,7 +23,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QShortcut, QKeySequence
 
 # Import local modules (relative imports should always work in plugin context)
-from .detection.video import VideoHasher
+from ..database_manager import VideoDatabase
 from .ui.dialogs.comparison_dialog import ComparisonDialog
 from .ui.dialogs.subsequence_comparison_dialog import SubsequenceComparisonDialog
 from .ui.widgets.progress_widgets import FileListWidget
@@ -102,7 +102,7 @@ class DuplicateFinderWindow(QMainWindow):
         self._center_on_screen()
 
         # Initialize core components (video_hasher will be created after settings load)
-        self.video_hasher = None
+        self.db = None
         self.current_verification_pipeline = None  # Pipeline configured from UI
         self.current_theme = ThemeType.LIGHT  # Default theme
 
@@ -166,7 +166,7 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Create video hasher early (needed for db access in UI setup)
         # Will be recreated after loading settings if hash method differs
-        self.video_hasher = VideoHasher(method='pHash')
+        self.db = VideoDatabase()
 
         # Setup UI
         self.setup_ui()
@@ -176,8 +176,8 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Recreate video hasher with selected method if different
         hash_method = self.hash_method_combo.currentData() if self.hash_method_combo else 'pHash'
-        if hash_method != self.video_hasher.method:
-            self.video_hasher = VideoHasher(method=hash_method)
+        # Hash method no longer checked (DuplicateFlow handles hashing)
+            self.db = VideoDatabase()
 
         # Set video hasher on hash debugger widget
         if self.hash_debugger_v2:
@@ -474,7 +474,7 @@ class DuplicateFinderWindow(QMainWindow):
         }
 
         # Create panel
-        panel = UIPanels.create_left_panel(self.file_list_widget, callbacks, self.video_hasher.db)
+        panel = UIPanels.create_left_panel(self.file_list_widget, callbacks, self.db)
 
         # Extract references to parameter widgets and buttons
         # Find the QTabWidget first
@@ -745,7 +745,7 @@ class DuplicateFinderWindow(QMainWindow):
         if count > 0:
             # Update cache status for new files
             all_files = self.file_handler.get_all_files()
-            self.file_handler.batch_update_cache_status(all_files, self.video_hasher)
+            self.file_handler.batch_update_cache_status(all_files, self.db)
 
             # Update UI
             self.force_ui_update()
@@ -792,7 +792,7 @@ class DuplicateFinderWindow(QMainWindow):
 
             # Update cache status
             files = self.file_handler.get_all_files()
-            self.file_handler.batch_update_cache_status(files, self.video_hasher)
+            self.file_handler.batch_update_cache_status(files, self.db)
 
             # Update UI
             self.force_ui_update()
@@ -871,7 +871,7 @@ class DuplicateFinderWindow(QMainWindow):
         Clear the video hash cache.
         """
         try:
-            self.video_hasher.clear_cache()
+            # Cache clearing handled by DuplicateFlow
 
             # Update file statuses
             files = self.file_handler.get_all_files()
@@ -1066,7 +1066,7 @@ class DuplicateFinderWindow(QMainWindow):
                 if methods_config:  # Only create pipeline if methods are configured
                     from .verification_pipeline import VerificationPipeline
                     verification_pipeline = VerificationPipeline(
-                        db_manager=self.video_hasher.db,
+                        db_manager=self.db,
                         max_workers=8,
                         enable_caching=True,
                         mode=mode
@@ -1215,7 +1215,7 @@ class DuplicateFinderWindow(QMainWindow):
 
                 try:
                     # Use VideoHasher to compute and store hash
-                    from ..processing.video_hasher import VideoHasher
+                    from ..database_manager import VideoDatabase
                     hasher = VideoHasher(self.db_manager)
                     hasher.process_video(file_path)
                     logger.debug(f"✓ Hash computed for {file_path}")
@@ -1443,7 +1443,7 @@ class DuplicateFinderWindow(QMainWindow):
             # Create the advanced pipeline
             pipeline = AdvancedDuplicatePipeline(
                 config=advanced_config,
-                db_manager=self.video_hasher.db
+                db_manager=self.db
             )
 
             # Create and show progress dialog
@@ -1458,7 +1458,7 @@ class DuplicateFinderWindow(QMainWindow):
                 logger.info("Advanced 3-level analysis completed successfully")
 
                 # Load duplicates from database
-                duplicates = self.video_hasher.db.get_pending_duplicates()
+                duplicates = self.db.get_pending_duplicates()
                 self.duplicate_handler.clear_duplicates()
                 for file1, file2, similarity in duplicates:
                     self.duplicate_handler.add_duplicate(file1, file2, similarity)
@@ -1538,7 +1538,7 @@ class DuplicateFinderWindow(QMainWindow):
 
         # Update file statuses
         for file_path in files:
-            if self.video_hasher.has_hash(file_path):
+            if self.db.has_video(file_path):
                 self.file_handler.update_file_status(file_path, "✅ Analyzed")
             else:
                 self.file_handler.update_file_status(file_path, "❌ Failed")
@@ -1631,7 +1631,7 @@ class DuplicateFinderWindow(QMainWindow):
 
                 # Create VerificationPipeline instance with mode
                 verification_pipeline = VerificationPipeline(
-                    db_manager=self.video_hasher.db,
+                    db_manager=self.db,
                     max_workers=8,
                     enable_caching=True,
                     mode=mode
@@ -1656,7 +1656,7 @@ class DuplicateFinderWindow(QMainWindow):
 
             # Create SubsequenceDetector with pipeline
             self.subsequence_detector = SubsequenceDetector(
-                hasher=self.video_hasher,
+                db_manager=self.db,
                 max_cache_memory_mb=cache_size,
                 sample_interval_seconds=sample_interval,
                 min_match_ratio=min_match_ratio,
@@ -1762,7 +1762,7 @@ class DuplicateFinderWindow(QMainWindow):
                 ))
 
                 # Store in database
-                self.video_hasher.db.store_subsequence_detection(
+                self.db.store_subsequence_detection(
                     short_video,
                     long_video,
                     match_ratio,
@@ -1853,7 +1853,7 @@ class DuplicateFinderWindow(QMainWindow):
 
             # Create verification pipeline (replaces old SubsequenceVerificationMethods)
             verifier = VerificationPipeline(
-                db_manager=self.video_hasher.db,
+                db_manager=self.db,
                 max_workers=workers,
                 mode='filtering'
             )
@@ -1950,7 +1950,7 @@ class DuplicateFinderWindow(QMainWindow):
         # Store in database
         start_frame_idx = int(scene_data['start_time'] * 25)  # Assume 25fps
 
-        self.video_hasher.db.store_subsequence_detection(
+        self.db.store_subsequence_detection(
             scene_data['short_video'],
             scene_data['long_video'],
             scene_data['result']['match_ratio'],
@@ -2364,7 +2364,7 @@ class DuplicateFinderWindow(QMainWindow):
         """
         try:
             # TODO: Réimplémenter cleanup_missing_files dans DatabaseManager
-            # removed = self.video_hasher.db.cleanup_missing_files()
+            # removed = self.db.cleanup_missing_files()
             # if removed > 0:
             #     logger.info(f"Auto cleanup: {removed} missing files removed")
             pass
@@ -2376,8 +2376,8 @@ class DuplicateFinderWindow(QMainWindow):
         Show statistics dialog.
         """
         try:
-            stats = self.video_hasher.get_statistics()
-            cache_stats = self.video_hasher.get_cache_stats()
+            stats = {}  # Statistics handled by DuplicateFlow
+            cache_stats = {}  # Cache stats handled by DuplicateFlow
 
             message = f"""📊 STATISTICS
 
@@ -2460,9 +2460,9 @@ class DuplicateFinderWindow(QMainWindow):
                 self.audio_first_handler.stop_analysis()
 
             # Close database connections
-            if self.video_hasher and self.video_hasher.db:
+            if self.video_hasher and self.db:
                 logger.info("Closing database connections...")
-                self.video_hasher.db.close()
+                self.db.close()
 
             # Clear caches
             if self.scene_detector and hasattr(self.scene_detector, 'clear_cache'):
@@ -2523,7 +2523,7 @@ class DuplicateFinderWindow(QMainWindow):
         try:
             # Detect clusters from database
             logger.info("Detecting clusters...")
-            detector = detect_clusters_from_db(self.video_hasher.db, min_similarity=0.85)
+            detector = detect_clusters_from_db(self.db, min_similarity=0.85)
 
             if not detector.clusters:
                 QMessageBox.information(
@@ -2606,7 +2606,7 @@ class DuplicateFinderWindow(QMainWindow):
             Dictionary with duplicate data
         """
         try:
-            db = self.video_hasher.db
+            db = self.db
 
             # Get all duplicates from database
             duplicates = db.get_all_duplicates()

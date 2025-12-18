@@ -53,16 +53,16 @@ class AudioFirstHandler(QObject):
     analysis_error = pyqtSignal(str)
     status_update = pyqtSignal(str)
 
-    def __init__(self, video_hasher, analysis_handler=None):
+    def __init__(self, db_manager, analysis_handler=None):
         """
         Initialize audio-first handler.
 
         Args:
-            video_hasher: VideoHasher instance for selective video hashing
+            db_manager: DatabaseManager instance for database access
             analysis_handler: AnalysisHandler instance for hash/comparison operations
         """
         super().__init__()
-        self.video_hasher = video_hasher
+        self.db = db_manager
         self.analysis_handler = analysis_handler
 
         # Components (created when needed)
@@ -172,7 +172,7 @@ class AudioFirstHandler(QObject):
             audio_detector=self.audio_detector,
             num_workers=self.config.audio.workers,
             precision_mode=self.config.audio.precision_mode,
-            database=self.video_hasher.db  # Enable audio fingerprint caching
+            database=self.db  # Enable audio fingerprint caching
         )
 
         # Connect signals
@@ -283,7 +283,7 @@ class AudioFirstHandler(QObject):
             unique_videos.add(video1)
             unique_videos.add(video2)
 
-        videos_to_hash = [v for v in unique_videos if not self.video_hasher.has_hash(v)]
+        videos_to_hash = [v for v in unique_videos if not self.db.has_video(v)]
 
         logger.info(f"Phase 3: Hash sélectif de {len(videos_to_hash)}/{len(unique_videos)} vidéos")
 
@@ -301,7 +301,8 @@ class AudioFirstHandler(QObject):
                 self.video_hash_progress.emit(i, total)
 
                 # Compute hash if not cached
-                video_hash, duration = self.video_hasher.compute_video_hash(video_path)
+                # TODO: Migrate to DuplicateFlow for hash computation
+                raise NotImplementedError("Hash computation migrated to DuplicateFlow")
                 if video_hash is not None:
                     logger.debug(f"Hash calculé pour {os.path.basename(video_path)}: {len(video_hash)} frames, {duration:.1f}s")
                 else:
