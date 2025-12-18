@@ -1749,14 +1749,13 @@ class DuplicateFinderWindow(QMainWindow):
                 mode='filtering'
             )
             # Add DuplicateFlow algorithms for verification
-            verifier.add_method('dct_perceptual', enabled=True, parameters={'threshold': dct_threshold})
-            verifier.add_method('temporal_consistency', enabled=True, parameters={'threshold': sequence_threshold})
+            verifier.add_method('dct_coefficients', enabled=True, parameters={'threshold': dct_threshold})
+            verifier.add_method('motion_analysis', enabled=True, parameters={'threshold': sequence_threshold})
 
             # Create worker
             self.verification_worker = VerificationWorker(
-                verifier=verifier,
-                matches=scenes,
-                db=self.video_hasher.db
+                verification_pipeline=verifier,
+                matches=scenes
             )
 
             # Connect signals

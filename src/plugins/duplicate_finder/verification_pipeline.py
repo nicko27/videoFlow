@@ -8,9 +8,9 @@ Example Usage:
     pipeline = VerificationPipeline(db_manager=db)
 
     # Configure pipeline with ordered methods
-    pipeline.add_method('audio_fingerprint', enabled=True, threshold=85.0)
-    pipeline.add_method('dct_perceptual', enabled=True, threshold=75.0)
-    pipeline.add_method('motion_vectors', enabled=True, threshold=85.0)
+    pipeline.add_method('audio_fingerprint', enabled=True, parameters={'threshold': 85.0})
+    pipeline.add_method('dct_coefficients', enabled=True, parameters={'threshold': 75.0})
+    pipeline.add_method('motion_analysis', enabled=True, parameters={'threshold': 85.0})
 
     # Run pipeline (delegates to DuplicateFlow)
     result = pipeline.verify(short_video, long_video, start_time, duration)
