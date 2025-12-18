@@ -208,12 +208,8 @@ DEFAULT_THRESHOLD = VideoComparison.DEFAULT_THRESHOLD
 DURATION_TOLERANCE = VideoComparison.DURATION_TOLERANCE
 FRAME_EXTRACTION_COUNT = VideoComparison.FRAME_EXTRACTION_COUNT
 
-# Strategy 3
-
-# Audio
-FAST_HOP_LENGTH = AudioFingerprinting.FAST_HOP_LENGTH
-BALANCED_HOP_LENGTH = AudioFingerprinting.BALANCED_HOP_LENGTH
-MAXIMUM_HOP_LENGTH = AudioFingerprinting.MAXIMUM_HOP_LENGTH
+# OBSOLETE: Audio fingerprinting exports removed - AudioFingerprinting class deleted
+# FAST_HOP_LENGTH, BALANCED_HOP_LENGTH, MAXIMUM_HOP_LENGTH no longer available
 
 # Performance
 DEFAULT_HASH_WORKERS = Performance.DEFAULT_HASH_WORKERS
