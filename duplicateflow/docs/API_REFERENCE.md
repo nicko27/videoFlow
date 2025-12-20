@@ -1,6 +1,6 @@
 # 📘 API Reference - DuplicateFlow
 
-**Version**: 0.1.0 (Phase 1 Complete)
+**Version**: 0.7.0 (Phases 1-7 Complete)
 **Dernière mise à jour**: 2025-12-20
 
 ---
@@ -826,11 +826,26 @@ class MessageType(Enum):
 
 ## Ressources
 
+### Guides Utilisateur
 - **User Guide**: [USER_GUIDE.md](USER_GUIDE.md)
 - **Developer Guide**: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
-- **Phase 1 Complete**: [PHASE1_COMPLETE_SUMMARY.md](PHASE1_COMPLETE_SUMMARY.md)
+- **Documentation Index**: [INDEX.md](INDEX.md) - Navigation complète
+
+### Phases de Testing (1-7)
+- **Phase 1**: [PHASE1_COMPLETE_SUMMARY.md](PHASE1_COMPLETE_SUMMARY.md) - Architecture Clean + CLI scan (160 tests, 92%)
+- **Phase 2**: [PHASE2_COMPLETE_SUMMARY.md](PHASE2_COMPLETE_SUMMARY.md) - Tests modèles (95%+)
+- **Phase 3**: [PHASE3_COMPLETE_SUMMARY.md](PHASE3_COMPLETE_SUMMARY.md) - Tests d'intégration
+- **Phase 4**: [PHASE4_COMPLETE_SUMMARY.md](PHASE4_COMPLETE_SUMMARY.md) - Pipeline Management (41 tests, 94%)
+- **Phase 5**: [PHASE5_SERVICE_LAYER_TESTING_COMPLETE.md](PHASE5_SERVICE_LAYER_TESTING_COMPLETE.md) - Service Layer (80 tests, 92-100%)
+- **Phase 6**: [PHASE6_CLI_TESTING_SUMMARY.md](PHASE6_CLI_TESTING_SUMMARY.md) - CLI Commands (89 tests, 82.2%)
+- **Phase 7**: [PHASE7_COMPLETE_SUMMARY.md](PHASE7_COMPLETE_SUMMARY.md) - Algorithms (471 tests, 60%+)
+
+### Statistiques Globales
+- ✅ **841+ tests** créés (Phases 1-7)
+- ✅ **~12,000+ lignes** de code de tests
+- ✅ **Coverage**: Models 94%+, Services 92-100%, CLI 82.2%, Algorithms 60%+
 
 ---
 
 **Dernière mise à jour**: 2025-12-20
-**Version**: 0.1.0 (Phase 1 Complete)
+**Version**: 0.7.0 (Phases 1-7 Complete)
