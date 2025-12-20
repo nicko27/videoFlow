@@ -44,6 +44,12 @@ from .benchmark import (
     TestSetBenchmark,
 )
 
+# Import Phase 4 models
+from .pipeline_config import (
+    AlgorithmConfig,
+    PipelineConfig,
+)
+
 __all__ = [
     # Existing models
     "VerificationResult",
@@ -65,4 +71,7 @@ __all__ = [
     "ComparisonBenchmark",
     "AccuracyMetrics",
     "TestSetBenchmark",
+    # Phase 4 models
+    "AlgorithmConfig",
+    "PipelineConfig",
 ]

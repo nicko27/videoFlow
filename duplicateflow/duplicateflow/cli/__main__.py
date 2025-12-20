@@ -15,6 +15,7 @@ from duplicateflow.cli.commands import create_scan_parser, run_scan_command
 from duplicateflow.cli.commands.compare_command import create_compare_parser, run_compare_command
 from duplicateflow.cli.commands.find_command import create_find_parser, run_find_command
 from duplicateflow.cli.commands.benchmark_command import create_benchmark_parser, run_benchmark_command
+from duplicateflow.cli.commands.pipeline_command import create_pipeline_parser, run_pipeline_command
 
 
 def create_main_parser() -> argparse.ArgumentParser:
@@ -52,7 +53,7 @@ For more information, visit: https://github.com/yourusername/duplicateflow
     parser.add_argument(
         '--version',
         action='version',
-        version='DuplicateFlow 0.3.0 (Phase 3 Complete - Benchmarking)'
+        version='DuplicateFlow 0.4.0 (Phase 4 Complete - Pipeline Management)'
     )
 
     # Create subcommands
@@ -68,6 +69,7 @@ For more information, visit: https://github.com/yourusername/duplicateflow
     create_compare_parser(subparsers)
     create_find_parser(subparsers)
     create_benchmark_parser(subparsers)
+    create_pipeline_parser(subparsers)
 
     return parser
 
@@ -99,6 +101,8 @@ def main(argv: Optional[list] = None) -> int:
         return run_find_command(args)
     elif args.command == 'benchmark':
         return run_benchmark_command(args)
+    elif args.command == 'pipeline':
+        return run_pipeline_command(args)
 
     # Unknown command (should not happen due to argparse validation)
     console = Console()
