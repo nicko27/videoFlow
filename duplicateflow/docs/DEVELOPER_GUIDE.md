@@ -1,6 +1,6 @@
 # 🔧 Guide Développeur DuplicateFlow
 
-**Version**: 0.1.0 (Phase 1 Complete)
+**Version**: 0.7.0 (Phases 1-7 Complete)
 **Dernière mise à jour**: 2025-12-20
 
 ---
@@ -864,11 +864,23 @@ pytest tests/unit/core/models/test_scan.py::test_video_format_webm -v
 
 ## 📚 Ressources
 
+### Documentation Technique
 - **API Reference**: [API_REFERENCE.md](API_REFERENCE.md)
 - **User Guide**: [USER_GUIDE.md](USER_GUIDE.md)
-- **Phase 1 Complete**: [PHASE1_COMPLETE_SUMMARY.md](PHASE1_COMPLETE_SUMMARY.md)
+- **Documentation Index**: [INDEX.md](INDEX.md) - Navigation complète
+
+### Phases de Testing (1-7)
+- **Phase 1**: [PHASE1_COMPLETE_SUMMARY.md](PHASE1_COMPLETE_SUMMARY.md) - Architecture Clean (160 tests, 92%)
+- **Phase 4**: [PHASE4_COMPLETE_SUMMARY.md](PHASE4_COMPLETE_SUMMARY.md) - Pipeline Management (41 tests, 94%)
+- **Phase 5**: [PHASE5_SERVICE_LAYER_TESTING_COMPLETE.md](PHASE5_SERVICE_LAYER_TESTING_COMPLETE.md) - Services (80 tests, 92-100%)
+- **Phase 6**: [PHASE6_CLI_TESTING_SUMMARY.md](PHASE6_CLI_TESTING_SUMMARY.md) - CLI (89 tests, 82.2%)
+- **Phase 7**: [PHASE7_COMPLETE_SUMMARY.md](PHASE7_COMPLETE_SUMMARY.md) - Algorithms (471 tests, 60%+)
+
+### Statistiques Globales
+- ✅ **841+ tests** créés
+- ✅ **Coverage**: Models 94%+, Services 92-100%, CLI 82.2%, Algorithms 60%+
 
 ---
 
 **Dernière mise à jour**: 2025-12-20
-**Version**: 0.1.0 (Phase 1 Complete)
+**Version**: 0.7.0 (Phases 1-7 Complete)
