@@ -12,7 +12,7 @@ from datetime import datetime
 
 from duplicateflow.core.models.pipeline_config import PipelineConfig, AlgorithmConfig
 from duplicateflow.core.interfaces import IProgressReporter, IUIAdapter, MessageType
-from duplicateflow.pipeline.registry import ALGORITHM_REGISTRY
+from duplicateflow.core.registry import get_algorithm_names
 
 
 class PipelineManagementService:
@@ -356,11 +356,13 @@ class PipelineManagementService:
         """
         errors = []
 
+        available_algorithms = get_algorithm_names()
+
         for algo in config.algorithms:
-            if algo.name not in ALGORITHM_REGISTRY:
+            if algo.name not in available_algorithms:
                 errors.append(
                     f"Algorithm '{algo.name}' not found in registry. "
-                    f"Available: {', '.join(sorted(ALGORITHM_REGISTRY.keys()))}"
+                    f"Available: {', '.join(sorted(available_algorithms))}"
                 )
 
         return errors
