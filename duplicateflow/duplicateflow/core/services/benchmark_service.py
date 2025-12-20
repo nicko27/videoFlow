@@ -92,7 +92,7 @@ class BenchmarkService:
             >>> benchmark.pipeline_name
             'balanced'
         """
-        from duplicateflow.core.interfaces.message_type import MessageType
+        from duplicateflow.core.interfaces import MessageType
 
         self.progress.start_phase(
             "benchmark",
@@ -198,7 +198,7 @@ class BenchmarkService:
             >>> len(benchmark.pipeline_benchmarks)
             3
         """
-        from duplicateflow.core.interfaces.message_type import MessageType
+        from duplicateflow.core.interfaces import MessageType
 
         total = len(pipeline_names)
         self.progress.start_phase(
@@ -294,7 +294,7 @@ class BenchmarkService:
             >>> benchmark.accuracy_metrics.accuracy
             0.92
         """
-        from duplicateflow.core.interfaces.message_type import MessageType
+        from duplicateflow.core.interfaces import MessageType
 
         # Load test set
         try:
