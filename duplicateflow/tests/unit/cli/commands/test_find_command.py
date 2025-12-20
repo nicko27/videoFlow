@@ -528,3 +528,657 @@ class TestFindCommandIntegration:
         assert finder_call_args is not None
 
         mock_display.assert_called_once()
+
+
+class TestFindCommandFilters:
+    """Test filtering functionality."""
+
+    @patch('duplicateflow.cli.commands.find_command.Console')
+    @patch('duplicateflow.cli.commands.find_command.display_detection_result')
+    @patch('duplicateflow.cli.commands.find_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.find_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.find_command.DuplicateFinderService')
+    @patch('duplicateflow.cli.commands.find_command.ComparisonService')
+    @patch('duplicateflow.cli.commands.find_command.ScanService')
+    @patch('duplicateflow.cli.commands.find_command.Pipeline')
+    def test_filter_by_formats(
+        self,
+        mock_pipeline_cls,
+        mock_scan_cls,
+        mock_comparison_cls,
+        mock_finder_cls,
+        mock_progress,
+        mock_ui_adapter,
+        mock_display,
+        mock_console_cls,
+        tmp_path
+    ):
+        """Test filtering videos by format."""
+        from duplicateflow.core.models import VideoFile, VideoFormat
+
+        test_dir = tmp_path / "videos"
+        test_dir.mkdir()
+
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_pipeline = Mock()
+        mock_pipeline_cls.from_preset.return_value = mock_pipeline
+
+        # Scan finds videos with different formats
+        mock_scan_result = Mock(spec=ScanResult)
+        mock_scan_result.total_videos = 5
+
+        videos = []
+        for i in range(3):
+            video_file = Mock(spec=VideoFile)
+            video_file.path = tmp_path / f"video{i}.mp4"
+            video_file.format = VideoFormat.MP4
+            video_file.size_mb = 10.0
+            videos.append(video_file)
+
+        for i in range(2):
+            video_file = Mock(spec=VideoFile)
+            video_file.path = tmp_path / f"video{i+3}.mkv"
+            video_file.format = VideoFormat.MKV
+            video_file.size_mb = 15.0
+            videos.append(video_file)
+
+        mock_scan_result.videos = videos
+
+        mock_scan_service = Mock()
+        mock_scan_service.scan_directory.return_value = mock_scan_result
+        mock_scan_cls.return_value = mock_scan_service
+
+        mock_detection_result = Mock(spec=DetectionResult)
+        mock_detection_result.duplicate_groups = []
+        mock_detection_result.duplicates_found = 0
+
+        mock_finder_service = Mock()
+        mock_finder_service.find_duplicates.return_value = mock_detection_result
+        mock_finder_cls.return_value = mock_finder_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        # Test filtering by mp4 only
+        args = argparse.Namespace(
+            directory=str(test_dir),
+            preset='balanced',
+            threshold=70.0,
+            recursive=True,
+            max_comparisons=None,
+            formats=['mp4'],  # Filter by MP4 only
+            min_size=None,
+            output_json=None,
+            output_csv=None
+        )
+
+        exit_code = run_find_command(args)
+
+        # Verify finder was called with only MP4 videos (3 videos)
+        finder_call_args = mock_finder_service.find_duplicates.call_args
+        assert finder_call_args is not None
+        video_paths = finder_call_args[0][0]
+        assert len(video_paths) == 3  # Only MP4 videos
+
+        assert exit_code == 1  # No duplicates found
+
+    @patch('duplicateflow.cli.commands.find_command.Console')
+    @patch('duplicateflow.cli.commands.find_command.display_detection_result')
+    @patch('duplicateflow.cli.commands.find_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.find_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.find_command.DuplicateFinderService')
+    @patch('duplicateflow.cli.commands.find_command.ComparisonService')
+    @patch('duplicateflow.cli.commands.find_command.ScanService')
+    @patch('duplicateflow.cli.commands.find_command.Pipeline')
+    def test_filter_by_min_size(
+        self,
+        mock_pipeline_cls,
+        mock_scan_cls,
+        mock_comparison_cls,
+        mock_finder_cls,
+        mock_progress,
+        mock_ui_adapter,
+        mock_display,
+        mock_console_cls,
+        tmp_path
+    ):
+        """Test filtering videos by minimum size."""
+        from duplicateflow.core.models import VideoFile, VideoFormat
+
+        test_dir = tmp_path / "videos"
+        test_dir.mkdir()
+
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_pipeline = Mock()
+        mock_pipeline_cls.from_preset.return_value = mock_pipeline
+
+        # Scan finds videos with different sizes
+        mock_scan_result = Mock(spec=ScanResult)
+        mock_scan_result.total_videos = 5
+
+        videos = []
+        for i in range(2):
+            video_file = Mock(spec=VideoFile)
+            video_file.path = tmp_path / f"small{i}.mp4"
+            video_file.format = VideoFormat.MP4
+            video_file.size_mb = 5.0  # Small files
+            videos.append(video_file)
+
+        for i in range(3):
+            video_file = Mock(spec=VideoFile)
+            video_file.path = tmp_path / f"large{i}.mp4"
+            video_file.format = VideoFormat.MP4
+            video_file.size_mb = 20.0  # Large files
+            videos.append(video_file)
+
+        mock_scan_result.videos = videos
+
+        mock_scan_service = Mock()
+        mock_scan_service.scan_directory.return_value = mock_scan_result
+        mock_scan_cls.return_value = mock_scan_service
+
+        mock_detection_result = Mock(spec=DetectionResult)
+        mock_detection_result.duplicate_groups = []
+        mock_detection_result.duplicates_found = 0
+
+        mock_finder_service = Mock()
+        mock_finder_service.find_duplicates.return_value = mock_detection_result
+        mock_finder_cls.return_value = mock_finder_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        # Test filtering by min size 10MB
+        args = argparse.Namespace(
+            directory=str(test_dir),
+            preset='balanced',
+            threshold=70.0,
+            recursive=True,
+            max_comparisons=None,
+            formats=None,
+            min_size=10.0,  # Filter by min size 10MB
+            output_json=None,
+            output_csv=None
+        )
+
+        exit_code = run_find_command(args)
+
+        # Verify finder was called with only large videos (3 videos)
+        finder_call_args = mock_finder_service.find_duplicates.call_args
+        assert finder_call_args is not None
+        video_paths = finder_call_args[0][0]
+        assert len(video_paths) == 3  # Only large videos >= 10MB
+
+        assert exit_code == 1  # No duplicates found
+
+    @patch('duplicateflow.cli.commands.find_command.Console')
+    @patch('duplicateflow.cli.commands.find_command.display_detection_result')
+    @patch('duplicateflow.cli.commands.find_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.find_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.find_command.DuplicateFinderService')
+    @patch('duplicateflow.cli.commands.find_command.ComparisonService')
+    @patch('duplicateflow.cli.commands.find_command.ScanService')
+    @patch('duplicateflow.cli.commands.find_command.Pipeline')
+    def test_filter_combined(
+        self,
+        mock_pipeline_cls,
+        mock_scan_cls,
+        mock_comparison_cls,
+        mock_finder_cls,
+        mock_progress,
+        mock_ui_adapter,
+        mock_display,
+        mock_console_cls,
+        tmp_path
+    ):
+        """Test filtering by both format and size."""
+        from duplicateflow.core.models import VideoFile, VideoFormat
+
+        test_dir = tmp_path / "videos"
+        test_dir.mkdir()
+
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_pipeline = Mock()
+        mock_pipeline_cls.from_preset.return_value = mock_pipeline
+
+        # Create diverse video collection
+        mock_scan_result = Mock(spec=ScanResult)
+        mock_scan_result.total_videos = 6
+
+        videos = []
+        # Small MP4
+        video_file = Mock(spec=VideoFile)
+        video_file.path = tmp_path / "small.mp4"
+        video_file.format = VideoFormat.MP4
+        video_file.size_mb = 5.0
+        videos.append(video_file)
+
+        # Large MP4 (matches both filters)
+        video_file = Mock(spec=VideoFile)
+        video_file.path = tmp_path / "large1.mp4"
+        video_file.format = VideoFormat.MP4
+        video_file.size_mb = 20.0
+        videos.append(video_file)
+
+        video_file = Mock(spec=VideoFile)
+        video_file.path = tmp_path / "large2.mp4"
+        video_file.format = VideoFormat.MP4
+        video_file.size_mb = 25.0
+        videos.append(video_file)
+
+        # Small MKV
+        video_file = Mock(spec=VideoFile)
+        video_file.path = tmp_path / "small.mkv"
+        video_file.format = VideoFormat.MKV
+        video_file.size_mb = 3.0
+        videos.append(video_file)
+
+        # Large MKV (matches size but not format)
+        video_file = Mock(spec=VideoFile)
+        video_file.path = tmp_path / "large.mkv"
+        video_file.format = VideoFormat.MKV
+        video_file.size_mb = 30.0
+        videos.append(video_file)
+
+        # Large AVI (matches size but not format)
+        video_file = Mock(spec=VideoFile)
+        video_file.path = tmp_path / "large.avi"
+        video_file.format = VideoFormat.AVI
+        video_file.size_mb = 15.0
+        videos.append(video_file)
+
+        mock_scan_result.videos = videos
+
+        mock_scan_service = Mock()
+        mock_scan_service.scan_directory.return_value = mock_scan_result
+        mock_scan_cls.return_value = mock_scan_service
+
+        mock_detection_result = Mock(spec=DetectionResult)
+        mock_detection_result.duplicate_groups = []
+        mock_detection_result.duplicates_found = 0
+
+        mock_finder_service = Mock()
+        mock_finder_service.find_duplicates.return_value = mock_detection_result
+        mock_finder_cls.return_value = mock_finder_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        # Test combined filter: MP4 format AND min size 10MB
+        args = argparse.Namespace(
+            directory=str(test_dir),
+            preset='balanced',
+            threshold=70.0,
+            recursive=True,
+            max_comparisons=None,
+            formats=['mp4'],  # Only MP4
+            min_size=10.0,  # Only >= 10MB
+            output_json=None,
+            output_csv=None
+        )
+
+        exit_code = run_find_command(args)
+
+        # Verify finder was called with only large MP4 videos (2 videos)
+        finder_call_args = mock_finder_service.find_duplicates.call_args
+        assert finder_call_args is not None
+        video_paths = finder_call_args[0][0]
+        assert len(video_paths) == 2  # Only large MP4 videos
+
+        assert exit_code == 1  # No duplicates found
+
+
+class TestFindCommandExport:
+    """Test export functionality."""
+
+    @pytest.fixture
+    def mock_scan_result_export(self, tmp_path):
+        """Create a mock scan result for export tests."""
+        from duplicateflow.core.models import VideoFile, VideoFormat
+
+        result = Mock(spec=ScanResult)
+        result.total_videos = 5
+
+        videos = []
+        for i in range(1, 6):
+            video_file = Mock(spec=VideoFile)
+            video_file.path = tmp_path / f"video{i}.mp4"
+            video_file.format = VideoFormat.MP4
+            video_file.size_mb = 10.0
+            videos.append(video_file)
+
+        result.videos = videos
+        return result
+
+    @patch('duplicateflow.cli.commands.find_command.Console')
+    @patch('duplicateflow.cli.commands.find_command.display_detection_result')
+    @patch('duplicateflow.cli.commands.find_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.find_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.find_command.DuplicateFinderService')
+    @patch('duplicateflow.cli.commands.find_command.ComparisonService')
+    @patch('duplicateflow.cli.commands.find_command.ScanService')
+    @patch('duplicateflow.cli.commands.find_command.Pipeline')
+    def test_json_export_error(
+        self,
+        mock_pipeline_cls,
+        mock_scan_cls,
+        mock_comparison_cls,
+        mock_finder_cls,
+        mock_progress,
+        mock_ui_adapter,
+        mock_display,
+        mock_console_cls,
+        tmp_path,
+        mock_scan_result_export
+    ):
+        """Test JSON export error handling."""
+        test_dir = tmp_path / "videos"
+        test_dir.mkdir()
+
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_pipeline = Mock()
+        mock_pipeline_cls.from_preset.return_value = mock_pipeline
+
+        mock_scan_service = Mock()
+        mock_scan_service.scan_directory.return_value = mock_scan_result_export
+        mock_scan_cls.return_value = mock_scan_service
+
+        mock_detection_result = Mock(spec=DetectionResult)
+        mock_detection_result.duplicate_groups = [Mock()]
+        mock_detection_result.duplicates_found = 2
+        # Mock to_json to raise an exception
+        mock_detection_result.to_json.side_effect = IOError("Permission denied")
+
+        mock_finder_service = Mock()
+        mock_finder_service.find_duplicates.return_value = mock_detection_result
+        mock_finder_cls.return_value = mock_finder_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        # Invalid output path to trigger error
+        args = argparse.Namespace(
+            directory=str(test_dir),
+            preset='balanced',
+            threshold=70.0,
+            recursive=True,
+            max_comparisons=None,
+            formats=None,
+            min_size=None,
+            output_json='/invalid/path/output.json',
+            output_csv=None
+        )
+
+        exit_code = run_find_command(args)
+
+        # Should return 1 due to export error
+        assert exit_code == 1
+
+    @patch('duplicateflow.cli.commands.find_command.Console')
+    @patch('duplicateflow.cli.commands.find_command.display_detection_result')
+    @patch('duplicateflow.cli.commands.find_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.find_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.find_command.DuplicateFinderService')
+    @patch('duplicateflow.cli.commands.find_command.ComparisonService')
+    @patch('duplicateflow.cli.commands.find_command.ScanService')
+    @patch('duplicateflow.cli.commands.find_command.Pipeline')
+    def test_csv_export_error(
+        self,
+        mock_pipeline_cls,
+        mock_scan_cls,
+        mock_comparison_cls,
+        mock_finder_cls,
+        mock_progress,
+        mock_ui_adapter,
+        mock_display,
+        mock_console_cls,
+        tmp_path,
+        mock_scan_result_export
+    ):
+        """Test CSV export error handling."""
+        test_dir = tmp_path / "videos"
+        test_dir.mkdir()
+
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_pipeline = Mock()
+        mock_pipeline_cls.from_preset.return_value = mock_pipeline
+
+        mock_scan_service = Mock()
+        mock_scan_service.scan_directory.return_value = mock_scan_result_export
+        mock_scan_cls.return_value = mock_scan_service
+
+        mock_detection_result = Mock(spec=DetectionResult)
+        mock_detection_result.duplicate_groups = [Mock()]
+        mock_detection_result.duplicates_found = 2
+        # Mock to_csv_rows to raise an exception
+        mock_detection_result.to_csv_rows.side_effect = IOError("Disk full")
+
+        mock_finder_service = Mock()
+        mock_finder_service.find_duplicates.return_value = mock_detection_result
+        mock_finder_cls.return_value = mock_finder_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            directory=str(test_dir),
+            preset='balanced',
+            threshold=70.0,
+            recursive=True,
+            max_comparisons=None,
+            formats=None,
+            min_size=None,
+            output_json=None,
+            output_csv='/invalid/path/output.csv'
+        )
+
+        exit_code = run_find_command(args)
+
+        # Should return 1 due to export error
+        assert exit_code == 1
+
+    @patch('duplicateflow.cli.commands.find_command.Console')
+    @patch('duplicateflow.cli.commands.find_command.display_detection_result')
+    @patch('duplicateflow.cli.commands.find_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.find_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.find_command.DuplicateFinderService')
+    @patch('duplicateflow.cli.commands.find_command.ComparisonService')
+    @patch('duplicateflow.cli.commands.find_command.ScanService')
+    @patch('duplicateflow.cli.commands.find_command.Pipeline')
+    def test_csv_export_empty_results(
+        self,
+        mock_pipeline_cls,
+        mock_scan_cls,
+        mock_comparison_cls,
+        mock_finder_cls,
+        mock_progress,
+        mock_ui_adapter,
+        mock_display,
+        mock_console_cls,
+        tmp_path,
+        mock_scan_result_export
+    ):
+        """Test CSV export with empty results."""
+        test_dir = tmp_path / "videos"
+        test_dir.mkdir()
+
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_pipeline = Mock()
+        mock_pipeline_cls.from_preset.return_value = mock_pipeline
+
+        mock_scan_service = Mock()
+        mock_scan_service.scan_directory.return_value = mock_scan_result_export
+        mock_scan_cls.return_value = mock_scan_service
+
+        mock_detection_result = Mock(spec=DetectionResult)
+        mock_detection_result.duplicate_groups = []
+        mock_detection_result.duplicates_found = 0
+        mock_detection_result.to_csv_rows.return_value = []  # No rows to export
+
+        mock_finder_service = Mock()
+        mock_finder_service.find_duplicates.return_value = mock_detection_result
+        mock_finder_cls.return_value = mock_finder_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        output_csv = tmp_path / "output.csv"
+        args = argparse.Namespace(
+            directory=str(test_dir),
+            preset='balanced',
+            threshold=70.0,
+            recursive=True,
+            max_comparisons=None,
+            formats=None,
+            min_size=None,
+            output_json=None,
+            output_csv=str(output_csv)
+        )
+
+        exit_code = run_find_command(args)
+
+        # CSV should not be created since no results
+        assert not output_csv.exists()
+        assert exit_code == 1  # No duplicates found
+
+
+class TestFindCommandExceptionHandling:
+    """Test exception handling."""
+
+    @patch('duplicateflow.cli.commands.find_command.Console')
+    @patch('duplicateflow.cli.commands.find_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.find_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.find_command.ScanService')
+    @patch('duplicateflow.cli.commands.find_command.Pipeline')
+    def test_service_exception_during_scan(
+        self,
+        mock_pipeline_cls,
+        mock_scan_cls,
+        mock_progress,
+        mock_ui_adapter,
+        mock_console_cls,
+        tmp_path
+    ):
+        """Test handling of service exception during scan."""
+        test_dir = tmp_path / "videos"
+        test_dir.mkdir()
+
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_pipeline = Mock()
+        mock_pipeline_cls.from_preset.return_value = mock_pipeline
+
+        # Mock scan service to raise exception
+        mock_scan_service = Mock()
+        mock_scan_service.scan_directory.side_effect = RuntimeError("Scan failed")
+        mock_scan_cls.return_value = mock_scan_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            directory=str(test_dir),
+            preset='balanced',
+            threshold=70.0,
+            recursive=True,
+            max_comparisons=None,
+            formats=None,
+            min_size=None,
+            output_json=None,
+            output_csv=None
+        )
+
+        exit_code = run_find_command(args)
+
+        # Should return 1 due to exception
+        assert exit_code == 1
+
+    @pytest.fixture
+    def mock_scan_result_exception(self, tmp_path):
+        """Create a mock scan result for exception tests."""
+        from duplicateflow.core.models import VideoFile, VideoFormat
+
+        result = Mock(spec=ScanResult)
+        result.total_videos = 5
+
+        videos = []
+        for i in range(1, 6):
+            video_file = Mock(spec=VideoFile)
+            video_file.path = tmp_path / f"video{i}.mp4"
+            video_file.format = VideoFormat.MP4
+            video_file.size_mb = 10.0
+            videos.append(video_file)
+
+        result.videos = videos
+        return result
+
+    @patch('duplicateflow.cli.commands.find_command.Console')
+    @patch('duplicateflow.cli.commands.find_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.find_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.find_command.DuplicateFinderService')
+    @patch('duplicateflow.cli.commands.find_command.ComparisonService')
+    @patch('duplicateflow.cli.commands.find_command.ScanService')
+    @patch('duplicateflow.cli.commands.find_command.Pipeline')
+    def test_service_exception_during_detection(
+        self,
+        mock_pipeline_cls,
+        mock_scan_cls,
+        mock_comparison_cls,
+        mock_finder_cls,
+        mock_progress,
+        mock_ui_adapter,
+        mock_console_cls,
+        tmp_path,
+        mock_scan_result_exception
+    ):
+        """Test handling of service exception during detection."""
+        test_dir = tmp_path / "videos"
+        test_dir.mkdir()
+
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_pipeline = Mock()
+        mock_pipeline_cls.from_preset.return_value = mock_pipeline
+
+        mock_scan_service = Mock()
+        mock_scan_service.scan_directory.return_value = mock_scan_result_exception
+        mock_scan_cls.return_value = mock_scan_service
+
+        # Mock finder service to raise exception
+        mock_finder_service = Mock()
+        mock_finder_service.find_duplicates.side_effect = RuntimeError("Detection failed")
+        mock_finder_cls.return_value = mock_finder_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            directory=str(test_dir),
+            preset='balanced',
+            threshold=70.0,
+            recursive=True,
+            max_comparisons=None,
+            formats=None,
+            min_size=None,
+            output_json=None,
+            output_csv=None
+        )
+
+        exit_code = run_find_command(args)
+
+        # Should return 1 due to exception
+        assert exit_code == 1

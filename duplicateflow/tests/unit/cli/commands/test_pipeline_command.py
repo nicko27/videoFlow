@@ -17,7 +17,8 @@ from duplicateflow.cli.commands.pipeline_command import (
     run_delete_command,
     run_show_command,
     run_export_command,
-    run_import_command
+    run_import_command,
+    run_validate_command
 )
 from duplicateflow.core.models import PipelineConfig, AlgorithmConfig
 
@@ -450,3 +451,513 @@ class TestPipelineCommandIntegration:
         # Verify workflow
         mock_service.create_pipeline.assert_called_once()
         mock_service.save_pipeline.assert_called_once()
+
+
+class TestPipelineCommandValidate:
+    """Test validate subcommand."""
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_validate_success(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test validating a valid pipeline."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_config = Mock(spec=PipelineConfig)
+        mock_config.name = 'test_pipeline'
+        mock_config.global_threshold = 70.0
+        mock_config.get_enabled_algorithms.return_value = [Mock(), Mock()]
+        mock_config.get_total_weight.return_value = 1.0
+
+        mock_service = Mock()
+        mock_service.load_pipeline.return_value = mock_config
+        mock_service.validate_pipeline.return_value = []  # No errors
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='validate',
+            name='test_pipeline'
+        )
+
+        exit_code = run_validate_command(args)
+
+        assert exit_code == 0
+        mock_service.load_pipeline.assert_called_once_with('test_pipeline')
+        mock_service.validate_pipeline.assert_called_once()
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_validate_with_errors(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test validating a pipeline with errors."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_config = Mock(spec=PipelineConfig)
+        mock_config.name = 'invalid_pipeline'
+
+        mock_service = Mock()
+        mock_service.load_pipeline.return_value = mock_config
+        mock_service.validate_pipeline.return_value = [
+            "Weight sum is not 1.0",
+            "Unknown algorithm: invalid_algo"
+        ]
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='validate',
+            name='invalid_pipeline'
+        )
+
+        exit_code = run_validate_command(args)
+
+        assert exit_code == 1
+        mock_service.load_pipeline.assert_called_once_with('invalid_pipeline')
+        mock_service.validate_pipeline.assert_called_once()
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_validate_pipeline_not_found(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test validating a non-existent pipeline."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_service = Mock()
+        mock_service.load_pipeline.side_effect = FileNotFoundError("Pipeline not found")
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='validate',
+            name='nonexistent'
+        )
+
+        exit_code = run_validate_command(args)
+
+        assert exit_code == 1
+
+
+class TestPipelineCommandErrors:
+    """Test error handling."""
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_show_error_handling(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test exception handling in show command."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_service = Mock()
+        mock_service.get_pipeline_info.side_effect = Exception("Unexpected error")
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='show',
+            name='test',
+            format='yaml'
+        )
+
+        exit_code = run_show_command(args)
+
+        assert exit_code == 1
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_create_error_handling(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test exception handling in create command."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_service = Mock()
+        mock_service.create_pipeline.side_effect = ValueError("Invalid algorithm")
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='create',
+            name='test',
+            description='Test',
+            algorithms=['invalid'],
+            weights=[1.0],
+            thresholds=None,
+            global_threshold=70.0,
+            format='yaml',
+            no_normalize=False
+        )
+
+        exit_code = run_create_command(args)
+
+        assert exit_code == 1
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_create_file_exists_error(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test file exists error in create command."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_config = Mock(spec=PipelineConfig)
+        mock_service = Mock()
+        mock_service.create_pipeline.return_value = mock_config
+        mock_service.save_pipeline.side_effect = FileExistsError("Pipeline already exists")
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='create',
+            name='existing',
+            description='Test',
+            algorithms=['frame_hash'],
+            weights=[1.0],
+            thresholds=None,
+            global_threshold=70.0,
+            format='yaml',
+            no_normalize=False
+        )
+
+        exit_code = run_create_command(args)
+
+        assert exit_code == 1
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_create_exception_handling(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test general exception handling in create command."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_service = Mock()
+        mock_service.create_pipeline.side_effect = Exception("Unexpected error")
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='create',
+            name='test',
+            description='Test',
+            algorithms=['frame_hash'],
+            weights=[1.0],
+            thresholds=None,
+            global_threshold=70.0,
+            format='yaml',
+            no_normalize=False
+        )
+
+        exit_code = run_create_command(args)
+
+        assert exit_code == 1
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_export_error_handling(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test exception handling in export command."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_service = Mock()
+        mock_service.export_pipeline.side_effect = Exception("Export failed")
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='export',
+            name='test',
+            destination='/tmp/test.yaml',
+            format='yaml'
+        )
+
+        exit_code = run_export_command(args)
+
+        assert exit_code == 1
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_import_error_handling(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test exception handling in import command."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_service = Mock()
+        mock_service.import_pipeline.side_effect = FileNotFoundError("File not found")
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='import',
+            source='/tmp/nonexistent.yaml',
+            name=None,
+            overwrite=False
+        )
+
+        exit_code = run_import_command(args)
+
+        assert exit_code == 1
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_import_file_exists_error(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test file exists error in import command."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_service = Mock()
+        mock_service.import_pipeline.side_effect = FileExistsError("Pipeline already exists")
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='import',
+            source='/tmp/test.yaml',
+            name=None,
+            overwrite=False
+        )
+
+        exit_code = run_import_command(args)
+
+        assert exit_code == 1
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_import_value_error(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test value error in import command."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_service = Mock()
+        mock_service.import_pipeline.side_effect = ValueError("Invalid pipeline format")
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='import',
+            source='/tmp/invalid.yaml',
+            name=None,
+            overwrite=False
+        )
+
+        exit_code = run_import_command(args)
+
+        assert exit_code == 1
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_import_exception_handling(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test general exception handling in import command."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_service = Mock()
+        mock_service.import_pipeline.side_effect = Exception("Unexpected error")
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='import',
+            source='/tmp/test.yaml',
+            name=None,
+            overwrite=False
+        )
+
+        exit_code = run_import_command(args)
+
+        assert exit_code == 1
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_validate_exception_handling(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test general exception handling in validate command."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_service = Mock()
+        mock_service.load_pipeline.side_effect = Exception("Unexpected error")
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='validate',
+            name='test'
+        )
+
+        exit_code = run_validate_command(args)
+
+        assert exit_code == 1
+
+    @patch('duplicateflow.cli.commands.pipeline_command.PipelineManagementService')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichProgressReporter')
+    @patch('duplicateflow.cli.commands.pipeline_command.RichUIAdapter')
+    @patch('duplicateflow.cli.commands.pipeline_command.Console')
+    def test_delete_exception_handling(
+        self,
+        mock_console_cls,
+        mock_ui_adapter,
+        mock_progress,
+        mock_service_cls
+    ):
+        """Test general exception handling in delete command."""
+        mock_console = MagicMock()
+        mock_console_cls.return_value = mock_console
+
+        mock_service = Mock()
+        mock_service.delete_pipeline.side_effect = Exception("Unexpected error")
+        mock_service_cls.return_value = mock_service
+
+        mock_progress_instance = MagicMock()
+        mock_progress.return_value.__enter__.return_value = mock_progress_instance
+
+        # Use --yes flag to skip confirmation
+        args = argparse.Namespace(
+            command='pipeline',
+            subcommand='delete',
+            name='test',
+            yes=True
+        )
+
+        exit_code = run_delete_command(args)
+
+        assert exit_code == 1
