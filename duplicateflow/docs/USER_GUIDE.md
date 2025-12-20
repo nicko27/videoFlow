@@ -1,6 +1,6 @@
 # 📖 Guide Utilisateur DuplicateFlow
 
-**Version**: 0.1.0 (Phase 1 Complete)
+**Version**: 0.2.0 (Phase 2 Complete - Duplicate Detection)
 **Dernière mise à jour**: 2025-12-20
 
 ---
@@ -11,11 +11,12 @@ DuplicateFlow est un système de détection de vidéos dupliquées et similaires
 
 ### Capacités
 
-- ✅ **Scan de vidéos** - Découverte automatique de fichiers vidéo
+- ✅ **Scan de vidéos** - Découverte automatique de fichiers vidéo (Phase 1)
+- ✅ **Comparaison de vidéos** - Similarité entre 2 vidéos (Phase 2) **NOUVEAU**
+- ✅ **Détection de doublons** - Algorithmes perceptuels N-à-N (Phase 2) **NOUVEAU**
 - ✅ **Export des résultats** - Export JSON et CSV
-- ⏳ **Détection de doublons** - Algorithmes perceptuels (Phase 2)
-- ⏳ **Comparaison de vidéos** - Similarité entre 2 vidéos (Phase 2)
-- ⏳ **Benchmarking** - Tests de performance (Phase 2)
+- ✅ **8 Presets** - Fast, balanced, thorough, multimodal, etc. (Phase 2) **NOUVEAU**
+- ⏳ **Benchmarking** - Tests de performance (Phase 3)
 
 ---
 
@@ -41,6 +42,171 @@ python -m duplicateflow.cli --version
 ---
 
 ## 📋 Commandes Disponibles
+
+### `compare` - Comparer deux vidéos **NOUVEAU Phase 2**
+
+Compare deux vidéos spécifiques pour déterminer leur similarité.
+
+**Syntaxe de base**:
+```bash
+python -m duplicateflow.cli compare <VIDEO1> <VIDEO2> [OPTIONS]
+```
+
+**Options**:
+
+| Option | Description | Défaut |
+|--------|-------------|--------|
+| `VIDEO1` | Première vidéo à comparer | *Requis* |
+| `VIDEO2` | Deuxième vidéo à comparer | *Requis* |
+| `--preset PRESET` | Preset de pipeline à utiliser | `balanced` |
+| `--threshold PERCENT` | Seuil de similarité (0-100) | `70.0` |
+| `--output-json FILE` | Exporter le résultat en JSON | Aucun |
+| `--show-details` | Afficher les détails des algorithmes | `False` |
+
+**Presets disponibles**:
+- `fast` - Rapide (~30s pour 1h vidéo) - 85% précision
+- `balanced` - Équilibré (~2min) - 92% précision ⭐ **Recommandé**
+- `thorough` - Approfondi (~5min) - >95% précision
+- `multimodal` - Visual + audio (~8min) - >96% précision
+- `structural`, `hybrid`, `audio_advanced`, `motion_intense` - Spécialisés
+
+**Exemples**:
+
+```bash
+# Comparaison simple avec preset balanced
+python -m duplicateflow.cli compare movie1.mp4 movie2.mp4
+
+# Avec preset thorough pour plus de précision
+python -m duplicateflow.cli compare movie1.mp4 movie2.mp4 --preset thorough
+
+# Afficher les détails des algorithmes
+python -m duplicateflow.cli compare movie1.mp4 movie2.mp4 --show-details
+
+# Export en JSON
+python -m duplicateflow.cli compare movie1.mp4 movie2.mp4 --output-json result.json
+
+# Seuil personnalisé (80% de similarité minimum)
+python -m duplicateflow.cli compare movie1.mp4 movie2.mp4 --threshold 80
+
+# Comparaison rapide pour scan initial
+python -m duplicateflow.cli compare movie1.mp4 movie2.mp4 --preset fast
+
+# Comparaison multimodale (vidéo + audio)
+python -m duplicateflow.cli compare movie1.mp4 movie2.mp4 --preset multimodal
+```
+
+**Sortie**:
+```
+📊 Comparison Result
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Video 1: movie1.mp4
+Video 2: movie2.mp4
+
+Similarity: 88.50%
+Match: ✓ DUPLICATE
+
+Pipeline: balanced
+Time: 2500ms (2.50s)
+Algorithms: 4 executed
+```
+
+**Code de sortie**:
+- `0` : Vidéos sont des doublons (similarity >= threshold)
+- `1` : Vidéos ne sont PAS des doublons
+
+---
+
+### `find` - Trouver des doublons **NOUVEAU Phase 2**
+
+Détecte automatiquement les doublons dans un répertoire.
+
+**Syntaxe de base**:
+```bash
+python -m duplicateflow.cli find <DIRECTORY> [OPTIONS]
+```
+
+**Options**:
+
+| Option | Description | Défaut |
+|--------|-------------|--------|
+| `DIRECTORY` | Répertoire à analyser | *Requis* |
+| `--preset PRESET` | Preset de pipeline | `balanced` |
+| `--threshold PERCENT` | Seuil de similarité (0-100) | `70.0` |
+| `--recursive` | Scanner récursivement | `False` |
+| `--max-comparisons N` | Limiter le nombre de comparaisons | Aucun |
+| `--formats EXT [EXT ...]` | Filtrer par formats | Tous |
+| `--min-size MB` | Taille minimale en MB | Aucune |
+| `--output-json FILE` | Exporter en JSON | Aucun |
+| `--output-csv FILE` | Exporter en CSV | Aucun |
+
+**Exemples**:
+
+```bash
+# Scan simple du répertoire courant
+python -m duplicateflow.cli find .
+
+# Scan récursif avec preset thorough
+python -m duplicateflow.cli find /path/to/videos --recursive --preset thorough
+
+# Limiter les comparaisons (utile pour grandes collections)
+python -m duplicateflow.cli find /videos --max-comparisons 1000
+
+# Filtrer par format et taille
+python -m duplicateflow.cli find /videos --formats mp4 mkv --min-size 100
+
+# Export des résultats
+python -m duplicateflow.cli find /videos \
+  --output-json duplicates.json \
+  --output-csv duplicates.csv
+
+# Scan rapide pour vérification initiale
+python -m duplicateflow.cli find /videos --preset fast --recursive
+
+# Détection précise multimodale
+python -m duplicateflow.cli find /videos \
+  --preset multimodal \
+  --threshold 85 \
+  --recursive
+```
+
+**Sortie**:
+```
+Step 1: Scanning for videos...
+✓ Found 42 videos to analyze
+
+Step 2: Detecting duplicates...
+[Progress bar: 100%]
+
+🔍 Detection Summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Videos Scanned: 42
+Comparisons: 861
+
+Duplicate Groups: 3
+Duplicates Found: 8
+Duplicate Percentage: 19.0%
+
+Space Reclaimable: 2.5 GB
+
+Pipeline: balanced
+Time: 120.5s (2.0m)
+Speed: 7.1 comp/s
+
+Duplicate Groups
+┏━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Group┃ Videos ┃ Avg Similarity┃ Total Size┃
+┡━━━━━╇━━━━━━━━╇━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ #1   │ 3      │ 92.5%        │ 850.0 MB │
+│ #2   │ 4      │ 88.0%        │ 1200.0 MB│
+│ #3   │ 2      │ 95.0%        │ 450.0 MB │
+└─────┴────────┴──────────────┴──────────┘
+```
+
+**Code de sortie**:
+- `0` : Doublons trouvés
+- `1` : Aucun doublon trouvé
+
+---
 
 ### `scan` - Scanner des vidéos
 

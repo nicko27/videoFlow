@@ -30,6 +30,11 @@ from .scan import (
     VideoFormat,
 )
 
+# Import Phase 2 models
+from .algorithm_result import AlgorithmResult
+from .comparison import ComparisonResult
+from .detection import DetectionResult
+
 __all__ = [
     # Existing models
     "VerificationResult",
@@ -40,4 +45,8 @@ __all__ = [
     "ScanResult",
     "DuplicateGroup",
     "VideoFormat",
+    # Phase 2 models
+    "AlgorithmResult",
+    "ComparisonResult",
+    "DetectionResult",
 ]
