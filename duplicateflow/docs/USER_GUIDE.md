@@ -1,6 +1,6 @@
 # 📖 Guide Utilisateur DuplicateFlow
 
-**Version**: 0.2.0 (Phase 2 Complete - Duplicate Detection)
+**Version**: 0.3.0 (Phase 3 Complete - Benchmarking)
 **Dernière mise à jour**: 2025-12-20
 
 ---
@@ -12,11 +12,11 @@ DuplicateFlow est un système de détection de vidéos dupliquées et similaires
 ### Capacités
 
 - ✅ **Scan de vidéos** - Découverte automatique de fichiers vidéo (Phase 1)
-- ✅ **Comparaison de vidéos** - Similarité entre 2 vidéos (Phase 2) **NOUVEAU**
-- ✅ **Détection de doublons** - Algorithmes perceptuels N-à-N (Phase 2) **NOUVEAU**
+- ✅ **Comparaison de vidéos** - Similarité entre 2 vidéos (Phase 2)
+- ✅ **Détection de doublons** - Algorithmes perceptuels N-à-N (Phase 2)
+- ✅ **Benchmarking** - Tests de performance et précision (Phase 3) **NOUVEAU**
 - ✅ **Export des résultats** - Export JSON et CSV
-- ✅ **8 Presets** - Fast, balanced, thorough, multimodal, etc. (Phase 2) **NOUVEAU**
-- ⏳ **Benchmarking** - Tests de performance (Phase 3)
+- ✅ **8 Presets** - Fast, balanced, thorough, multimodal, etc.
 
 ---
 
@@ -205,6 +205,142 @@ Duplicate Groups
 **Code de sortie**:
 - `0` : Doublons trouvés
 - `1` : Aucun doublon trouvé
+
+---
+
+### `benchmark` - Tester les performances **NOUVEAU Phase 3**
+
+Analyse les performances et la précision des presets de pipeline.
+
+**Syntaxe de base**:
+```bash
+python -m duplicateflow.cli benchmark <VIDEO1> <VIDEO2> [OPTIONS]
+python -m duplicateflow.cli benchmark --testset <TESTSET_JSON> [OPTIONS]
+```
+
+**Modes d'utilisation**:
+
+| Mode | Description |
+|------|-------------|
+| **Comparaison de pipelines** | Compare plusieurs presets sur la même paire de vidéos |
+| **Évaluation test set** | Évalue la précision sur un jeu de données labellisé |
+
+**Options**:
+
+| Option | Description | Défaut |
+|--------|-------------|--------|
+| `VIDEO1 VIDEO2` | Deux vidéos à comparer | *Requis si pas --testset* |
+| `--testset FILE` | Fichier JSON de test avec vérité terrain | Aucun |
+| `--preset PRESET` | Un seul preset à benchmarker | `balanced` |
+| `--presets PRESET [PRESET ...]` | Plusieurs presets à comparer | Aucun |
+| `--threshold PERCENT` | Seuil de similarité (0-100) | `70.0` |
+| `--profile-algorithms` | Afficher le détail par algorithme | `False` |
+| `--ground-truth duplicate\|not-duplicate` | Spécifier la vérité terrain | Aucune |
+| `--output-json FILE` | Exporter en JSON | Aucun |
+| `--output-csv FILE` | Exporter en CSV | Aucun |
+
+**Presets disponibles**:
+- `fast`, `balanced`, `thorough`, `multimodal`
+- `structural`, `hybrid`, `audio_advanced`, `motion_intense`
+
+**Exemples**:
+
+```bash
+# Benchmark un seul preset
+python -m duplicateflow.cli benchmark video1.mp4 video2.mp4 --preset balanced
+
+# Comparer plusieurs presets
+python -m duplicateflow.cli benchmark video1.mp4 video2.mp4 \
+  --presets fast balanced thorough multimodal
+
+# Profiler les algorithmes
+python -m duplicateflow.cli benchmark video1.mp4 video2.mp4 \
+  --preset thorough \
+  --profile-algorithms
+
+# Évaluer sur test set (avec vérité terrain)
+python -m duplicateflow.cli benchmark --testset testdata/ground_truth.json \
+  --preset balanced
+
+# Export complet
+python -m duplicateflow.cli benchmark video1.mp4 video2.mp4 \
+  --presets fast balanced thorough \
+  --output-json benchmark.json \
+  --output-csv benchmark.csv
+```
+
+**Format Test Set (JSON)**:
+```json
+{
+  "name": "test_set_v1",
+  "pairs": [
+    {
+      "video1": "/testdata/duplicate1_a.mp4",
+      "video2": "/testdata/duplicate1_b.mp4",
+      "is_duplicate": true
+    },
+    {
+      "video1": "/testdata/different1.mp4",
+      "video2": "/testdata/different2.mp4",
+      "is_duplicate": false
+    }
+  ]
+}
+```
+
+**Sortie (Comparaison de pipelines)**:
+```
+📊 Benchmark Summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Videos: video1.mp4 vs video2.mp4
+Pipelines tested: 3
+Fastest: fast (1000ms)
+
+Pipeline Performance Comparison
+┏━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃ Rank┃ Pipeline┃ Time(ms)┃ Time (s)┃ Similarity ┃ Duplicate┃ Memory(MB)┃ Algorithms ┃
+┡━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━━━━━┩
+│  #1 │ fast    │   1000  │   1.00  │   82.0%    │    ✓     │    80.0   │     3      │
+│  #2 │ balanced│   2500  │   2.50  │   88.5%    │    ✓     │   128.0   │     4      │
+│  #3 │ thorough│   5000  │   5.00  │   92.0%    │    ✓     │   200.0   │     5      │
+└─────┴─────────┴─────────┴─────────┴────────────┴──────────┴───────────┴────────────┘
+```
+
+**Sortie (Test Set)**:
+```
+📈 Test Set Results
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Test Set: test_set_v1
+Pipeline: balanced
+Total Comparisons: 100
+
+Accuracy Metrics:
+Accuracy:  85.00%
+Precision: 90.00%
+Recall:    81.82%
+F1 Score:  85.71%
+
+Performance:
+Avg Time:   2500ms per comparison
+Total Time: 250.0s
+
+Confusion Matrix
+┏━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                   ┃ Predicted: Duplicate  ┃ Predicted: Not Duplicate  ┃
+┡━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Actual: Duplicate │        45 (TP)        │         10 (FN)           │
+│ Actual: Not Dup   │        5 (FP)         │         40 (TN)           │
+└───────────────────┴───────────────────────┴───────────────────────────┘
+```
+
+**Métriques Accuracy**:
+- **Accuracy** : (TP + TN) / Total - Précision globale
+- **Precision** : TP / (TP + FP) - Proportion de vrais positifs parmi les prédictions positives
+- **Recall** : TP / (TP + FN) - Proportion de doublons détectés parmi tous les doublons
+- **F1 Score** : Moyenne harmonique de precision et recall
+
+**Code de sortie**:
+- `0` : Benchmark complété avec succès
 
 ---
 

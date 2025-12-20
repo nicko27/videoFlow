@@ -33,7 +33,16 @@ from .scan import (
 # Import Phase 2 models
 from .algorithm_result import AlgorithmResult
 from .comparison import ComparisonResult
-from .detection import DetectionResult
+from .detection import DetectionResult, DuplicateGroup as DetectionDuplicateGroup
+
+# Import Phase 3 models
+from .benchmark import (
+    AlgorithmBenchmark,
+    PipelineBenchmark,
+    ComparisonBenchmark,
+    AccuracyMetrics,
+    TestSetBenchmark,
+)
 
 __all__ = [
     # Existing models
@@ -49,4 +58,11 @@ __all__ = [
     "AlgorithmResult",
     "ComparisonResult",
     "DetectionResult",
+    "DetectionDuplicateGroup",
+    # Phase 3 models
+    "AlgorithmBenchmark",
+    "PipelineBenchmark",
+    "ComparisonBenchmark",
+    "AccuracyMetrics",
+    "TestSetBenchmark",
 ]
