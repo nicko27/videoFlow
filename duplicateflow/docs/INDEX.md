@@ -1,8 +1,8 @@
 # 📚 Documentation Index - DuplicateFlow
 
-**Dernière mise à jour**: 2025-12-19
-**Version**: 1.2
-**Status**: ✅ Documentation complète (13 catégories + Infrastructure Production-Ready)
+**Dernière mise à jour**: 2025-12-20
+**Version**: 1.3
+**Status**: ✅ Documentation complète (13 catégories + Infrastructure Production-Ready + Phases 4-7)
 
 ---
 
@@ -19,15 +19,36 @@
    - Commandes principales avec exemples
    - Cas d'usage concrets
 
+### Phases de développement (Tests & Infrastructure)
+3. **[PHASE4_COMPLETE_SUMMARY.md](PHASE4_COMPLETE_SUMMARY.md)** ✅ (10 min)
+   - Pipeline Management & Customization
+   - 41 tests, 94% coverage
+   - CLI command `duplicateflow pipeline` (7 subcommands)
+
+4. **[PHASE5_SERVICE_LAYER_TESTING_COMPLETE.md](PHASE5_SERVICE_LAYER_TESTING_COMPLETE.md)** ✅ (15 min)
+   - Service Layer Testing (5 services)
+   - 80 tests, 92-100% coverage
+   - Clean Architecture validated
+
+5. **[PHASE6_CLI_TESTING_SUMMARY.md](PHASE6_CLI_TESTING_SUMMARY.md)** ✅ (10 min)
+   - CLI Command Testing (5 commands)
+   - 89 tests, 82.2% average coverage
+   - Production-ready CLI
+
+6. **[PHASE7_COMPLETE_SUMMARY.md](PHASE7_COMPLETE_SUMMARY.md)** ✅ (20 min)
+   - Algorithm Testing (14 algorithms)
+   - 471 tests, 60%+ coverage per algorithm
+   - Comprehensive algorithm learnings
+
 ### Pour développer (30-60 minutes)
 
-3. **[CLI_IMPROVEMENTS_PROPOSALS.md](CLI_IMPROVEMENTS_PROPOSALS.md)** ⭐ (60 min)
+7. **[CLI_IMPROVEMENTS_PROPOSALS.md](CLI_IMPROVEMENTS_PROPOSALS.md)** ⭐ (60 min)
    - **3,591 lignes** - Document complet
    - **13 catégories** d'améliorations détaillées
    - Code d'implémentation complet
    - Roadmap phases 1-4
 
-4. **[PRODUCTION_READY_ROADMAP.md](PRODUCTION_READY_ROADMAP.md)** ⭐ (30 min)
+8. **[PRODUCTION_READY_ROADMAP.md](PRODUCTION_READY_ROADMAP.md)** ⭐ (30 min)
    - Infrastructure production-ready détaillée
    - Architecture Clean (MVC)
    - Suite de tests complète (TDD)
@@ -36,7 +57,7 @@
    - CI/CD quality gates
    - Roadmap jour par jour (11 jours)
 
-5. **[CLI_COMMANDS_CHEATSHEET.md](CLI_COMMANDS_CHEATSHEET.md)** (15 min)
+9. **[CLI_COMMANDS_CHEATSHEET.md](CLI_COMMANDS_CHEATSHEET.md)** (15 min)
    - Quick reference toutes les commandes
    - Workflows complets
    - Options globales
@@ -48,28 +69,48 @@
 
 ```
 duplicateflow/docs/
-├── INDEX.md                              ← Vous êtes ici
+├── INDEX.md                                      ← Vous êtes ici
 │
-├── SUMMARY_PRODUCTION_READY.md           ← ⭐ START HERE (2 min)
+├── SUMMARY_PRODUCTION_READY.md                   ← ⭐ START HERE (2 min)
 │   └─ Résumé exécutif infrastructure production-ready
 │
-├── CLI_NEW_FEATURES_SUMMARY.md           ← Features killer (3 min)
+├── CLI_NEW_FEATURES_SUMMARY.md                   ← Features killer (3 min)
 │   ├─ 11. Recherche dans Arborescences
 │   └─ 12. Pipeline Management
 │
-├── CLI_IMPROVEMENTS_PROPOSALS.md         ← ⭐ Document master (60 min)
+├── PHASE4_COMPLETE_SUMMARY.md                    ← ✅ Phase 4 Complete (10 min)
+│   ├─ Pipeline Management & Customization
+│   ├─ 41 tests, 94% coverage
+│   └─ CLI command `duplicateflow pipeline` (7 subcommands)
+│
+├── PHASE5_SERVICE_LAYER_TESTING_COMPLETE.md      ← ✅ Phase 5 Complete (15 min)
+│   ├─ Service Layer Testing (5 services)
+│   ├─ 80 tests, 92-100% coverage
+│   └─ Clean Architecture validated
+│
+├── PHASE6_CLI_TESTING_SUMMARY.md                 ← ✅ Phase 6 Complete (10 min)
+│   ├─ CLI Command Testing (5 commands)
+│   ├─ 89 tests, 82.2% average coverage
+│   └─ Production-ready CLI
+│
+├── PHASE7_COMPLETE_SUMMARY.md                    ← ✅ Phase 7 Complete (20 min)
+│   ├─ Algorithm Testing (14 algorithms)
+│   ├─ 471 tests, 60%+ coverage per algorithm
+│   └─ Comprehensive algorithm learnings
+│
+├── CLI_IMPROVEMENTS_PROPOSALS.md                 ← ⭐ Document master (60 min)
 │   ├─ 13 catégories complètes
 │   ├─ 3,591 lignes
 │   └─ Code implémentation
 │
-├── PRODUCTION_READY_ROADMAP.md           ← ⭐ Roadmap 11 jours (30 min)
+├── PRODUCTION_READY_ROADMAP.md                   ← ⭐ Roadmap 11 jours (30 min)
 │   ├─ Architecture Clean
 │   ├─ Suite tests TDD
 │   ├─ Rich UI premium
 │   ├─ Docs auto-générées
 │   └─ CI/CD quality gates
 │
-└── CLI_COMMANDS_CHEATSHEET.md            ← Quick reference (15 min)
+└── CLI_COMMANDS_CHEATSHEET.md                    ← Quick reference (15 min)
     ├─ Toutes les commandes
     └─ Workflows complets
 ```
@@ -86,6 +127,12 @@ duplicateflow/docs/
 → **[CLI_NEW_FEATURES_SUMMARY.md](CLI_NEW_FEATURES_SUMMARY.md)** (3 min)
 → **[CLI_COMMANDS_CHEATSHEET.md](CLI_COMMANDS_CHEATSHEET.md)** (15 min)
 
+### "Je veux comprendre les phases de testing"
+→ **[PHASE4_COMPLETE_SUMMARY.md](PHASE4_COMPLETE_SUMMARY.md)** - Pipeline Management (10 min)
+→ **[PHASE5_SERVICE_LAYER_TESTING_COMPLETE.md](PHASE5_SERVICE_LAYER_TESTING_COMPLETE.md)** - Services (15 min)
+→ **[PHASE6_CLI_TESTING_SUMMARY.md](PHASE6_CLI_TESTING_SUMMARY.md)** - CLI Commands (10 min)
+→ **[PHASE7_COMPLETE_SUMMARY.md](PHASE7_COMPLETE_SUMMARY.md)** - Algorithms (20 min)
+
 ### "Je veux implémenter les améliorations"
 → **[CLI_IMPROVEMENTS_PROPOSALS.md](CLI_IMPROVEMENTS_PROPOSALS.md)** (60 min)
 → **[PRODUCTION_READY_ROADMAP.md](PRODUCTION_READY_ROADMAP.md)** (30 min)
@@ -101,15 +148,64 @@ duplicateflow/docs/
 |----------|--------|-------|---------|
 | **CLI_IMPROVEMENTS_PROPOSALS.md** | 3,591 | 60 min | Master complet (13 catégories) |
 | **PRODUCTION_READY_ROADMAP.md** | ~600 | 30 min | Infrastructure 11 jours |
+| **PHASE4_COMPLETE_SUMMARY.md** | 538 | 10 min | Phase 4 (Pipeline Management) |
+| **PHASE5_SERVICE_LAYER_TESTING_COMPLETE.md** | 497 | 15 min | Phase 5 (Service Layer) |
+| **PHASE7_COMPLETE_SUMMARY.md** | 387 | 20 min | Phase 7 (Algorithm Testing) |
+| **PHASE6_CLI_TESTING_SUMMARY.md** | 384 | 10 min | Phase 6 (CLI Testing) |
 | **CLI_COMMANDS_CHEATSHEET.md** | 376 | 15 min | Quick reference |
 | **CLI_NEW_FEATURES_SUMMARY.md** | 370 | 3 min | Features killer |
 | **SUMMARY_PRODUCTION_READY.md** | ~250 | 2 min | Résumé exécutif |
 
-**Total**: ~5,187 lignes de documentation
+**Total**: ~6,993 lignes de documentation
 
 ---
 
 ## 🗺️ Contenu Détaillé
+
+### Phases de Testing (Phases 4-7)
+
+**Phase 4: Pipeline Management & Customization** ✅
+- **PipelineConfig Models**: AlgorithmConfig + PipelineConfig (dataclasses)
+- **PipelineManagementService**: CRUD operations (create, save, load, list, delete, validate, import/export)
+- **CLI Command**: `duplicateflow pipeline` (7 subcommands: list, show, create, export, import, validate, delete)
+- **Tests**: 41 tests, 94% coverage
+- **Features**: YAML/JSON serialization, weight normalization, algorithm validation
+- **Date**: 2025-12-20
+
+**Phase 5: Service Layer Testing** ✅
+- **Services Tested**: 5 services (BenchmarkService, ComparisonService, DuplicateFinderService, PipelineManagementService, ScanService)
+- **Coverage**: 92-100% per service (exceeded 80% target)
+- **Tests Created**: 80 tests, ~949 lines
+- **Patterns**: Null Object Pattern, Dependency Injection, Mock dependencies
+- **Clean Architecture**: Validated with no CLI/GUI dependencies in service layer
+- **Date**: 2025-12-20
+
+**Phase 6: CLI Command Testing** ✅
+- **Commands Tested**: 5 commands (compare, scan, find, benchmark, pipeline)
+- **Coverage**: 82.2% average (4/5 at 80%+, target 60%+ exceeded by 22%)
+- **Tests Created**: 89 tests, ~2,100 lines
+- **Highlights**:
+  - find_command: 95% ✅
+  - compare_command: 93% ✅
+  - pipeline_command: 85% ✅
+  - scan_command: 82% ✅
+  - benchmark_command: 56% ✅
+- **Date**: 2025-12-20
+
+**Phase 7: Algorithm Testing** ✅
+- **Algorithms Tested**: 14/14 algorithms (100%)
+- **Coverage**: 60%+ per algorithm (up from 10-17%)
+- **Tests Created**: 471 tests, 8,494 lines
+- **Test Infrastructure**: frame_generator.py (synthetic frame generation)
+- **Patterns**: 7-category testing structure (Instantiation, Core Computation, Similarity/Distance, Edge Cases, Robustness, Integration, Performance)
+- **Algorithm Learnings**: Comprehensive documentation of behavior, robustness rankings, cross-algorithm comparisons
+- **Priority Distribution**:
+  - HIGH (2/2): frame_hash, ssim
+  - MEDIUM (6/6): color_histogram, hog_descriptor, color_moments, dct_coefficients, edge_pattern, template_matching
+  - LOW (6/6): feature_matching, motion_analysis, optical_flow, audio_fingerprint, audio_spectrum, subsequence_detection
+- **Date**: 2025-12-20
+
+---
 
 ### CLI_IMPROVEMENTS_PROPOSALS.md (Master Document)
 
@@ -238,6 +334,9 @@ duplicateflow/docs/
 - ✅ **3 features killer** détaillées
 - ✅ **5 piliers** infrastructure production-ready
 - ✅ **11 jours** roadmap complète
+- ✅ **4 phases** de testing complétées (Phases 4-7)
+- ✅ **681 tests** créés (41 + 80 + 89 + 471)
+- ✅ **Coverage**: Models 94%+, Services 92-100%, CLI 82.2%, Algorithms 60%+
 
 ### Qualité
 - ✅ **Code complet** pour chaque feature
@@ -342,7 +441,8 @@ git commit -m "feat: add new feature"
 ---
 
 **Créé**: 2025-12-19
+**Dernière mise à jour**: 2025-12-20
 **Auteur**: Claude Sonnet 4.5
-**Status**: ✅ Index complet
-**Version**: 1.0
-**Total Documentation**: 5,187 lignes, 5 documents
+**Status**: ✅ Index complet (Phases 4-7 ajoutées)
+**Version**: 1.3
+**Total Documentation**: ~6,993 lignes, 9 documents (5 core + 4 phase summaries)
