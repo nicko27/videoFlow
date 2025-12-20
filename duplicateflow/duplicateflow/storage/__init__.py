@@ -35,9 +35,11 @@ Example:
 from duplicateflow.storage.storage_manager import StorageManager
 from duplicateflow.storage.result_cache import ResultCache
 from duplicateflow.storage.feature_cache import FeatureCache
+from duplicateflow.storage.pipeline_store import PipelineStore
 
 __all__ = [
     'StorageManager',
     'ResultCache',
     'FeatureCache',
+    'PipelineStore',
 ]

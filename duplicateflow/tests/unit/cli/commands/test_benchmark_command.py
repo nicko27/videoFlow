@@ -39,8 +39,8 @@ class TestBenchmarkCommandParser:
         ])
 
         assert args.command == 'benchmark'
-        assert args.video1 == 'video1.mp4'
-        assert args.video2 == 'video2.mp4'
+        assert args.videos == ['video1.mp4', 'video2.mp4']
+        assert args.testset is None
 
     def test_parse_with_preset(self):
         """Test parsing with preset option."""
@@ -79,6 +79,7 @@ class TestBenchmarkCommandParser:
 
         assert args.testset == 'testdata.json'
         assert args.preset == 'balanced'
+        assert args.videos == []  # No videos when using testset
 
 
 class TestBenchmarkCommandExecution:
@@ -118,20 +119,25 @@ class TestBenchmarkCommandExecution:
         mock_console = MagicMock()
         mock_console_cls.return_value = mock_console
 
+        # Mock comparison result (for compare_pipelines, not benchmark_pipeline)
+        mock_comparison_result = Mock()
+        mock_comparison_result.pipeline_benchmarks = [mock_benchmark_result]
+
         mock_service = Mock()
-        mock_service.benchmark_pipeline.return_value = mock_benchmark_result
+        mock_service.compare_pipelines.return_value = mock_comparison_result
         mock_service_cls.return_value = mock_service
 
         mock_progress_instance = MagicMock()
         mock_progress.return_value.__enter__.return_value = mock_progress_instance
 
         args = argparse.Namespace(
-            video1=str(video1),
-            video2=str(video2),
+            videos=[str(video1), str(video2)],
             preset='balanced',
             presets=None,
             threshold=70.0,
             testset=None,
+            profile_algorithms=False,
+            ground_truth=None,
             output_json=None,
             output_csv=None
         )
@@ -139,7 +145,7 @@ class TestBenchmarkCommandExecution:
         exit_code = run_benchmark_command(args)
 
         assert exit_code == 0
-        mock_service.benchmark_pipeline.assert_called_once()
+        mock_service.compare_pipelines.assert_called_once()
 
     @patch('duplicateflow.cli.commands.benchmark_command.BenchmarkService')
     @patch('duplicateflow.cli.commands.benchmark_command.RichProgressReporter')
@@ -173,12 +179,13 @@ class TestBenchmarkCommandExecution:
         mock_progress.return_value.__enter__.return_value = mock_progress_instance
 
         args = argparse.Namespace(
-            video1=str(video1),
-            video2=str(video2),
+            videos=[str(video1), str(video2)],
             preset=None,
             presets=['fast', 'balanced', 'thorough'],
             threshold=70.0,
             testset=None,
+            profile_algorithms=False,
+            ground_truth=None,
             output_json=None,
             output_csv=None
         )
@@ -195,12 +202,13 @@ class TestBenchmarkCommandExecution:
         mock_console_cls.return_value = mock_console
 
         args = argparse.Namespace(
-            video1='nonexistent1.mp4',
-            video2='nonexistent2.mp4',
+            videos=['nonexistent1.mp4', 'nonexistent2.mp4'],
             preset='balanced',
             presets=None,
             threshold=70.0,
             testset=None,
+            profile_algorithms=False,
+            ground_truth=None,
             output_json=None,
             output_csv=None
         )
@@ -240,12 +248,13 @@ class TestBenchmarkCommandExecution:
         mock_progress.return_value.__enter__.return_value = mock_progress_instance
 
         args = argparse.Namespace(
-            video1=None,
-            video2=None,
+            videos=[],
             preset='balanced',
             presets=None,
             threshold=70.0,
             testset=str(testset_file),
+            profile_algorithms=False,
+            ground_truth=None,
             output_json=None,
             output_csv=None
         )
@@ -282,24 +291,33 @@ class TestBenchmarkCommandIntegration:
         mock_console = MagicMock()
         mock_console_cls.return_value = mock_console
 
-        mock_result = Mock(spec=PipelineBenchmark)
-        mock_result.pipeline_name = "thorough"
-        mock_result.total_time_ms = 500.0
+        mock_pipeline_bench = Mock(spec=PipelineBenchmark)
+        mock_pipeline_bench.pipeline_name = "thorough"
+        mock_pipeline_bench.total_time_ms = 500.0
+        mock_pipeline_bench.similarity_score = 85.0
+        mock_pipeline_bench.is_duplicate = True
+        mock_pipeline_bench.memory_peak_mb = 100.0
+        mock_pipeline_bench.algorithm_benchmarks = []
+
+        mock_result = Mock()
+        mock_result.pipeline_benchmarks = [mock_pipeline_bench]
+        mock_result.to_dict.return_value = {}
 
         mock_service = Mock()
-        mock_service.benchmark_pipeline.return_value = mock_result
+        mock_service.compare_pipelines.return_value = mock_result
         mock_service_cls.return_value = mock_service
 
         mock_progress_instance = MagicMock()
         mock_progress.return_value.__enter__.return_value = mock_progress_instance
 
         args = argparse.Namespace(
-            video1=str(video1),
-            video2=str(video2),
+            videos=[str(video1), str(video2)],
             preset='thorough',
             presets=None,
             threshold=80.0,
             testset=None,
+            profile_algorithms=False,
+            ground_truth=None,
             output_json=None,
             output_csv=None
         )
@@ -308,5 +326,5 @@ class TestBenchmarkCommandIntegration:
 
         assert exit_code == 0
         mock_service_cls.assert_called_once()
-        mock_service.benchmark_pipeline.assert_called_once()
+        mock_service.compare_pipelines.assert_called_once()
         mock_display.assert_called_once()

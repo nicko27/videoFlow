@@ -167,7 +167,7 @@ if duplicateflow_path.exists():
     sys.path.insert(0, str(duplicateflow_path))
 
 from src.core.logger import Logger
-from src.plugins.duplicate_finder.core.database_manager import VideoDatabase
+from src.plugins.duplicate_finder.database_manager import VideoDatabase
 from src.plugins.duplicate_finder.services.test_set_manager import TestSetManager
 from src.plugins.duplicate_finder.orchestration.pipeline_manager import PipelineManager
 

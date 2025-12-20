@@ -2,7 +2,8 @@
 Pipeline for orchestrating multiple algorithms with weighted scoring.
 
 A Pipeline executes multiple algorithms on the same video pair and combines
-their results using weighted averaging.
+their results using weighted averaging. Supports optional validation steps
+for pre-filtering or post-verification.
 """
 
 import logging
@@ -10,6 +11,7 @@ from typing import List, Dict, Any, Optional
 from tqdm import tqdm
 from duplicateflow.core import get_algorithm
 from duplicateflow.storage import StorageManager
+from duplicateflow.sdk.validator import Validator
 
 logger = logging.getLogger('duplicateflow.pipeline')
 
@@ -40,7 +42,12 @@ class Pipeline:
         global_threshold: float = 70.0,
         early_termination: bool = True,
         early_termination_margin: float = 10.0,
-        show_progress: bool = False
+        show_progress: bool = False,
+        pre_validators: Optional[List[Validator]] = None,
+        post_validators: Optional[List[Validator]] = None,
+        validation_mode: str = 'all',
+        analyze_duration: Optional[float] = None,
+        analyze_from_start: bool = True
     ):
         """
         Initialize pipeline with algorithm steps.
@@ -56,6 +63,19 @@ class Pipeline:
             early_termination: Stop if global score exceeds threshold
             early_termination_margin: Margin above threshold for early stop
             show_progress: Show progress bar during execution
+            pre_validators: Optional list of validators to run BEFORE comparison
+                           (e.g., LengthValidator to filter by duration)
+            post_validators: Optional list of validators to run AFTER comparison
+                            (e.g., scene boundary validation)
+            validation_mode: How to handle multiple validators:
+                - 'all': All validators must pass (AND logic)
+                - 'any': At least one validator must pass (OR logic)
+            analyze_duration: Optional duration limit for video analysis (seconds)
+                - None: Analyze full videos (default)
+                - float: Only analyze first N seconds of each video
+                - Useful for duplicate detection (vs scene detection)
+            analyze_from_start: If True, analyze from start of video (default)
+                              If False, analyze from end of video
 
         Example steps:
             [
@@ -71,6 +91,23 @@ class Pipeline:
                     'threshold': 70
                 }
             ]
+
+        Example with validators:
+            >>> from duplicateflow.sdk import LengthValidator
+            >>> pipeline = Pipeline(
+            ...     steps=[...],
+            ...     pre_validators=[
+            ...         LengthValidator(tolerance_percent=5.0, tolerance_seconds=30.0)
+            ...     ]
+            ... )
+
+        Example with partial analysis (duplicates mode):
+            >>> # Only analyze first 60 seconds for duplicate detection
+            >>> pipeline = Pipeline(
+            ...     steps=[...],
+            ...     analyze_duration=60.0,  # Analyze first 60 seconds only
+            ...     analyze_from_start=True
+            ... )
         """
         self.steps = steps
         self.storage = storage or StorageManager()
@@ -78,6 +115,13 @@ class Pipeline:
         self.early_termination = early_termination
         self.early_termination_margin = early_termination_margin
         self.show_progress = show_progress
+        self.validation_mode = validation_mode
+        self.analyze_duration = analyze_duration
+        self.analyze_from_start = analyze_from_start
+
+        # Convert validator dicts to instances if needed
+        self.pre_validators = self._initialize_validators(pre_validators or [])
+        self.post_validators = self._initialize_validators(post_validators or [])
 
         # Validate and normalize weights
         self._validate_steps()
@@ -101,6 +145,41 @@ class Pipeline:
                 'threshold': step['threshold']
             })
 
+    def _initialize_validators(self, validators: List) -> List[Validator]:
+        """
+        Initialize validators from list of dicts or instances.
+
+        Args:
+            validators: List of Validator instances or dicts with 'type' and 'config'
+
+        Returns:
+            List of Validator instances
+        """
+        initialized = []
+
+        for validator in validators:
+            # If already a Validator instance, use it directly
+            if isinstance(validator, Validator):
+                initialized.append(validator)
+            # If dict with 'type' and 'config', instantiate
+            elif isinstance(validator, dict):
+                validator_type = validator.get('type')
+                validator_config = validator.get('config', {})
+
+                if not validator_type:
+                    raise ValueError("Validator dict must have 'type' field")
+
+                # Import and instantiate the validator class
+                if validator_type == 'LengthValidator':
+                    from duplicateflow.sdk.validator import LengthValidator
+                    initialized.append(LengthValidator(**validator_config))
+                else:
+                    raise ValueError(f"Unknown validator type: {validator_type}")
+            else:
+                raise TypeError(f"Validator must be Validator instance or dict, got {type(validator)}")
+
+        return initialized
+
     def _validate_steps(self):
         """Validate pipeline steps and normalize weights."""
         if not self.steps:
@@ -122,6 +201,117 @@ class Pipeline:
 
         for step in self.steps:
             step['weight'] = step['weight'] / total_weight
+
+    def _run_validators(
+        self,
+        validators: List[Validator],
+        video1: str,
+        video2: str,
+        result: Optional[Dict[str, Any]] = None
+    ) -> tuple[bool, List[Dict[str, Any]]]:
+        """
+        Run a list of validators.
+
+        Args:
+            validators: List of Validator instances
+            video1: Path to first video
+            video2: Path to second video
+            result: Optional comparison result (for post-validators)
+
+        Returns:
+            Tuple of (all_valid, metadata_list):
+            - all_valid: True if validation passed according to validation_mode
+            - metadata_list: List of metadata dicts from each validator
+        """
+        if not validators:
+            return True, []
+
+        validation_results = []
+        metadata_list = []
+
+        for validator in validators:
+            try:
+                is_valid, metadata = validator.validate(video1, video2, result)
+                validation_results.append(is_valid)
+                metadata_list.append({
+                    'validator': validator.__class__.__name__,
+                    'passed': is_valid,
+                    'metadata': metadata
+                })
+                logger.debug(f"Validator {validator.__class__.__name__}: {'PASS' if is_valid else 'FAIL'}")
+            except Exception as e:
+                logger.error(f"Validator {validator.__class__.__name__} failed: {e}")
+                validation_results.append(False)
+                metadata_list.append({
+                    'validator': validator.__class__.__name__,
+                    'passed': False,
+                    'metadata': {'error': str(e)}
+                })
+
+        # Apply validation mode logic
+        if self.validation_mode == 'all':
+            all_valid = all(validation_results)
+        elif self.validation_mode == 'any':
+            all_valid = any(validation_results)
+        else:
+            raise ValueError(f"Invalid validation_mode: {self.validation_mode}")
+
+        return all_valid, metadata_list
+
+    def _compute_analysis_params(
+        self,
+        video_path: str,
+        requested_start: Optional[float],
+        requested_duration: Optional[float]
+    ) -> tuple[float, Optional[float]]:
+        """
+        Compute effective start_time and duration based on analyze_duration setting.
+
+        Args:
+            video_path: Path to video
+            requested_start: User-requested start time (or None)
+            requested_duration: User-requested duration (or None)
+
+        Returns:
+            Tuple of (start_time, duration) to use for analysis
+        """
+        # If no analyze_duration limit, use requested params
+        if self.analyze_duration is None:
+            return requested_start or 0.0, requested_duration
+
+        # Get video duration if needed
+        import cv2
+        cap = cv2.VideoCapture(video_path)
+        try:
+            if not cap.isOpened():
+                # Fallback: use requested params
+                return requested_start or 0.0, requested_duration
+
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+            video_duration = frame_count / fps if fps > 0 else None
+        finally:
+            cap.release()
+
+        if video_duration is None:
+            # Fallback: use requested params
+            return requested_start or 0.0, requested_duration
+
+        # Apply analyze_duration limit
+        if self.analyze_from_start:
+            # Analyze from start
+            start_time = requested_start or 0.0
+            effective_duration = min(self.analyze_duration, video_duration - start_time)
+        else:
+            # Analyze from end
+            start_time = max(0.0, video_duration - self.analyze_duration)
+            effective_duration = min(self.analyze_duration, video_duration)
+
+        # If user requested a shorter duration, use that
+        if requested_duration is not None:
+            effective_duration = min(effective_duration, requested_duration)
+
+        return start_time, effective_duration
 
     def compare(
         self,
@@ -148,7 +338,45 @@ class Pipeline:
                 - individual_results: List of per-algorithm results
                 - weights: Weights used for each algorithm
                 - metadata: Additional pipeline metadata
+
+        Note:
+            If analyze_duration is set, the effective analysis window will be
+            limited to the first (or last) N seconds of each video, overriding
+            the duration parameter if necessary.
         """
+        # Compute effective analysis parameters based on analyze_duration
+        if self.analyze_duration is not None:
+            short_start, short_duration = self._compute_analysis_params(
+                short_video, 0.0, None
+            )
+            long_start, long_duration = self._compute_analysis_params(
+                long_video, start_time, duration
+            )
+            # Use computed values
+            start_time = long_start
+            duration = long_duration
+            logger.info(f"Partial analysis mode: analyzing {self.analyze_duration}s from {'start' if self.analyze_from_start else 'end'}")
+            logger.debug(f"Short video: start={short_start:.1f}s, duration={short_duration}s")
+            logger.debug(f"Long video: start={start_time:.1f}s, duration={duration}s")
+        # Run pre-validators (before comparison)
+        if self.pre_validators:
+            logger.info(f"Running {len(self.pre_validators)} pre-validator(s)")
+            pre_valid, pre_metadata = self._run_validators(
+                self.pre_validators, short_video, long_video, None
+            )
+            if not pre_valid:
+                logger.info("Pre-validation failed, skipping comparison")
+                return {
+                    'global_score': 0.0,
+                    'accepted': False,
+                    'individual_results': [],
+                    'weights': {},
+                    'metadata': {
+                        'pre_validation_failed': True,
+                        'pre_validation_results': pre_metadata
+                    }
+                }
+
         # Check if files are identical (quick duplicate check)
         logger.info(f"Comparing videos: {short_video} vs {long_video}")
         if self.storage.are_files_identical(short_video, long_video, method='fast'):
@@ -260,9 +488,9 @@ class Pipeline:
         global_score = weighted_sum / total_weight if total_weight > 0 else 0.0
         # Use safe threshold (handle None)
         threshold_safe = self.global_threshold if self.global_threshold is not None else 70.0
-        logger.info(f"Pipeline complete: score={global_score:.2f}, accepted={global_score >= threshold_safe}")
 
-        return {
+        # Create initial result
+        result = {
             'global_score': global_score,
             'accepted': global_score >= threshold_safe,
             'individual_results': individual_results,
@@ -273,6 +501,26 @@ class Pipeline:
                 'total_algorithms': len(self.algorithms)
             }
         }
+
+        # Run post-validators (after comparison)
+        if self.post_validators:
+            logger.info(f"Running {len(self.post_validators)} post-validator(s)")
+            post_valid, post_metadata = self._run_validators(
+                self.post_validators, short_video, long_video, result
+            )
+
+            # Add post-validation metadata
+            result['metadata']['post_validation_results'] = post_metadata
+
+            # If post-validation fails, mark result as not accepted
+            if not post_valid:
+                logger.info("Post-validation failed, rejecting result")
+                result['accepted'] = False
+                result['metadata']['post_validation_failed'] = True
+
+        logger.info(f"Pipeline complete: score={global_score:.2f}, accepted={result['accepted']}")
+
+        return result
 
     def get_config(self) -> Dict[str, Any]:
         """
@@ -286,7 +534,12 @@ class Pipeline:
             'global_threshold': self.global_threshold,
             'early_termination': self.early_termination,
             'early_termination_margin': self.early_termination_margin,
-            'num_algorithms': len(self.algorithms)
+            'num_algorithms': len(self.algorithms),
+            'pre_validators': [v.get_metadata() for v in self.pre_validators],
+            'post_validators': [v.get_metadata() for v in self.post_validators],
+            'validation_mode': self.validation_mode,
+            'analyze_duration': self.analyze_duration,
+            'analyze_from_start': self.analyze_from_start
         }
 
     @classmethod

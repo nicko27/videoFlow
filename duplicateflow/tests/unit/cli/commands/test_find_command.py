@@ -47,6 +47,8 @@ class TestFindCommandParser:
         assert args.max_comparisons is None
         assert args.output_json is None
         assert args.output_csv is None
+        assert args.formats is None
+        assert args.min_size is None
 
     def test_parse_with_recursive(self):
         """Test parsing with recursive flag."""
@@ -117,15 +119,21 @@ class TestFindCommandExecution:
     @pytest.fixture
     def mock_scan_result(self, tmp_path):
         """Create a mock scan result."""
+        from duplicateflow.core.models import VideoFile, VideoFormat
+
         result = Mock(spec=ScanResult)
         result.total_videos = 5
-        result.videos_found = [
-            tmp_path / "video1.mp4",
-            tmp_path / "video2.mp4",
-            tmp_path / "video3.mp4",
-            tmp_path / "video4.mp4",
-            tmp_path / "video5.mp4"
-        ]
+
+        # Create VideoFile objects with path attributes
+        videos = []
+        for i in range(1, 6):
+            video_file = Mock(spec=VideoFile)
+            video_file.path = tmp_path / f"video{i}.mp4"
+            video_file.format = VideoFormat.MP4
+            video_file.size_mb = 10.0
+            videos.append(video_file)
+
+        result.videos = videos
         return result
 
     @pytest.fixture
@@ -206,7 +214,9 @@ class TestFindCommandExecution:
             recursive=False,
             max_comparisons=None,
             output_json=None,
-            output_csv=None
+            output_csv=None,
+            formats=None,
+            min_size=None
         )
 
         # Execute
@@ -232,7 +242,9 @@ class TestFindCommandExecution:
             recursive=False,
             max_comparisons=None,
             output_json=None,
-            output_csv=None
+            output_csv=None,
+            formats=None,
+            min_size=None
         )
 
         exit_code = run_find_command(args)
@@ -258,7 +270,9 @@ class TestFindCommandExecution:
             recursive=False,
             max_comparisons=None,
             output_json=None,
-            output_csv=None
+            output_csv=None,
+            formats=None,
+            min_size=None
         )
 
         exit_code = run_find_command(args)
@@ -296,7 +310,7 @@ class TestFindCommandExecution:
         # Scan returns 0 videos
         mock_scan_result = Mock(spec=ScanResult)
         mock_scan_result.total_videos = 0
-        mock_scan_result.videos_found = []
+        mock_scan_result.videos = []
 
         mock_scan_service = Mock()
         mock_scan_service.scan_directory.return_value = mock_scan_result
@@ -312,7 +326,9 @@ class TestFindCommandExecution:
             recursive=False,
             max_comparisons=None,
             output_json=None,
-            output_csv=None
+            output_csv=None,
+            formats=None,
+            min_size=None
         )
 
         exit_code = run_find_command(args)
@@ -376,7 +392,9 @@ class TestFindCommandExecution:
             recursive=False,
             max_comparisons=None,
             output_json=str(output_json),
-            output_csv=None
+            output_csv=None,
+            formats=None,
+            min_size=None
         )
 
         exit_code = run_find_command(args)
@@ -404,7 +422,9 @@ class TestFindCommandExecution:
             recursive=False,
             max_comparisons=None,
             output_json=None,
-            output_csv=None
+            output_csv=None,
+            formats=None,
+            min_size=None
         )
 
         exit_code = run_find_command(args)
@@ -448,9 +468,20 @@ class TestFindCommandIntegration:
         mock_pipeline_cls.from_preset.return_value = mock_pipeline
 
         # Scan finds 10 videos
+        from duplicateflow.core.models import VideoFile, VideoFormat
+
         mock_scan_result = Mock(spec=ScanResult)
         mock_scan_result.total_videos = 10
-        mock_scan_result.videos_found = [tmp_path / f"video{i}.mp4" for i in range(10)]
+
+        videos = []
+        for i in range(10):
+            video_file = Mock(spec=VideoFile)
+            video_file.path = tmp_path / f"video{i}.mp4"
+            video_file.format = VideoFormat.MP4
+            video_file.size_mb = 10.0
+            videos.append(video_file)
+
+        mock_scan_result.videos = videos
 
         mock_scan_service = Mock()
         mock_scan_service.scan_directory.return_value = mock_scan_result
@@ -476,7 +507,9 @@ class TestFindCommandIntegration:
             recursive=True,
             max_comparisons=100,
             output_json=None,
-            output_csv=None
+            output_csv=None,
+            formats=None,
+            min_size=None
         )
 
         exit_code = run_find_command(args)

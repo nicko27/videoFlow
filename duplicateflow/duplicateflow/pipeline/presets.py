@@ -373,6 +373,154 @@ MOTION_INTENSE_PRESET = {
 }
 
 
+# Fast Duplicates Preset: Optimized duplicate detection with validation
+# Uses validation + partial analysis for maximum speed
+FAST_DUPLICATES_PRESET = {
+    'steps': [
+        {
+            'algorithm': 'frame_hash',
+            'weight': 0.6,
+            'threshold': 80,
+            'params': {
+                'hash_method': 'pHash',
+                'num_samples': 8
+            }
+        },
+        {
+            'algorithm': 'color_histogram',
+            'weight': 0.4,
+            'threshold': 75,
+            'params': {
+                'num_samples': 5,
+                'bins': (32, 32, 32)
+            }
+        }
+    ],
+    'global_threshold': 75.0,
+    'early_termination': True,
+    'early_termination_margin': 10.0,
+    # NEW: Validation and partial analysis
+    'pre_validators': [
+        {
+            'type': 'LengthValidator',
+            'config': {
+                'tolerance_percent': 5.0,
+                'tolerance_seconds': 30.0,
+                'require_both': False
+            }
+        }
+    ],
+    'analyze_duration': 60.0,
+    'analyze_from_start': True
+}
+
+
+# Accurate Scenes Preset: Precise scene detection with strict validation
+ACCURATE_SCENES_PRESET = {
+    'steps': [
+        {
+            'algorithm': 'ssim',
+            'weight': 0.3,
+            'threshold': 0.70,
+            'params': {
+                'sample_interval': 5.0
+            }
+        },
+        {
+            'algorithm': 'motion_analysis',
+            'weight': 0.3,
+            'threshold': 70,
+            'params': {
+                'num_samples': 5
+            }
+        },
+        {
+            'algorithm': 'audio_spectrum',
+            'weight': 0.4,
+            'threshold': 70,
+            'params': {
+                'num_samples': 10,
+                'sample_duration': 2.0
+            }
+        }
+    ],
+    'global_threshold': 70.0,
+    'early_termination': False,
+    # NEW: Strict length validation for scenes
+    'pre_validators': [
+        {
+            'type': 'LengthValidator',
+            'config': {
+                'tolerance_percent': 2.0,
+                'tolerance_seconds': 5.0,
+                'require_both': True  # Strict AND logic
+            }
+        }
+    ],
+    'analyze_duration': None  # Full analysis for scenes
+}
+
+
+# Intro Detector Preset: Detect similar intros/openings
+INTRO_DETECTOR_PRESET = {
+    'steps': [
+        {
+            'algorithm': 'frame_hash',
+            'weight': 0.6,
+            'threshold': 85,
+            'params': {
+                'hash_method': 'pHash',
+                'num_samples': 8
+            }
+        },
+        {
+            'algorithm': 'color_histogram',
+            'weight': 0.4,
+            'threshold': 80,
+            'params': {
+                'num_samples': 5,
+                'bins': (32, 32, 32)
+            }
+        }
+    ],
+    'global_threshold': 85.0,
+    'early_termination': True,
+    # NEW: Analyze only first 45 seconds
+    'analyze_duration': 45.0,
+    'analyze_from_start': True
+}
+
+
+# Credits Detector Preset: Detect similar end credits
+CREDITS_DETECTOR_PRESET = {
+    'steps': [
+        {
+            'algorithm': 'frame_hash',
+            'weight': 0.5,
+            'threshold': 85,
+            'params': {
+                'hash_method': 'pHash',
+                'num_samples': 8
+            }
+        },
+        {
+            'algorithm': 'color_histogram',
+            'weight': 0.5,
+            'threshold': 80,
+            'params': {
+                'num_samples': 5,
+                'bins': (32, 32, 32)
+            }
+        }
+    ],
+    'global_threshold': 85.0,
+    'early_termination': True,
+    # NEW: Analyze only last 30 seconds
+    'analyze_duration': 30.0,
+    'analyze_from_start': False  # From end
+}
+
+
 # Map preset names to configurations
 PRESETS = {
     'fast': FAST_PRESET,
@@ -382,7 +530,12 @@ PRESETS = {
     'structural': STRUCTURAL_PRESET,
     'hybrid': HYBRID_PRESET,
     'audio_advanced': AUDIO_ADVANCED_PRESET,
-    'motion_intense': MOTION_INTENSE_PRESET
+    'motion_intense': MOTION_INTENSE_PRESET,
+    # NEW: Presets with validators
+    'fast_duplicates': FAST_DUPLICATES_PRESET,
+    'accurate_scenes': ACCURATE_SCENES_PRESET,
+    'intro_detector': INTRO_DETECTOR_PRESET,
+    'credits_detector': CREDITS_DETECTOR_PRESET
 }
 
 
