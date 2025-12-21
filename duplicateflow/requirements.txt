@@ -15,5 +15,8 @@ pydantic>=2.5.0
 pyyaml>=6.0
 colorama>=0.4.6
 
+# Security: Pin urllib3 to fix CVE-2025-66418, CVE-2025-50181, CVE-2025-66471
+urllib3>=2.6.0
+
 # Storage
 # (sqlite3 is included in Python stdlib)
