@@ -803,3 +803,22 @@ class TestOpticalFlowVideoIntegration:
         assert result['metadata']['windows_tested'] >= 1
         assert 0.0 <= result['similarity'] <= 1.0
         assert isinstance(result['accepted'], (bool, np.bool_))
+
+    def test_compare_duration_auto_detect(self, test_video_path):
+        """Test duration auto-detection when not provided."""
+        algo = OpticalFlowAlgorithm()
+        algo.configure(threshold=70.0, max_frames=10)
+
+        # Don't provide duration - should auto-detect from short video
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0
+            # duration=None (implicit)
+        )
+
+        # Should successfully auto-detect and compare
+        assert 'similarity' in result
+        assert 0.0 <= result['similarity'] <= 1.0
+        assert isinstance(result['accepted'], (bool, np.bool_))
+        assert 'windows_tested' in result['metadata']

@@ -946,3 +946,45 @@ class TestTemplateMatchingVideoIntegration:
         assert result['metadata']['windows_tested'] >= 1
         assert 0.0 <= result['similarity'] <= 1.0
         assert isinstance(result['accepted'], (bool, np.bool_))
+
+    def test_compare_duration_auto_detect(self, test_video_path):
+        """Test duration auto-detection when not provided."""
+        algo = TemplateMatchingAlgorithm()
+        algo.configure(threshold=75.0, num_templates=4)
+
+        # Don't provide duration - should auto-detect from short video
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0
+            # duration=None (implicit)
+        )
+
+        # Should successfully auto-detect and compare
+        assert 'similarity' in result
+        assert 0.0 <= result['similarity'] <= 1.0
+        assert isinstance(result['accepted'], (bool, np.bool_))
+        assert 'num_templates' in result['metadata']
+
+    def test_cli_params(self):
+        """Test get_cli_params returns correct structure."""
+        algo = TemplateMatchingAlgorithm()
+        params = algo.get_cli_params()
+
+        assert isinstance(params, list)
+        assert len(params) > 0
+
+        # Check structure of each param
+        for param in params:
+            assert 'names' in param
+            assert 'type' in param
+            assert 'help' in param
+
+    def test_requirements(self):
+        """Test get_requirements returns dependencies."""
+        algo = TemplateMatchingAlgorithm()
+        reqs = algo.get_requirements()
+
+        assert isinstance(reqs, list)
+        assert 'opencv-python>=4.8.0' in reqs
+        assert 'numpy>=1.24.0' in reqs
