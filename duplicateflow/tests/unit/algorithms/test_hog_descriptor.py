@@ -845,3 +845,192 @@ class TestHOGDescriptorVideoIntegration:
         assert isinstance(reqs, list)
         assert 'opencv-python>=4.8.0' in reqs
         assert 'numpy>=1.24.0' in reqs
+
+    def test_insufficient_descriptors(self, tmp_path):
+        """Test handling when insufficient HOG descriptors can be extracted."""
+        import tempfile
+        import cv2
+
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(threshold=70.0, num_samples=10)  # Request many samples
+
+        # Create a 1-frame video
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tf:
+            temp_video = tf.name
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(temp_video, fourcc, 1.0, (320, 240))
+        frame = np.zeros((240, 320, 3), dtype=np.uint8)
+        out.write(frame)
+        out.release()
+
+        try:
+            result = algo.compare(
+                short_video=temp_video,
+                long_video=temp_video,
+                start_time=0.0,
+                duration=0.1
+            )
+
+            # Should return error for insufficient frames
+            assert result['similarity'] == 0.0
+            assert result['accepted'] is False
+            assert 'error' in result['metadata']
+            assert 'Insufficient frames' in result['metadata']['error']
+        finally:
+            import os
+            os.unlink(temp_video)
+
+    def test_searchable_zero(self, test_video_path):
+        """Test handling when searchable duration is zero or negative."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(threshold=70.0, num_samples=5)
+
+        # Use same video as both short and long with full duration
+        # This makes searchable = 0
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0  # Use full or longer duration
+        )
+
+        # Should still work with single window at start_time
+        assert 'similarity' in result
+        assert 0.0 <= result['similarity'] <= 100.0
+        assert result['metadata']['windows_tested'] >= 1
+
+    def test_compute_hog_exception(self, test_video_path):
+        """Test exception handling in _compute_hog."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(threshold=70.0, num_samples=5)
+
+        # Create an invalid frame that will cause exception
+        invalid_frame = np.array([[[]]], dtype=np.uint8)
+
+        # Should return None for invalid frame
+        result = algo._compute_hog(invalid_frame)
+        assert result is None
+
+    def test_frame_none_in_extraction(self, test_video_path):
+        """Test handling of None frames during HOG extraction."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(threshold=70.0, num_samples=5)
+
+        # Extract with reasonable duration
+        offsets, hogs = algo._extract_hog_descriptors(test_video_path, duration=1.0)
+
+        # Should extract some valid HOG descriptors
+        assert len(hogs) >= 2
+        for hog in hogs:
+            assert isinstance(hog, np.ndarray)
+            assert len(hog) > 0
+
+    def test_frame_none_in_window_comparison(self, test_video_path):
+        """Test handling of None frames during window comparison."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(threshold=70.0, num_samples=5)
+
+        # Extract HOG descriptors
+        offsets, hogs = algo._extract_hog_descriptors(test_video_path, duration=1.0)
+
+        # Compare at a valid window
+        score = algo._compare_window(
+            test_video_path,
+            window_start=0.0,
+            short_offsets=offsets,
+            short_hogs=hogs
+        )
+
+        # Should return a valid score
+        assert isinstance(score, (int, float))
+        assert 0.0 <= score <= 100.0
+
+    def test_compare_features_empty_sets(self):
+        """Test compare_features with empty feature sets."""
+        algo = HOGDescriptorAlgorithm()
+
+        # Test with empty first set
+        result = algo.compare_features([], [np.random.rand(100)], threshold=70.0)
+        assert result['similarity'] == 0.0
+        assert result['accepted'] is False
+        assert 'error' in result['metadata']
+        assert 'Empty feature sets' in result['metadata']['error']
+
+        # Test with empty second set
+        result = algo.compare_features([np.random.rand(100)], [], threshold=70.0)
+        assert result['similarity'] == 0.0
+        assert result['accepted'] is False
+        assert 'error' in result['metadata']
+
+        # Test with both empty
+        result = algo.compare_features([], [], threshold=70.0)
+        assert result['similarity'] == 0.0
+        assert result['accepted'] is False
+        assert 'error' in result['metadata']
+
+    def test_compare_features_zero_norms(self):
+        """Test compare_features with zero-norm vectors."""
+        algo = HOGDescriptorAlgorithm()
+
+        # Create zero vectors (zero norm)
+        zero_vec = np.zeros(100, dtype=np.float32)
+        normal_vec = np.random.rand(100).astype(np.float32)
+
+        # Test with zero vectors - should handle gracefully
+        result = algo.compare_features([zero_vec], [normal_vec], threshold=70.0)
+
+        # Should return error for no valid comparisons
+        assert result['similarity'] == 0.0
+        assert result['accepted'] is False
+        assert 'error' in result['metadata']
+        assert 'No valid comparisons' in result['metadata']['error']
+
+    def test_compare_features_valid_hogs(self, test_video_path):
+        """Test compare_features with valid HOG descriptors."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(threshold=70.0, num_samples=5)
+
+        # Extract features from same video
+        features1 = algo.extract_features(test_video_path)
+        features2 = algo.extract_features(test_video_path)
+
+        # Compare features
+        result = algo.compare_features(features1, features2, threshold=70.0)
+
+        # Should get high similarity for same video
+        assert 'similarity' in result
+        assert result['similarity'] > 50.0  # Same video should be similar
+        assert 'num_hogs_1' in result['metadata']
+        assert 'num_hogs_2' in result['metadata']
+        assert 'num_comparisons' in result['metadata']
+        assert 'min_similarity' in result['metadata']
+        assert 'max_similarity' in result['metadata']
+
+    def test_different_cell_sizes(self, test_video_path):
+        """Test HOG computation with different cell sizes."""
+        # Test with 8x8 cells
+        algo1 = HOGDescriptorAlgorithm()
+        algo1.configure(threshold=70.0, cell_size=(8, 8), nbins=9)
+        result1 = algo1.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=1.0
+        )
+
+        # Test with 16x16 cells
+        algo2 = HOGDescriptorAlgorithm()
+        algo2.configure(threshold=70.0, cell_size=(16, 16), nbins=9)
+        result2 = algo2.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=1.0
+        )
+
+        # Both should work
+        assert 'similarity' in result1
+        assert 'similarity' in result2
+        assert 0.0 <= result1['similarity'] <= 100.0
+        assert 0.0 <= result2['similarity'] <= 100.0

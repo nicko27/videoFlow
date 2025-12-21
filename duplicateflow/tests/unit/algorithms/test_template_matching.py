@@ -988,3 +988,102 @@ class TestTemplateMatchingVideoIntegration:
         assert isinstance(reqs, list)
         assert 'opencv-python>=4.8.0' in reqs
         assert 'numpy>=1.24.0' in reqs
+
+    def test_insufficient_templates(self, tmp_path):
+        """Test handling when insufficient templates can be extracted."""
+        import tempfile
+        import cv2
+
+        algo = TemplateMatchingAlgorithm()
+        algo.configure(threshold=75.0, num_templates=10)  # Request many templates
+
+        # Create a 1-frame video
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as tf:
+            temp_video = tf.name
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(temp_video, fourcc, 1.0, (320, 240))
+        frame = np.zeros((240, 320, 3), dtype=np.uint8)
+        out.write(frame)
+        out.release()
+
+        try:
+            result = algo.compare(
+                short_video=temp_video,
+                long_video=temp_video,
+                start_time=0.0,
+                duration=0.1
+            )
+
+            # Should return error for insufficient templates
+            assert result['similarity'] == 0.0
+            assert result['accepted'] is False
+            assert 'error' in result['metadata']
+            assert 'Insufficient templates' in result['metadata']['error']
+        finally:
+            import os
+            os.unlink(temp_video)
+
+    def test_template_resize_edge_case(self, test_video_path):
+        """Test template extraction with resize that requires adjustment."""
+        algo = TemplateMatchingAlgorithm()
+        # Configure with small template size that will trigger resize logic
+        algo.configure(
+            threshold=75.0,
+            num_templates=3,
+            template_size=(16, 16)  # Very small template
+        )
+
+        templates = algo._extract_templates(test_video_path, duration=1.0)
+
+        # Should extract templates and resize them
+        assert len(templates) >= 2
+        for template in templates:
+            # Each template should be exactly the requested size
+            assert template.shape == (16, 16)
+
+    def test_match_template_exception_handling(self, test_video_path, tmp_path):
+        """Test exception handling during template matching."""
+        algo = TemplateMatchingAlgorithm()
+        algo.configure(threshold=75.0, num_templates=4)
+
+        # Extract templates normally
+        templates = algo._extract_templates(test_video_path, duration=1.0)
+
+        # Create an invalid template that might cause cv2.matchTemplate to fail
+        invalid_template = np.array([[]], dtype=np.uint8)
+        templates_with_invalid = templates + [invalid_template]
+
+        # Should handle exception gracefully and still return a score
+        score = algo._compare_window(
+            test_video_path,
+            window_start=0.0,
+            duration=1.0,
+            templates=templates_with_invalid
+        )
+
+        # Should return a valid score (from valid templates) despite exception
+        assert isinstance(score, (int, float))
+        assert 0.0 <= score <= 100.0
+
+    def test_sqdiff_method_scoring(self, test_video_path):
+        """Test SQDIFF method uses different scoring logic."""
+        algo = TemplateMatchingAlgorithm()
+        # Use TM_SQDIFF_NORMED which has inverted scoring
+        algo.configure(
+            threshold=75.0,
+            num_templates=4,
+            method='TM_SQDIFF_NORMED'
+        )
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=1.0
+        )
+
+        # Should complete with SQDIFF method
+        assert 'similarity' in result
+        assert 0.0 <= result['similarity'] <= 100.0
+        assert isinstance(result['accepted'], (bool, np.bool_))
