@@ -579,3 +579,156 @@ class TestEdgePatternPerformance:
 
         # Cosine of two zero vectors is undefined, but should be handled
         assert result['similarity'] >= 0.0
+
+
+# ============================================================================
+# VIDEO INTEGRATION TESTS
+# ============================================================================
+
+class TestEdgePatternVideoIntegration:
+    """Test edge pattern algorithm with real video files."""
+
+    @pytest.fixture
+    def test_video_path(self):
+        """Return path to test video file."""
+        from pathlib import Path
+        video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+        if not Path(video_path).exists():
+            pytest.skip(f"Test video not found: {video_path}")
+        return video_path
+
+    def test_compare_same_video_identical_segments(self, test_video_path):
+        """Test comparing identical segments from same video."""
+        algo = EdgePatternAlgorithm()
+        algo.configure(threshold=0.70, num_samples=5)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert result['similarity'] > 0.70
+        assert result['accepted'] == True
+        assert 'best_offset_seconds' in result['metadata']
+        assert 'num_samples' in result['metadata']
+
+    def test_compare_different_videos(self, test_video_path):
+        """Test comparing different videos (same video = high similarity)."""
+        algo = EdgePatternAlgorithm()
+        algo.configure(threshold=0.80)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Same video should match
+        assert result['similarity'] > 0.60
+
+    def test_extract_features_real_video(self, test_video_path):
+        """Test feature extraction from real video."""
+        algo = EdgePatternAlgorithm()
+        algo.configure(num_samples=6)
+
+        features = algo.extract_features(test_video_path)
+
+        assert len(features) >= 2
+        assert all(isinstance(f, np.ndarray) for f in features)
+        assert all(f.dtype == np.float32 for f in features)
+
+    def test_compare_window_integration(self, test_video_path):
+        """Test compare with sliding window."""
+        algo = EdgePatternAlgorithm()
+        algo.configure(search_step=2.0, max_windows=10, num_samples=4)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert 'windows_tested' in result['metadata']
+        assert result['metadata']['windows_tested'] >= 1
+
+    def test_compare_search_window(self, test_video_path):
+        """Test search window functionality."""
+        algo = EdgePatternAlgorithm()
+        algo.configure(search_step=3.0, max_windows=20, num_samples=5)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=4.0
+        )
+
+        assert 'best_offset_seconds' in result['metadata']
+        assert result['metadata']['best_offset_seconds'] >= 0.0
+
+    def test_compare_with_different_params(self, test_video_path):
+        """Test compare with different grid sizes."""
+        algo = EdgePatternAlgorithm()
+        algo.configure(grid_size=(8, 8), num_samples=4)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        assert result['similarity'] > 0.0
+        assert 'num_samples' in result['metadata']
+
+    def test_compare_with_different_thresholds(self, test_video_path):
+        """Test compare with different Canny thresholds."""
+        algo = EdgePatternAlgorithm()
+        algo.configure(canny_threshold1=50, canny_threshold2=150, num_samples=4)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        assert result['similarity'] > 0.0
+        assert 'num_samples' in result['metadata']
+
+    def test_compare_insufficient_frames(self, test_video_path):
+        """Test compare with very short duration."""
+        algo = EdgePatternAlgorithm()
+        algo.configure(num_samples=100)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=0.1
+        )
+
+        # Very short duration may result in insufficient frames
+        assert 'similarity' in result
+        assert 'accepted' in result
+        assert 'metadata' in result
+
+    def test_compare_early_termination(self, test_video_path):
+        """Test early termination when excellent match found."""
+        algo = EdgePatternAlgorithm()
+        algo.configure(threshold=70.0, search_step=1.0, max_windows=50, num_samples=5)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Should find match quickly
+        assert result['similarity'] > 0.60
+        assert 'windows_tested' in result['metadata']

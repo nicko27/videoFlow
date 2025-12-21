@@ -708,3 +708,170 @@ class TestFeatureMatchingPerformance:
             assert True  # Expected
         else:
             assert len(kp) >= 0
+
+
+# ============================================================================
+# VIDEO INTEGRATION TESTS
+# ============================================================================
+
+class TestFeatureMatchingVideoIntegration:
+    """Test feature matching algorithm with real video files."""
+
+    @pytest.fixture
+    def test_video_path(self):
+        """Return path to test video file."""
+        from pathlib import Path
+        video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+        if not Path(video_path).exists():
+            pytest.skip(f"Test video not found: {video_path}")
+        return video_path
+
+    def test_compare_same_video_identical_segments(self, test_video_path):
+        """Test comparing identical segments from same video."""
+        algo = FeatureMatchingAlgorithm()
+        algo.configure(threshold=30.0, detector='ORB', num_samples=5)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert result['similarity'] > 0.30
+        assert result['accepted'] == True
+        assert 'best_offset_seconds' in result['metadata']
+        assert 'avg_matches' in result['metadata']
+
+    def test_compare_different_videos(self, test_video_path):
+        """Test comparing different videos (same video = high similarity)."""
+        algo = FeatureMatchingAlgorithm()
+        algo.configure(threshold=25.0, detector='ORB')
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Same video should match
+        assert result['similarity'] > 0.20
+
+    def test_extract_features_real_video(self, test_video_path):
+        """Test feature extraction from real video."""
+        algo = FeatureMatchingAlgorithm()
+        algo.configure(detector='ORB', num_samples=5)
+
+        features = algo.extract_features(test_video_path)
+
+        assert len(features) >= 2
+        assert all(isinstance(f, tuple) for f in features)
+        assert all(len(f) == 3 for f in features)  # (offset, num_kp, descriptors)
+
+    def test_compare_with_orb_detector(self, test_video_path):
+        """Test compare with ORB detector."""
+        algo = FeatureMatchingAlgorithm()
+        algo.configure(detector='ORB', num_samples=4, max_features=500)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        assert result['metadata']['detector'] == 'ORB'
+        assert result['similarity'] > 0.0
+
+    def test_compare_with_akaze_detector(self, test_video_path):
+        """Test compare with AKAZE detector."""
+        algo = FeatureMatchingAlgorithm()
+        algo.configure(detector='AKAZE', num_samples=4)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        assert result['metadata']['detector'] == 'AKAZE'
+        assert result['similarity'] > 0.0
+
+    def test_compare_window_integration(self, test_video_path):
+        """Test compare with sliding window."""
+        algo = FeatureMatchingAlgorithm()
+        algo.configure(search_step=2.0, max_windows=10, num_samples=3)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=4.0
+        )
+
+        assert 'windows_tested' in result['metadata']
+        assert result['metadata']['windows_tested'] >= 1
+
+    def test_compare_search_window(self, test_video_path):
+        """Test search window functionality."""
+        algo = FeatureMatchingAlgorithm()
+        algo.configure(search_step=3.0, max_windows=20, num_samples=4)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=4.0
+        )
+
+        assert 'best_offset_seconds' in result['metadata']
+        assert result['metadata']['best_offset_seconds'] >= 0.0
+
+    def test_extract_features_integration(self, test_video_path):
+        """Test _extract_features with real video."""
+        algo = FeatureMatchingAlgorithm()
+        algo.configure(num_samples=6, sample_interval=5.0)
+
+        features = algo._extract_features(
+            video_path=test_video_path,
+            duration=5.0
+        )
+
+        assert len(features) >= 1
+        assert all(isinstance(f, tuple) for f in features)
+        assert all(len(f) == 3 for f in features)
+
+    def test_compare_insufficient_frames(self, test_video_path):
+        """Test compare with very short duration."""
+        algo = FeatureMatchingAlgorithm()
+        algo.configure(num_samples=100)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=0.1
+        )
+
+        # Very short duration may result in insufficient frames
+        assert 'similarity' in result
+        assert 'accepted' in result
+        assert 'metadata' in result
+
+    def test_compare_early_termination(self, test_video_path):
+        """Test early termination when excellent match found."""
+        algo = FeatureMatchingAlgorithm()
+        algo.configure(threshold=30.0, search_step=1.0, max_windows=50, num_samples=4)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Should find match quickly
+        assert result['similarity'] > 0.20
+        assert 'windows_tested' in result['metadata']

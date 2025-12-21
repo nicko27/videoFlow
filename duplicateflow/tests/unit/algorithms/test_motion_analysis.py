@@ -646,3 +646,60 @@ class TestMotionAnalysisPerformance:
 
         # Should handle gracefully (static scenes = perfect match)
         assert result['similarity'] == 100.0
+
+
+# ============================================================================
+# VIDEO INTEGRATION TESTS
+# ============================================================================
+
+class TestMotionAnalysisVideoIntegration:
+    """Test motion analysis algorithm with real video files."""
+
+    @pytest.fixture
+    def test_video_path(self):
+        """Return path to test video file."""
+        from pathlib import Path
+        video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+        if not Path(video_path).exists():
+            pytest.skip(f"Test video not found: {video_path}")
+        return video_path
+
+    def test_compare_same_video(self, test_video_path):
+        """Test comparing identical segments from same video."""
+        algo = MotionAnalysisAlgorithm()
+        algo.configure(threshold=0.70)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        assert result['similarity'] > 0.60
+        assert 'metadata' in result
+
+    def test_extract_features_real_video(self, test_video_path):
+        """Test feature extraction from real video."""
+        algo = MotionAnalysisAlgorithm()
+        algo.configure()
+
+        features = algo.extract_features(test_video_path)
+
+        assert isinstance(features, np.ndarray)
+        assert features.dtype == np.float32
+
+    def test_compare_window_integration(self, test_video_path):
+        """Test compare with sliding window."""
+        algo = MotionAnalysisAlgorithm()
+        algo.configure(search_step=2.0, max_windows=10)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        assert 'metadata' in result
+        assert result['similarity'] >= 0.0

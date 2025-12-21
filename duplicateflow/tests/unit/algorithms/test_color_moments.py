@@ -595,3 +595,264 @@ class TestColorMomentsPerformance:
             assert -10 <= h_skew <= 10, "H skewness unreasonable"
             assert -10 <= s_skew <= 10, "S skewness unreasonable"
             assert -10 <= v_skew <= 10, "V skewness unreasonable"
+
+
+class TestColorMomentsCompareFeatures:
+    """Test compare_features static method."""
+
+    def test_compare_features_identical_moments(self):
+        """Test comparing identical color moments."""
+        frame = create_noise_frame(seed=42)
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        moments = []
+        for channel in range(3):
+            moments.extend([
+                hsv[:, :, channel].mean(),
+                hsv[:, :, channel].std(),
+                0.0  # skewness placeholder
+            ])
+        moments = np.array(moments, dtype=np.float32)
+
+        result = ColorMomentsAlgorithm.compare_features([moments], [moments], threshold=80.0)
+
+        assert result['similarity'] > 95.0
+        assert result['accepted'] == True
+
+    def test_compare_features_different_moments(self):
+        """Test comparing different color moments."""
+        frame1 = create_noise_frame(seed=42)
+        frame2 = create_checkerboard_frame(square_size=16)
+
+        # Compute moments for both
+        moments1 = []
+        moments2 = []
+        for frame in [frame1, frame2]:
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            moms = []
+            for channel in range(3):
+                moms.extend([
+                    hsv[:, :, channel].mean(),
+                    hsv[:, :, channel].std(),
+                    0.0
+                ])
+            if frame is frame1:
+                moments1 = [np.array(moms, dtype=np.float32)]
+            else:
+                moments2 = [np.array(moms, dtype=np.float32)]
+
+        result = ColorMomentsAlgorithm.compare_features(moments1, moments2, threshold=80.0)
+
+        assert 'similarity' in result
+        assert 'accepted' in result
+
+    def test_compare_features_empty_features1(self):
+        """Test compare_features with empty first feature set."""
+        moments = np.array([100, 50, 0, 150, 60, 0, 120, 40, 0], dtype=np.float32)
+
+        result = ColorMomentsAlgorithm.compare_features([], [moments], threshold=80.0)
+
+        assert result['similarity'] == 0.0
+        assert result['accepted'] == False
+        assert 'error' in result['metadata']
+
+    def test_compare_features_empty_features2(self):
+        """Test compare_features with empty second feature set."""
+        moments = np.array([100, 50, 0, 150, 60, 0, 120, 40, 0], dtype=np.float32)
+
+        result = ColorMomentsAlgorithm.compare_features([moments], [], threshold=80.0)
+
+        assert result['similarity'] == 0.0
+        assert result['accepted'] == False
+        assert 'error' in result['metadata']
+
+    def test_compare_features_multiple_moments(self):
+        """Test comparing multiple color moments."""
+        moments = []
+        for seed in [42, 43, 44]:
+            frame = create_noise_frame(seed=seed)
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            moms = []
+            for channel in range(3):
+                moms.extend([
+                    hsv[:, :, channel].mean(),
+                    hsv[:, :, channel].std(),
+                    0.0
+                ])
+            moments.append(np.array(moms, dtype=np.float32))
+
+        result = ColorMomentsAlgorithm.compare_features(moments, moments, threshold=80.0)
+
+        assert result['similarity'] > 90.0
+        assert result['accepted'] == True
+        assert result['metadata']['num_moments_1'] == 3
+        assert result['metadata']['num_moments_2'] == 3
+
+    def test_compare_features_metadata(self):
+        """Test that compare_features returns complete metadata."""
+        moments = np.array([100, 50, 0, 150, 60, 0, 120, 40, 0], dtype=np.float32)
+
+        result = ColorMomentsAlgorithm.compare_features([moments], [moments], threshold=80.0)
+
+        assert 'metadata' in result
+        assert 'num_moments_1' in result['metadata']
+        assert 'num_moments_2' in result['metadata']
+
+
+# ============================================================================
+# Phase 10B Video Integration Tests: Real Video File Testing
+# ============================================================================
+
+
+@pytest.fixture
+def test_video_path():
+    """Return path to test video file."""
+    from pathlib import Path
+    video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+    if not Path(video_path).exists():
+        pytest.skip(f"Test video not found: {video_path}")
+    return video_path
+
+
+@pytest.fixture
+def test_video_pair():
+    """Return paths to two related test videos."""
+    from pathlib import Path
+    video1 = "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4"
+    video2 = "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4"
+
+    if not Path(video1).exists() or not Path(video2).exists():
+        pytest.skip(f"Test videos not found: {video1}, {video2}")
+
+    return video1, video2
+
+
+class TestColorMomentsVideoIntegration:
+    """Integration tests with real video files."""
+
+    def test_compare_same_video_identical_segments(self, test_video_path):
+        """Test comparing identical segments from same video."""
+        algo = ColorMomentsAlgorithm()
+        algo.configure(threshold=0.85, num_samples=5)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert result['similarity'] > 0.85
+        assert result['accepted'] == True
+        assert result['metadata']['best_offset_seconds'] == pytest.approx(0.0, abs=1.0)
+
+    def test_compare_different_videos(self, test_video_pair):
+        """Test comparing two different videos."""
+        video1, video2 = test_video_pair
+
+        algo = ColorMomentsAlgorithm()
+        algo.configure(threshold=0.70, num_samples=5)
+
+        result = algo.compare(
+            short_video=video1,
+            long_video=video2,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert 'similarity' in result
+        assert 'accepted' in result
+        assert 'metadata' in result
+
+    def test_extract_features_real_video(self, test_video_path):
+        """Test feature extraction from real video."""
+        algo = ColorMomentsAlgorithm()
+        algo.configure(num_samples=8)
+
+        features = algo.extract_features(test_video_path)
+
+        assert len(features) >= 2
+        assert all(isinstance(f, np.ndarray) for f in features)
+        # Each moment vector has 9 values (mean, std, skew for H, S, V)
+        assert all(f.shape == (9,) for f in features)
+
+    def test_compare_window_integration(self, test_video_path):
+        """Test _compare_window with real video."""
+        algo = ColorMomentsAlgorithm()
+        algo.configure()
+
+        offsets, ref_moments = algo._extract_color_moments(test_video_path, duration=5.0)
+
+        score = algo._compare_window(
+            long_video=test_video_path,
+            window_start=0.0,
+            short_offsets=offsets,
+            short_moments=ref_moments
+        )
+
+        assert score > 80.0
+
+    def test_compare_search_window(self, test_video_path):
+        """Test sliding window search mechanism."""
+        algo = ColorMomentsAlgorithm()
+        algo.configure(
+            threshold=0.85,
+            num_samples=5,
+            search_step=2.0,
+            max_windows=20
+        )
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert 'windows_tested' in result['metadata']
+        assert result['metadata']['windows_tested'] >= 1
+
+    def test_extract_moments_integration(self, test_video_path):
+        """Test _extract_color_moments with real video."""
+        algo = ColorMomentsAlgorithm()
+        algo.configure(num_samples=5)
+
+        offsets, moments = algo._extract_color_moments(test_video_path, duration=10.0)
+
+        assert len(offsets) >= 2
+        assert len(moments) >= 2
+        assert len(offsets) == len(moments)
+        assert all(m.shape == (9,) for m in moments)
+
+    def test_compare_insufficient_frames(self, test_video_path):
+        """Test comparison with very short duration."""
+        algo = ColorMomentsAlgorithm()
+        algo.configure(num_samples=8)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=0.5
+        )
+
+        if not result['accepted'] and 'error' in result['metadata']:
+            assert 'Insufficient frames' in result['metadata']['error']
+        else:
+            assert 'num_samples' in result['metadata']
+
+    def test_compare_early_termination(self, test_video_path):
+        """Test early termination optimization."""
+        algo = ColorMomentsAlgorithm()
+        algo.configure(threshold=0.90, num_samples=5)
+
+        # Compare segment with itself - should terminate early
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        # Should find perfect match quickly
+        assert result['similarity'] > 0.85
+        assert 'windows_tested' in result['metadata']

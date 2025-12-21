@@ -612,3 +612,169 @@ class TestAudioSpectrumPerformance:
         # Should preserve shape
         assert avg.shape == spectra[0].shape
         assert len(avg) == 3
+
+
+# ============================================================================
+# 9. VIDEO INTEGRATION TESTS
+# ============================================================================
+
+class TestAudioSpectrumVideoIntegration:
+    """Test audio spectrum algorithm with real video files."""
+
+    @pytest.fixture
+    def test_video_path(self):
+        """Return path to test video file."""
+        from pathlib import Path
+        video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+        if not Path(video_path).exists():
+            pytest.skip(f"Test video not found: {video_path}")
+        return video_path
+
+    def test_compare_same_video_identical_segments(self, test_video_path):
+        """Test comparing identical segments from same video."""
+        algo = AudioSpectrumAlgorithm()
+        algo.configure(threshold=0.70, num_samples=8)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert result['similarity'] > 0.70
+        assert result['accepted'] == True
+        assert 'best_offset_seconds' in result['metadata']
+        assert 'num_samples' in result['metadata']
+
+    def test_compare_different_videos(self, test_video_path):
+        """Test comparing different videos."""
+        algo = AudioSpectrumAlgorithm()
+        algo.configure(threshold=0.80)
+
+        # Compare same video with itself should give high similarity
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Same video should match
+        assert result['similarity'] > 0.60
+
+    def test_extract_features_real_video(self, test_video_path):
+        """Test feature extraction from real video."""
+        algo = AudioSpectrumAlgorithm()
+        algo.configure(num_samples=8)
+
+        features = algo.extract_features(test_video_path)
+
+        assert len(features) >= 2
+        assert all(isinstance(f, np.ndarray) for f in features)
+        assert all(len(f) == len(algo.freq_bands) for f in features)
+
+    def test_compare_window_integration(self, test_video_path):
+        """Test compare with sliding window."""
+        algo = AudioSpectrumAlgorithm()
+        algo.configure(search_step=2.0, max_windows=10, num_samples=5)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert 'windows_tested' in result['metadata']
+        assert result['metadata']['windows_tested'] >= 1
+
+    def test_compare_search_window(self, test_video_path):
+        """Test search window functionality."""
+        algo = AudioSpectrumAlgorithm()
+        algo.configure(search_step=3.0, max_windows=20, num_samples=6)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=4.0
+        )
+
+        assert 'best_offset_seconds' in result['metadata']
+        assert result['metadata']['best_offset_seconds'] >= 0.0
+
+    def test_extract_audio_spectra_integration(self, test_video_path):
+        """Test _extract_audio_spectra with real video."""
+        algo = AudioSpectrumAlgorithm()
+        algo.configure(num_samples=6, sample_duration=2.0)
+
+        spectra = algo._extract_audio_spectra(
+            video_path=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert len(spectra) >= 1
+        assert all(isinstance(s, np.ndarray) for s in spectra)
+        assert all(len(s) == len(algo.freq_bands) for s in spectra)
+
+    def test_get_video_duration_integration(self, test_video_path):
+        """Test _get_video_duration with real video."""
+        algo = AudioSpectrumAlgorithm()
+        algo.configure()
+
+        duration = algo._get_video_duration(test_video_path)
+
+        assert duration is not None
+        assert duration > 0.0
+        assert isinstance(duration, float)
+
+    def test_extract_audio_segment_integration(self, test_video_path):
+        """Test _extract_audio_segment with real video."""
+        algo = AudioSpectrumAlgorithm()
+        algo.configure()
+
+        audio = algo._extract_audio_segment(
+            video_path=test_video_path,
+            start_time=0.0,
+            duration=2.0
+        )
+
+        assert audio is not None
+        assert isinstance(audio, np.ndarray)
+        assert audio.dtype == np.float32
+        assert len(audio) > 0
+
+    def test_compare_insufficient_samples(self, test_video_path):
+        """Test compare with very short duration that yields insufficient samples."""
+        algo = AudioSpectrumAlgorithm()
+        algo.configure(num_samples=100, sample_duration=5.0)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=0.1
+        )
+
+        # Very short duration may result in insufficient samples
+        assert 'similarity' in result
+        assert 'accepted' in result
+        assert 'metadata' in result
+
+    def test_compare_early_termination(self, test_video_path):
+        """Test early termination when excellent match found."""
+        algo = AudioSpectrumAlgorithm()
+        algo.configure(threshold=70.0, search_step=1.0, max_windows=50)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Should find match quickly
+        assert result['similarity'] > 0.60
+        assert 'windows_tested' in result['metadata']

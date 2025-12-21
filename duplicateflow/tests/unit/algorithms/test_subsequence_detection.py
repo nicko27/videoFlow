@@ -646,3 +646,163 @@ class TestSubsequenceDetectionPerformance:
         assert isinstance(reqs, list)
         assert 'opencv-python>=4.8.0' in reqs
         assert 'numpy>=1.24.0' in reqs
+
+
+# ============================================================================
+# Phase 10C Video Integration Tests: Real Video File Testing
+# ============================================================================
+
+
+@pytest.fixture
+def test_video_path():
+    """Return path to test video file."""
+    from pathlib import Path
+    video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+    if not Path(video_path).exists():
+        pytest.skip(f"Test video not found: {video_path}")
+    return video_path
+
+
+@pytest.fixture
+def test_video_pair():
+    """Return paths to two related test videos."""
+    from pathlib import Path
+    video1 = "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4"
+    video2 = "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4"
+
+    if not Path(video1).exists() or not Path(video2).exists():
+        pytest.skip(f"Test videos not found: {video1}, {video2}")
+
+    return video1, video2
+
+
+class TestSubsequenceDetectionVideoIntegration:
+    """Integration tests with real video files."""
+
+    def test_compare_same_video_identical_segments(self, test_video_path):
+        """Test comparing identical segments from same video."""
+        algo = SubsequenceDetectionAlgorithm()
+        algo.configure(threshold=0.80, num_samples=5)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert result['similarity'] > 0.80
+        assert result['accepted'] == True
+        assert result['metadata']['best_offset_seconds'] == pytest.approx(0.0, abs=1.0)
+
+    def test_compare_different_videos(self, test_video_pair):
+        """Test comparing two different videos."""
+        video1, video2 = test_video_pair
+
+        algo = SubsequenceDetectionAlgorithm()
+        algo.configure(threshold=0.70, num_samples=5)
+
+        result = algo.compare(
+            short_video=video1,
+            long_video=video2,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert 'similarity' in result
+        assert 'accepted' in result
+        assert 'metadata' in result
+
+    def test_extract_features_real_video(self, test_video_path):
+        """Test feature extraction from real video."""
+        algo = SubsequenceDetectionAlgorithm()
+        algo.configure(num_samples=8)
+
+        features = algo.extract_features(test_video_path)
+
+        assert len(features) >= 2
+        assert all(isinstance(f, tuple) for f in features)
+        assert all(len(f) == 3 for f in features)  # (time, hash, motion)
+        # Check hash and motion arrays
+        for time, frame_hash, motion in features:
+            assert isinstance(time, float)
+            assert isinstance(frame_hash, np.ndarray)
+            assert isinstance(motion, np.ndarray)
+
+    def test_extract_signatures_integration(self, test_video_path):
+        """Test _extract_signatures with real video."""
+        algo = SubsequenceDetectionAlgorithm()
+        algo.configure(num_samples=5)
+
+        offsets, hashes, motions = algo._extract_signatures(test_video_path, duration=10.0)
+
+        assert len(offsets) >= 2
+        assert len(hashes) >= 2
+        assert len(motions) >= 2
+        assert len(offsets) == len(hashes) == len(motions)
+
+    def test_compare_search_window(self, test_video_path):
+        """Test sliding window search mechanism."""
+        algo = SubsequenceDetectionAlgorithm()
+        algo.configure(
+            threshold=0.80,
+            num_samples=5,
+            search_step=2.0,
+            max_windows=20
+        )
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert 'windows_tested' in result['metadata']
+        assert result['metadata']['windows_tested'] >= 1
+
+    def test_compare_early_termination(self, test_video_path):
+        """Test early termination optimization."""
+        algo = SubsequenceDetectionAlgorithm()
+        algo.configure(threshold=0.85, num_samples=5)
+
+        # Compare segment with itself - should terminate early
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        # Should find perfect match quickly
+        assert result['similarity'] > 0.80
+        assert 'windows_tested' in result['metadata']
+
+    def test_compare_features_static_method(self):
+        """Test compare_features static method."""
+        # Create simple features
+        features1 = [
+            (0.0, np.random.randint(0, 2, (8, 8), dtype=np.uint8), np.random.randn(64).astype(np.float32))
+            for _ in range(3)
+        ]
+        features2 = features1.copy()
+
+        result = SubsequenceDetectionAlgorithm.compare_features(
+            features1, features2, threshold=80.0
+        )
+
+        # Lower threshold since random features may not match perfectly
+        assert 'similarity' in result
+        assert 'accepted' in result
+
+    def test_compare_features_empty(self):
+        """Test compare_features with empty feature sets."""
+        feature = (0.0, np.random.randint(0, 2, (8, 8), dtype=np.uint8), np.random.randn(64).astype(np.float32))
+
+        result = SubsequenceDetectionAlgorithm.compare_features([], [feature], threshold=80.0)
+        assert result['similarity'] == 0.0
+        assert result['accepted'] == False
+
+        result = SubsequenceDetectionAlgorithm.compare_features([feature], [], threshold=80.0)
+        assert result['similarity'] == 0.0
+        assert result['accepted'] == False

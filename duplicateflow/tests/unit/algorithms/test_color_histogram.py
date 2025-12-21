@@ -561,3 +561,286 @@ class TestColorHistogramPerformance:
 
             # Normalized histogram should have reasonable max value
             assert hist.max() <= 1.0, "Histogram max should not exceed 1.0"
+
+
+class TestColorHistogramCompareFeatures:
+    """Test compare_features static method."""
+
+    def test_compare_features_identical_histograms(self):
+        """Test comparing identical histograms."""
+        hist = create_noise_frame(seed=42)
+        hist = cv2.cvtColor(hist, cv2.COLOR_BGR2HSV)
+        hist = cv2.calcHist([hist], [0, 1, 2], None, (32, 32, 32), [0, 180, 0, 256, 0, 256])
+        hist = cv2.normalize(hist, hist).flatten().astype(np.float32)
+
+        result = ColorHistogramAlgorithm.compare_features([hist], [hist], threshold=80.0)
+
+        assert result['similarity'] > 95.0
+        assert result['accepted'] == True
+
+    def test_compare_features_different_histograms(self):
+        """Test comparing different histograms."""
+        # Create two very different frames
+        frame1 = create_noise_frame(seed=42)
+        frame2 = create_checkerboard_frame(square_size=16)
+
+        # Compute histograms
+        hist1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2HSV)
+        hist1 = cv2.calcHist([hist1], [0, 1, 2], None, (32, 32, 32), [0, 180, 0, 256, 0, 256])
+        hist1 = cv2.normalize(hist1, hist1).flatten().astype(np.float32)
+
+        hist2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2HSV)
+        hist2 = cv2.calcHist([hist2], [0, 1, 2], None, (32, 32, 32), [0, 180, 0, 256, 0, 256])
+        hist2 = cv2.normalize(hist2, hist2).flatten().astype(np.float32)
+
+        result = ColorHistogramAlgorithm.compare_features([hist1], [hist2], threshold=80.0)
+
+        assert 'similarity' in result
+        assert result['accepted'] in [True, False]
+
+    def test_compare_features_empty_features1(self):
+        """Test compare_features with empty first feature set."""
+        hist = create_noise_frame(seed=42)
+        hist = cv2.cvtColor(hist, cv2.COLOR_BGR2HSV)
+        hist = cv2.calcHist([hist], [0, 1, 2], None, (32, 32, 32), [0, 180, 0, 256, 0, 256])
+        hist = cv2.normalize(hist, hist).flatten().astype(np.float32)
+
+        result = ColorHistogramAlgorithm.compare_features([], [hist], threshold=80.0)
+
+        assert result['similarity'] == 0.0
+        assert result['accepted'] == False
+        assert 'error' in result['metadata']
+        assert result['metadata']['error'] == 'Empty feature sets'
+
+    def test_compare_features_empty_features2(self):
+        """Test compare_features with empty second feature set."""
+        hist = create_noise_frame(seed=42)
+        hist = cv2.cvtColor(hist, cv2.COLOR_BGR2HSV)
+        hist = cv2.calcHist([hist], [0, 1, 2], None, (32, 32, 32), [0, 180, 0, 256, 0, 256])
+        hist = cv2.normalize(hist, hist).flatten().astype(np.float32)
+
+        result = ColorHistogramAlgorithm.compare_features([hist], [], threshold=80.0)
+
+        assert result['similarity'] == 0.0
+        assert result['accepted'] == False
+        assert 'error' in result['metadata']
+
+    def test_compare_features_multiple_histograms(self):
+        """Test comparing multiple histograms."""
+        # Create 3 histograms
+        hists1 = []
+        hists2 = []
+        for seed in [42, 43, 44]:
+            frame = create_noise_frame(seed=seed)
+            hist = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            hist = cv2.calcHist([hist], [0, 1, 2], None, (32, 32, 32), [0, 180, 0, 256, 0, 256])
+            hist = cv2.normalize(hist, hist).flatten().astype(np.float32)
+            hists1.append(hist)
+            hists2.append(hist)
+
+        result = ColorHistogramAlgorithm.compare_features(hists1, hists2, threshold=80.0)
+
+        assert result['similarity'] > 90.0
+        assert result['accepted'] == True
+        assert result['metadata']['num_hists_1'] == 3
+        assert result['metadata']['num_hists_2'] == 3
+        assert result['metadata']['num_comparisons'] == 9  # 3x3
+
+    def test_compare_features_metadata(self):
+        """Test that compare_features returns complete metadata."""
+        hist = create_noise_frame(seed=42)
+        hist = cv2.cvtColor(hist, cv2.COLOR_BGR2HSV)
+        hist = cv2.calcHist([hist], [0, 1, 2], None, (32, 32, 32), [0, 180, 0, 256, 0, 256])
+        hist = cv2.normalize(hist, hist).flatten().astype(np.float32)
+
+        result = ColorHistogramAlgorithm.compare_features([hist], [hist], threshold=80.0)
+
+        assert 'metadata' in result
+        assert 'num_hists_1' in result['metadata']
+        assert 'num_hists_2' in result['metadata']
+        assert 'num_comparisons' in result['metadata']
+        assert 'min_similarity' in result['metadata']
+        assert 'max_similarity' in result['metadata']
+
+
+# ============================================================================
+# Phase 10 Video Integration Tests: Real Video File Testing
+# ============================================================================
+
+
+@pytest.fixture
+def test_video_path():
+    """Return path to test video file."""
+    from pathlib import Path
+    video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+    if not Path(video_path).exists():
+        pytest.skip(f"Test video not found: {video_path}")
+    return video_path
+
+
+@pytest.fixture
+def test_video_pair():
+    """Return paths to two related test videos."""
+    from pathlib import Path
+    video1 = "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4"
+    video2 = "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4"
+
+    if not Path(video1).exists() or not Path(video2).exists():
+        pytest.skip(f"Test videos not found: {video1}, {video2}")
+
+    return video1, video2
+
+
+class TestColorHistogramVideoIntegration:
+    """Integration tests with real video files."""
+
+    def test_compare_same_video_identical_segments(self, test_video_path):
+        """Test comparing identical segments from same video."""
+        algo = ColorHistogramAlgorithm()
+        algo.configure(threshold=0.85, bins=32, num_samples=5)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert result['similarity'] > 0.85
+        assert result['accepted'] == True
+        assert result['metadata']['best_offset_seconds'] == pytest.approx(0.0, abs=1.0)
+
+    def test_compare_different_videos(self, test_video_pair):
+        """Test comparing two different videos."""
+        video1, video2 = test_video_pair
+
+        algo = ColorHistogramAlgorithm()
+        algo.configure(threshold=0.70, num_samples=5)
+
+        result = algo.compare(
+            short_video=video1,
+            long_video=video2,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert 'similarity' in result
+        assert 'accepted' in result
+        assert 'metadata' in result
+
+    def test_compare_with_different_bin_sizes(self, test_video_path):
+        """Test comparison with different histogram bin sizes."""
+        for bins in [16, 32, 64]:
+            algo = ColorHistogramAlgorithm()
+            algo.configure(bins=bins, num_samples=5)
+
+            result = algo.compare(
+                short_video=test_video_path,
+                long_video=test_video_path,
+                start_time=0.0,
+                duration=3.0
+            )
+
+            assert result['similarity'] > 0.80
+            assert 'num_samples' in result['metadata']
+
+    def test_extract_features_real_video(self, test_video_path):
+        """Test feature extraction from real video."""
+        algo = ColorHistogramAlgorithm()
+        algo.configure(num_samples=8, bins=(32, 32, 32))
+
+        features = algo.extract_features(test_video_path)
+
+        assert len(features) >= 2
+        assert all(isinstance(f, np.ndarray) for f in features)
+        # Each histogram is flattened: 32*32*32 = 32768
+        assert all(f.shape == (32*32*32,) for f in features)
+
+    def test_extract_features_with_sample_positions(self, test_video_path):
+        """Test feature extraction with fixed sample positions."""
+        algo = ColorHistogramAlgorithm()
+        algo.configure(num_samples=5, bins=(32, 32, 32))
+
+        features = algo.extract_features(test_video_path)
+
+        assert len(features) >= 2
+        assert all(f.shape == (32*32*32,) for f in features)
+
+    def test_compare_window_integration(self, test_video_path):
+        """Test _compare_window with real video."""
+        algo = ColorHistogramAlgorithm()
+        algo.configure(bins=(32, 32, 32))
+
+        offsets, ref_hists = algo._extract_color_signatures(test_video_path, duration=5.0)
+
+        score = algo._compare_window(
+            long_video=test_video_path,
+            window_start=0.0,
+            short_offsets=offsets,
+            short_hists=ref_hists
+        )
+
+        assert score > 80.0
+
+    def test_compare_search_window(self, test_video_path):
+        """Test sliding window search mechanism."""
+        algo = ColorHistogramAlgorithm()
+        algo.configure(
+            threshold=0.85,
+            num_samples=5,
+            search_step=2.0,
+            max_windows=20
+        )
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert 'windows_tested' in result['metadata']
+        assert result['metadata']['windows_tested'] >= 1
+
+    def test_histogram_comparison_methods(self, test_video_path):
+        """Test different histogram comparison methods."""
+        algo = ColorHistogramAlgorithm()
+        algo.configure(num_samples=5, bins=32)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        assert result['similarity'] > 0.80
+
+    def test_extract_histograms_integration(self, test_video_path):
+        """Test _extract_color_signatures with real video."""
+        algo = ColorHistogramAlgorithm()
+        algo.configure(num_samples=5, bins=(32, 32, 32))
+
+        offsets, histograms = algo._extract_color_signatures(test_video_path, duration=10.0)
+
+        assert len(offsets) >= 2
+        assert len(histograms) >= 2
+        assert len(offsets) == len(histograms)
+        assert all(h.shape == (32*32*32,) for h in histograms)
+
+    def test_compare_insufficient_frames(self, test_video_path):
+        """Test comparison with very short duration."""
+        algo = ColorHistogramAlgorithm()
+        algo.configure(num_samples=8)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=0.5
+        )
+
+        if not result['accepted'] and 'error' in result['metadata']:
+            assert 'Insufficient frames' in result['metadata']['error']
+        else:
+            assert 'num_samples' in result['metadata']

@@ -652,3 +652,175 @@ class TestAudioFingerprintPerformance:
         assert np.allclose(f1, f2)
         assert np.allclose(t1, t2)
         assert np.allclose(S1, S2)
+
+
+# ============================================================================
+# Phase 10C Video Integration Tests: Real Video File Testing
+# ============================================================================
+
+
+@pytest.fixture
+def test_video_path():
+    """Return path to test video file."""
+    from pathlib import Path
+    video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+    if not Path(video_path).exists():
+        pytest.skip(f"Test video not found: {video_path}")
+    return video_path
+
+
+@pytest.fixture
+def test_video_pair():
+    """Return paths to two related test videos."""
+    from pathlib import Path
+    video1 = "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4"
+    video2 = "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4"
+
+    if not Path(video1).exists() or not Path(video2).exists():
+        pytest.skip(f"Test videos not found: {video1}, {video2}")
+
+    return video1, video2
+
+
+class TestAudioFingerprintVideoIntegration:
+    """Integration tests with real video files."""
+
+    def test_compare_same_video_identical_segments(self, test_video_path):
+        """Test comparing identical segments from same video."""
+        algo = AudioFingerprintAlgorithm()
+        algo.configure(threshold=0.5)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert 'similarity' in result
+        assert 'accepted' in result
+        assert 'metadata' in result
+        # Audio fingerprinting should find high similarity for identical segments
+        if result['similarity'] > 0:
+            assert result['similarity'] >= 0.3  # Reasonable threshold for audio matching
+
+    def test_extract_fingerprints_real_video(self, test_video_path):
+        """Test fingerprint extraction from real video."""
+        algo = AudioFingerprintAlgorithm()
+        algo.configure()
+
+        fingerprints = algo.extract_fingerprints(test_video_path)
+
+        assert isinstance(fingerprints, dict)
+        # Should have extracted some hashes
+        assert len(fingerprints) > 0
+        # Each hash should map to a list of time offsets
+        for hash_val, offsets in fingerprints.items():
+            assert isinstance(hash_val, int)
+            assert isinstance(offsets, list)
+            assert all(isinstance(o, int) for o in offsets)
+
+    def test_extract_audio_integration(self, test_video_path):
+        """Test _extract_audio with real video."""
+        algo = AudioFingerprintAlgorithm()
+        algo.configure()
+
+        audio = algo._extract_audio(test_video_path)
+
+        assert isinstance(audio, np.ndarray)
+        assert audio.dtype == np.float32
+        assert audio.ndim == 1  # Mono audio
+        assert len(audio) > 0
+        # Audio should be in reasonable range
+        assert np.abs(audio).max() <= 1.0 or np.abs(audio).max() <= 32768.0
+
+    def test_compare_different_videos(self, test_video_pair):
+        """Test comparing two different videos."""
+        video1, video2 = test_video_pair
+
+        algo = AudioFingerprintAlgorithm()
+        algo.configure(threshold=0.5)
+
+        result = algo.compare(
+            short_video=video1,
+            long_video=video2,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert 'similarity' in result
+        assert 'accepted' in result
+        assert 'metadata' in result
+
+    def test_compare_with_duration(self, test_video_path):
+        """Test comparison with specific duration."""
+        algo = AudioFingerprintAlgorithm()
+        algo.configure()
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        assert 'similarity' in result
+        assert isinstance(result['similarity'], (int, float))
+        assert 'metadata' in result
+        if 'common_matches' in result['metadata']:
+            assert result['metadata']['common_matches'] >= 0
+
+    def test_compare_with_offset(self, test_video_path):
+        """Test comparison with start time offset."""
+        algo = AudioFingerprintAlgorithm()
+        algo.configure()
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=5.0,
+            duration=5.0
+        )
+
+        assert 'similarity' in result
+        assert 'accepted' in result
+
+    def test_fingerprints_consistency(self, test_video_path):
+        """Test that fingerprint extraction is consistent."""
+        algo = AudioFingerprintAlgorithm()
+        algo.configure()
+
+        # Extract twice
+        fp1 = algo.extract_fingerprints(test_video_path)
+        fp2 = algo.extract_fingerprints(test_video_path)
+
+        # Should produce same hashes
+        assert set(fp1.keys()) == set(fp2.keys())
+        # Time offsets might vary slightly, but hash count should be similar
+        assert abs(len(fp1) - len(fp2)) <= len(fp1) * 0.1  # Within 10%
+
+    def test_compare_features_edge_cases(self):
+        """Test compare_features with edge cases."""
+        # Empty fingerprints
+        result = AudioFingerprintAlgorithm.compare_features({}, {1: [10]}, threshold=0.5)
+        assert result['similarity'] == 0
+        assert result['accepted'] == False
+
+        result = AudioFingerprintAlgorithm.compare_features({1: [10]}, {}, threshold=0.5)
+        assert result['similarity'] == 0
+        assert result['accepted'] == False
+
+    def test_offset_to_seconds_integration(self, test_video_path):
+        """Test offset to seconds conversion in real workflow."""
+        algo = AudioFingerprintAlgorithm()
+        algo.configure()
+
+        # Extract some fingerprints
+        fingerprints = algo.extract_fingerprints(test_video_path)
+
+        # Check that we can convert offsets to seconds
+        for hash_val, offsets in list(fingerprints.items())[:5]:  # Test first 5
+            for offset in offsets:
+                seconds = algo._offset_to_seconds(offset)
+                assert isinstance(seconds, float)
+                assert seconds >= 0

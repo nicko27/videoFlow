@@ -531,3 +531,246 @@ class TestDCTCoefficientsPerformance:
 
         # White should have higher DC than black
         assert dc_white > dc_black
+
+
+class TestDCTCoefficientsCompareFeatures:
+    """Test compare_features static method."""
+
+    def test_compare_features_identical_signatures(self):
+        """Test comparing identical DCT signatures."""
+        frame = create_noise_frame(seed=42)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        resized = cv2.resize(gray, (64, 64))
+        dct = cv2.dct(np.float32(resized))
+        # Zigzag pattern for top-left 8x8
+        signature = dct.flatten()[:64].astype(np.float32)
+
+        result = DCTCoefficientsAlgorithm.compare_features([signature], [signature], threshold=80.0)
+
+        assert result['similarity'] > 95.0
+        assert result['accepted'] == True
+
+    def test_compare_features_different_signatures(self):
+        """Test comparing different DCT signatures."""
+        frame1 = create_noise_frame(seed=42)
+        frame2 = create_checkerboard_frame(square_size=16)
+
+        sigs = []
+        for frame in [frame1, frame2]:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            resized = cv2.resize(gray, (64, 64))
+            dct = cv2.dct(np.float32(resized))
+            signature = dct.flatten()[:64].astype(np.float32)
+            sigs.append(signature)
+
+        result = DCTCoefficientsAlgorithm.compare_features([sigs[0]], [sigs[1]], threshold=80.0)
+
+        assert 'similarity' in result
+        assert 'accepted' in result
+
+    def test_compare_features_empty_features1(self):
+        """Test compare_features with empty first feature set."""
+        signature = np.random.randn(64).astype(np.float32)
+
+        result = DCTCoefficientsAlgorithm.compare_features([], [signature], threshold=80.0)
+
+        assert result['similarity'] == 0.0
+        assert result['accepted'] == False
+        assert 'error' in result['metadata']
+
+    def test_compare_features_empty_features2(self):
+        """Test compare_features with empty second feature set."""
+        signature = np.random.randn(64).astype(np.float32)
+
+        result = DCTCoefficientsAlgorithm.compare_features([signature], [], threshold=80.0)
+
+        assert result['similarity'] == 0.0
+        assert result['accepted'] == False
+        assert 'error' in result['metadata']
+
+    def test_compare_features_multiple_signatures(self):
+        """Test comparing multiple DCT signatures."""
+        sigs = []
+        for seed in [42, 43, 44]:
+            frame = create_noise_frame(seed=seed)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            resized = cv2.resize(gray, (64, 64))
+            dct = cv2.dct(np.float32(resized))
+            signature = dct.flatten()[:64].astype(np.float32)
+            sigs.append(signature)
+
+        result = DCTCoefficientsAlgorithm.compare_features(sigs, sigs, threshold=80.0)
+
+        assert result['similarity'] > 90.0
+        assert result['accepted'] == True
+        assert result['metadata']['num_sigs_1'] == 3
+        assert result['metadata']['num_sigs_2'] == 3
+
+    def test_compare_features_metadata(self):
+        """Test that compare_features returns complete metadata."""
+        signature = np.random.randn(64).astype(np.float32)
+
+        result = DCTCoefficientsAlgorithm.compare_features([signature], [signature], threshold=80.0)
+
+        assert 'metadata' in result
+        assert 'num_sigs_1' in result['metadata']
+        assert 'num_sigs_2' in result['metadata']
+
+
+# ============================================================================
+# Phase 10B Video Integration Tests: Real Video File Testing
+# ============================================================================
+
+
+@pytest.fixture
+def test_video_path():
+    """Return path to test video file."""
+    from pathlib import Path
+    video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+    if not Path(video_path).exists():
+        pytest.skip(f"Test video not found: {video_path}")
+    return video_path
+
+
+@pytest.fixture
+def test_video_pair():
+    """Return paths to two related test videos."""
+    from pathlib import Path
+    video1 = "/Users/nico/Downloads/tests/Das Monster und die Schone_1.mp4"
+    video2 = "/Users/nico/Downloads/tests/Das Monster und die Schone_2.mp4"
+
+    if not Path(video1).exists() or not Path(video2).exists():
+        pytest.skip(f"Test videos not found: {video1}, {video2}")
+
+    return video1, video2
+
+
+class TestDCTCoefficientsVideoIntegration:
+    """Integration tests with real video files."""
+
+    def test_compare_same_video_identical_segments(self, test_video_path):
+        """Test comparing identical segments from same video."""
+        algo = DCTCoefficientsAlgorithm()
+        algo.configure(threshold=0.85, num_samples=5)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert result['similarity'] > 0.85
+        assert result['accepted'] == True
+        assert result['metadata']['best_offset_seconds'] == pytest.approx(0.0, abs=1.0)
+
+    def test_compare_different_videos(self, test_video_pair):
+        """Test comparing two different videos."""
+        video1, video2 = test_video_pair
+
+        algo = DCTCoefficientsAlgorithm()
+        algo.configure(threshold=0.70, num_samples=5)
+
+        result = algo.compare(
+            short_video=video1,
+            long_video=video2,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert 'similarity' in result
+        assert 'accepted' in result
+        assert 'metadata' in result
+
+    def test_extract_features_real_video(self, test_video_path):
+        """Test feature extraction from real video."""
+        algo = DCTCoefficientsAlgorithm()
+        algo.configure(num_samples=8, num_coeffs=64)
+
+        features = algo.extract_features(test_video_path)
+
+        assert len(features) >= 2
+        assert all(isinstance(f, np.ndarray) for f in features)
+        assert all(f.shape == (64,) for f in features)
+
+    def test_compare_window_integration(self, test_video_path):
+        """Test _compare_window with real video."""
+        algo = DCTCoefficientsAlgorithm()
+        algo.configure(num_coeffs=64)
+
+        offsets, ref_sigs = algo._extract_dct_signatures(test_video_path, duration=5.0)
+
+        score = algo._compare_window(
+            long_video=test_video_path,
+            window_start=0.0,
+            short_offsets=offsets,
+            short_sigs=ref_sigs
+        )
+
+        assert score > 80.0
+
+    def test_compare_search_window(self, test_video_path):
+        """Test sliding window search mechanism."""
+        algo = DCTCoefficientsAlgorithm()
+        algo.configure(
+            threshold=0.85,
+            num_samples=5,
+            search_step=2.0,
+            max_windows=20
+        )
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        assert 'windows_tested' in result['metadata']
+        assert result['metadata']['windows_tested'] >= 1
+
+    def test_extract_dct_signatures_integration(self, test_video_path):
+        """Test _extract_dct_signatures with real video."""
+        algo = DCTCoefficientsAlgorithm()
+        algo.configure(num_samples=5, num_coeffs=64)
+
+        offsets, signatures = algo._extract_dct_signatures(test_video_path, duration=10.0)
+
+        assert len(offsets) >= 2
+        assert len(signatures) >= 2
+        assert len(offsets) == len(signatures)
+        assert all(s.shape == (64,) for s in signatures)
+
+    def test_compare_insufficient_frames(self, test_video_path):
+        """Test comparison with very short duration."""
+        algo = DCTCoefficientsAlgorithm()
+        algo.configure(num_samples=8)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=0.5
+        )
+
+        if not result['accepted'] and 'error' in result['metadata']:
+            assert 'Insufficient frames' in result['metadata']['error']
+        else:
+            assert 'num_samples' in result['metadata']
+
+    def test_compare_early_termination(self, test_video_path):
+        """Test early termination optimization."""
+        algo = DCTCoefficientsAlgorithm()
+        algo.configure(threshold=0.90, num_samples=5)
+
+        # Compare segment with itself - should terminate early
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        # Should find perfect match quickly
+        assert result['similarity'] > 0.85
+        assert 'windows_tested' in result['metadata']
