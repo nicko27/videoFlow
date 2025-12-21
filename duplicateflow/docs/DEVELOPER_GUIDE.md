@@ -1,6 +1,6 @@
 # 🔧 Guide Développeur DuplicateFlow
 
-**Version**: 0.9.2 (Phases 1-10D Complete)
+**Version**: 0.9.3 (Phases 1-10E Complete)
 **Dernière mise à jour**: 2025-12-21
 
 ---
@@ -883,21 +883,22 @@ pytest tests/unit/core/models/test_scan.py::test_video_format_webm -v
   - **Phase 10B**: [PHASE10B_CONTINUATION_SUMMARY.md](PHASE10B_CONTINUATION_SUMMARY.md) - 3 algorithms à 90%+ (+44 tests)
   - **Phase 10C**: [PHASE10C_FINAL_SUMMARY.md](PHASE10C_FINAL_SUMMARY.md) - audio_fingerprint 92%, subsequence 91%, audio_spectrum 83% (+28 tests)
   - **Phase 10D**: [PHASE10D_FINAL_SUMMARY.md](PHASE10D_FINAL_SUMMARY.md) - feature_matching 87%, edge_pattern 92%, motion_analysis 67% (+22 tests)
+  - **Phase 10E**: [PHASE10E_FINAL_SUMMARY.md](PHASE10E_FINAL_SUMMARY.md) - optical_flow 87%, template_matching 83%, hog_descriptor 76% (+29 tests)
 
-### Statistiques Globales (Phases 1-10D)
-- ✅ **1,320+ tests** créés (+480 depuis Phase 7)
-- ✅ **~18,600+ lignes** de code de tests (+2,100 lignes)
-- ✅ **Coverage Globale**: ~68%
+### Statistiques Globales (Phases 1-10E)
+- ✅ **1,349+ tests** créés (+509 depuis Phase 7)
+- ✅ **~19,200+ lignes** de code de tests (+2,700 lignes)
+- ✅ **Coverage Globale**: ~70%
   - Models: 94%+
   - Services: 92-100%
   - CLI: 82.2%
-  - **11 Algorithmes à 67-92%** 🏆 (SSIM, frame_hash, edge_pattern, audio_fingerprint, color_moments, dct, subsequence, color_histogram, feature_matching, audio_spectrum, motion_analysis)
+  - **14 Algorithmes à 67-92%** 🏆 (SSIM, frame_hash, edge_pattern, audio_fingerprint, color_moments, dct, subsequence, color_histogram, optical_flow, feature_matching, template_matching, audio_spectrum, hog_descriptor, motion_analysis)
   - Processing: 93%
   - Storage: 98%
-- ✅ **11 algorithmes à 67%+ coverage** (6 à 90%+, 10 à 83%+)
+- ✅ **14 algorithmes à 67%+ coverage** (6 à 90%+, 13 à 76%+)
 - ✅ **5 modules storage à 90%+** (3 à 100% parfait)
 
 ---
 
 **Dernière mise à jour**: 2025-12-21
-**Version**: 0.9.2 (Phases 1-10D Complete)
+**Version**: 0.9.3 (Phases 1-10E Complete)

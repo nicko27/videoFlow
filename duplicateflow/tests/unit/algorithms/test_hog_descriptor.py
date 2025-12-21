@@ -592,3 +592,214 @@ class TestHOGDescriptorPerformance:
 
             # HOG values should be non-negative (histogram counts)
             assert np.all(hog_desc >= 0.0), "HOG descriptor has negative values"
+
+
+# ============================================================================
+# VIDEO INTEGRATION TESTS
+# ============================================================================
+
+class TestHOGDescriptorVideoIntegration:
+    """Test HOG descriptor algorithm with real video files."""
+
+    @pytest.fixture
+    def test_video_path(self):
+        """Return path to test video file."""
+        from pathlib import Path
+        video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+        if not Path(video_path).exists():
+            pytest.skip(f"Test video not found: {video_path}")
+        return video_path
+
+    def test_compare_same_video_identical_segments(self, test_video_path):
+        """Test comparing identical segments from same video."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(threshold=70.0, num_samples=5)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        # Identical segments should have high similarity
+        assert result['similarity'] > 0.70
+        assert result['accepted'] == True
+        assert 'best_offset_seconds' in result['metadata']
+        assert result['metadata']['num_samples'] >= 2
+        assert 'hog_params' in result['metadata']
+
+    def test_compare_different_videos(self, test_video_path):
+        """Test comparing different segments."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(threshold=70.0, num_samples=4)
+
+        # Compare different positions
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=10.0,  # Different position
+            duration=3.0
+        )
+
+        # Result should be valid
+        assert 0.0 <= result['similarity'] <= 1.0
+        assert isinstance(result['accepted'], (bool, np.bool_))
+        assert 'metadata' in result
+
+    def test_extract_features_real_video(self, test_video_path):
+        """Test extracting HOG descriptors from real video."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(num_samples=5)
+
+        hog_descriptors = algo.extract_features(test_video_path)
+
+        # Should return list of HOG descriptor vectors
+        assert isinstance(hog_descriptors, list)
+        assert len(hog_descriptors) >= 2
+        for hog_desc in hog_descriptors:
+            assert isinstance(hog_desc, np.ndarray)
+            assert hog_desc.ndim == 1  # 1D vector
+            assert len(hog_desc) > 0
+
+    def test_extract_hog_descriptors_integration(self, test_video_path):
+        """Test _extract_hog_descriptors with real video."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(num_samples=5, resize=(64, 64))
+
+        offsets, hog_descriptors = algo._extract_hog_descriptors(
+            test_video_path, duration=5.0
+        )
+
+        assert isinstance(offsets, list)
+        assert isinstance(hog_descriptors, list)
+        assert len(hog_descriptors) >= 2
+        assert all(isinstance(hog, np.ndarray) for hog in hog_descriptors)
+
+    def test_compare_window_integration(self, test_video_path):
+        """Test _compare_window with real video."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(num_samples=3)
+
+        # Extract HOG descriptors first
+        offsets, hog_descriptors = algo._extract_hog_descriptors(
+            test_video_path, duration=3.0
+        )
+
+        assert len(hog_descriptors) >= 2
+
+        # Compare window
+        score = algo._compare_window(
+            long_video=test_video_path,
+            window_start=0.0,
+            short_offsets=offsets,
+            short_hogs=hog_descriptors
+        )
+
+        assert isinstance(score, float)
+        assert 0.0 <= score <= 100.0
+
+    def test_compare_search_window(self, test_video_path):
+        """Test sliding window search with real video."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(
+            threshold=70.0,
+            num_samples=4,
+            search_step=2.0,
+            max_windows=5
+        )
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Should test multiple windows
+        assert result['metadata']['windows_tested'] >= 1
+        assert 'best_offset_seconds' in result['metadata']
+        assert result['metadata']['best_offset_seconds'] >= 0.0
+
+    def test_compare_with_different_cell_sizes(self, test_video_path):
+        """Test compare with different HOG cell size configurations."""
+        # Test with larger cells
+        algo1 = HOGDescriptorAlgorithm()
+        algo1.configure(num_samples=3, cell_size=(16, 16))
+        result1 = algo1.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Test with smaller cells
+        algo2 = HOGDescriptorAlgorithm()
+        algo2.configure(num_samples=3, cell_size=(4, 4))
+        result2 = algo2.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Both should succeed
+        assert 'similarity' in result1
+        assert 'similarity' in result2
+        assert result1['metadata']['hog_params']['cell_size'] == (16, 16)
+        assert result2['metadata']['hog_params']['cell_size'] == (4, 4)
+
+    def test_compare_with_different_nbins(self, test_video_path):
+        """Test compare with different number of orientation bins."""
+        for nbins in [6, 9, 12]:
+            algo = HOGDescriptorAlgorithm()
+            algo.configure(num_samples=3, nbins=nbins)
+
+            result = algo.compare(
+                short_video=test_video_path,
+                long_video=test_video_path,
+                start_time=0.0,
+                duration=3.0
+            )
+
+            assert 0.0 <= result['similarity'] <= 1.0
+            assert result['metadata']['hog_params']['nbins'] == nbins
+
+    def test_compare_insufficient_frames(self, test_video_path):
+        """Test handling of very short duration."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(num_samples=20)  # Try to extract many samples
+
+        # Very short duration might not yield enough frames
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=0.5  # Very short
+        )
+
+        # Should still return valid result
+        assert 'similarity' in result
+        assert isinstance(result['accepted'], (bool, np.bool_))
+
+    def test_compare_early_termination(self, test_video_path):
+        """Test early termination when excellent match found."""
+        algo = HOGDescriptorAlgorithm()
+        algo.configure(
+            threshold=65.0,
+            num_samples=4,
+            search_step=1.0,
+            max_windows=50
+        )
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Should test windows and return valid result
+        assert result['metadata']['windows_tested'] >= 1
+        assert 0.0 <= result['similarity'] <= 1.0
+        assert isinstance(result['accepted'], (bool, np.bool_))

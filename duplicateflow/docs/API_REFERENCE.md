@@ -1,6 +1,6 @@
 # 📘 API Reference - DuplicateFlow
 
-**Version**: 0.9.2 (Phases 1-10D Complete)
+**Version**: 0.9.3 (Phases 1-10E Complete)
 **Dernière mise à jour**: 2025-12-21
 
 ---
@@ -1197,22 +1197,23 @@ class MessageType(Enum):
 - **Phase 6**: [PHASE6_CLI_TESTING_SUMMARY.md](PHASE6_CLI_TESTING_SUMMARY.md) - CLI Commands (89 tests, 82.2%)
 - **Phase 7**: [PHASE7_COMPLETE_SUMMARY.md](PHASE7_COMPLETE_SUMMARY.md) - Algorithms (471 tests, 60%+)
 - **Phase 8**: [PHASE8_COMPLETE_SUMMARY.md](PHASE8_COMPLETE_SUMMARY.md) - Processing & Storage (269 tests, **95% avg, 3 at 100%**)
-- **Phase 10**: [PHASE10_FINAL_SUMMARY.md](PHASE10_FINAL_SUMMARY.md) - 🎉 **Algorithms Enhancement Complete (11 algorithms à 67-92%)**
+- **Phase 10**: [PHASE10_FINAL_SUMMARY.md](PHASE10_FINAL_SUMMARY.md) - 🎉 **Algorithms Enhancement Complete (14 algorithms à 67-92%)**
   - **Phase 10A**: [PHASE10_SSIM_ENHANCEMENT.md](PHASE10_SSIM_ENHANCEMENT.md) - SSIM 24% → 92%, frame_hash 36% → 92%
   - **Phase 10B**: [PHASE10B_CONTINUATION_SUMMARY.md](PHASE10B_CONTINUATION_SUMMARY.md) - color_histogram 25% → 89%, color_moments 26% → 91%, dct_coefficients 26% → 91%
   - **Phase 10C**: [PHASE10C_FINAL_SUMMARY.md](PHASE10C_FINAL_SUMMARY.md) - audio_fingerprint 78% → 92%, subsequence_detection 49% → 91%, audio_spectrum 45% → 83%
   - **Phase 10D**: [PHASE10D_FINAL_SUMMARY.md](PHASE10D_FINAL_SUMMARY.md) - feature_matching 43% → 87%, edge_pattern 42% → 92%, motion_analysis 34% → 67%
+  - **Phase 10E**: [PHASE10E_FINAL_SUMMARY.md](PHASE10E_FINAL_SUMMARY.md) - optical_flow 32% → 87%, template_matching 31% → 83%, hog_descriptor 31% → 76%
 
-### Statistiques Globales (Phases 1-10D)
-- ✅ **1,320+ tests** créés (+210 depuis Phase 8)
-- ✅ **~18,600+ lignes** de code de tests (+2,100 lignes)
-- ✅ **Coverage Globale**: ~68% (Models 94%+, Services 92-100%, CLI 82.2%, Processing 93%, Storage 98%, **11 algorithmes à 67-92%**)
-- ✅ **11 algorithmes à 67%+** (SSIM 92%, frame_hash 92%, edge_pattern 92%, audio_fingerprint 92%, color_moments 91%, dct 91%, subsequence 91%, color_hist 89%, feature_matching 87%, audio_spectrum 83%, motion_analysis 67%)
-- ✅ **6 algorithmes à 90%+**, **10 algorithmes à 83%+**
+### Statistiques Globales (Phases 1-10E)
+- ✅ **1,349+ tests** créés (+239 depuis Phase 8)
+- ✅ **~19,200+ lignes** de code de tests (+2,700 lignes)
+- ✅ **Coverage Globale**: ~70% (Models 94%+, Services 92-100%, CLI 82.2%, Processing 93%, Storage 98%, **14 algorithmes à 67-92%**)
+- ✅ **14 algorithmes à 67%+** (SSIM 92%, frame_hash 92%, edge_pattern 92%, audio_fingerprint 92%, color_moments 91%, dct 91%, subsequence 91%, color_hist 89%, optical_flow 87%, feature_matching 87%, template_matching 83%, audio_spectrum 83%, hog_descriptor 76%, motion_analysis 67%)
+- ✅ **6 algorithmes à 90%+**, **13 algorithmes à 76%+**
 - ✅ **5 modules storage à 90%+** (3 à 100% parfait: StorageManager, FeatureCache, PipelineStore)
-- 🏆 **Phase 10 Complete: 11 algorithmes améliorés, +175 tests vidéo, +49% coverage moyen**
+- 🏆 **Phase 10 Complete: 14 algorithmes améliorés, +204 tests vidéo, +50% coverage moyen**
 
 ---
 
 **Dernière mise à jour**: 2025-12-21
-**Version**: 0.9.2 (Phases 1-10D Complete)
+**Version**: 0.9.3 (Phases 1-10E Complete)

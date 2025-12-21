@@ -607,3 +607,199 @@ class TestOpticalFlowPerformance:
         assert isinstance(reqs, list)
         assert 'opencv-python>=4.8.0' in reqs
         assert 'numpy>=1.24.0' in reqs
+
+
+# ============================================================================
+# 8. VIDEO INTEGRATION TESTS
+# ============================================================================
+
+class TestOpticalFlowVideoIntegration:
+    """Test optical flow algorithm with real video files."""
+
+    @pytest.fixture
+    def test_video_path(self):
+        """Return path to test video file."""
+        from pathlib import Path
+        video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+        if not Path(video_path).exists():
+            pytest.skip(f"Test video not found: {video_path}")
+        return video_path
+
+    def test_compare_same_video_identical_segments(self, test_video_path):
+        """Test comparing identical segments from same video."""
+        algo = OpticalFlowAlgorithm()
+        algo.configure(threshold=70.0, max_frames=15, frame_step=3)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        # Identical segments should have high similarity
+        assert result['similarity'] > 0.70
+        assert result['accepted'] == True
+        assert 'best_offset_seconds' in result['metadata']
+        assert 'short_magnitude' in result['metadata']
+        assert 'short_variance' in result['metadata']
+        assert result['metadata']['windows_tested'] >= 1
+
+    def test_compare_different_videos(self, test_video_path):
+        """Test comparing different segments (simulated by different durations)."""
+        algo = OpticalFlowAlgorithm()
+        algo.configure(threshold=70.0, max_frames=10)
+
+        # Compare first 3 seconds vs different segment
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=10.0,  # Different position
+            duration=3.0
+        )
+
+        # Result should be valid
+        assert 0.0 <= result['similarity'] <= 1.0
+        assert isinstance(result['accepted'], (bool, np.bool_))
+        assert 'metadata' in result
+
+    def test_extract_features_real_video(self, test_video_path):
+        """Test extracting optical flow features from real video."""
+        algo = OpticalFlowAlgorithm()
+        algo.configure(max_frames=10, frame_step=3)
+
+        features = algo.extract_features(test_video_path)
+
+        # Should return tuple (magnitude, variance)
+        assert isinstance(features, tuple)
+        assert len(features) == 2
+        assert isinstance(features[0], float)  # magnitude
+        assert isinstance(features[1], float)  # variance
+        assert features[0] >= 0.0
+        assert features[1] >= 0.0
+
+    def test_compare_window_integration(self, test_video_path):
+        """Test _compute_flow_magnitude with real video."""
+        algo = OpticalFlowAlgorithm()
+        algo.configure(max_frames=10, frame_step=2)
+
+        mag, var = algo._compute_flow_magnitude(
+            test_video_path,
+            duration=3.0,
+            start_time=0.0
+        )
+
+        assert mag is not None
+        assert var is not None
+        assert isinstance(mag, float)
+        assert isinstance(var, float)
+        assert mag >= 0.0
+        assert var >= 0.0
+
+    def test_compare_search_window(self, test_video_path):
+        """Test sliding window search with real video."""
+        algo = OpticalFlowAlgorithm()
+        algo.configure(
+            threshold=70.0,
+            max_frames=8,
+            search_step=2.0,
+            max_windows=5
+        )
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Should test multiple windows
+        assert result['metadata']['windows_tested'] >= 1
+        assert 'best_offset_seconds' in result['metadata']
+        assert result['metadata']['best_offset_seconds'] >= 0.0
+
+    def test_compare_with_different_params(self, test_video_path):
+        """Test compare with different parameter configurations."""
+        # Test with more frames
+        algo1 = OpticalFlowAlgorithm()
+        algo1.configure(max_frames=20, frame_step=2)
+        result1 = algo1.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Test with fewer frames
+        algo2 = OpticalFlowAlgorithm()
+        algo2.configure(max_frames=5, frame_step=5)
+        result2 = algo2.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Both should succeed
+        assert 'similarity' in result1
+        assert 'similarity' in result2
+        assert 0.0 <= result1['similarity'] <= 1.0
+        assert 0.0 <= result2['similarity'] <= 1.0
+
+    def test_compare_with_min_variance(self, test_video_path):
+        """Test static scene detection with min_variance."""
+        algo = OpticalFlowAlgorithm()
+        algo.configure(
+            threshold=70.0,
+            max_frames=10,
+            min_variance=0.1  # Higher threshold for static detection
+        )
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        assert 'short_variance' in result['metadata']
+        assert isinstance(result['metadata']['short_variance'], (float, type(None)))
+
+    def test_compare_insufficient_frames(self, test_video_path):
+        """Test handling of very short duration."""
+        algo = OpticalFlowAlgorithm()
+        algo.configure(max_frames=100, frame_step=10)
+
+        # Very short duration might not have enough frames
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=0.5  # Very short
+        )
+
+        # Should still return valid result
+        assert 'similarity' in result
+        assert isinstance(result['accepted'], (bool, np.bool_))
+
+    def test_compare_early_termination(self, test_video_path):
+        """Test early termination when excellent match found."""
+        algo = OpticalFlowAlgorithm()
+        algo.configure(
+            threshold=60.0,  # Lower threshold
+            max_frames=10,
+            search_step=1.0,
+            max_windows=50  # Many windows
+        )
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Should test windows and return valid result
+        assert result['metadata']['windows_tested'] >= 1
+        assert 0.0 <= result['similarity'] <= 1.0
+        assert isinstance(result['accepted'], (bool, np.bool_))

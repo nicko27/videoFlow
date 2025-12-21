@@ -738,3 +738,211 @@ class TestTemplateMatchingPerformance:
 
         # Should either succeed (via reverse matching) or return 0
         assert 0.0 <= result['similarity'] <= 100.0
+
+
+# ============================================================================
+# VIDEO INTEGRATION TESTS
+# ============================================================================
+
+class TestTemplateMatchingVideoIntegration:
+    """Test template matching algorithm with real video files."""
+
+    @pytest.fixture
+    def test_video_path(self):
+        """Return path to test video file."""
+        from pathlib import Path
+        video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+        if not Path(video_path).exists():
+            pytest.skip(f"Test video not found: {video_path}")
+        return video_path
+
+    def test_compare_same_video_identical_segments(self, test_video_path):
+        """Test comparing identical segments from same video."""
+        algo = TemplateMatchingAlgorithm()
+        algo.configure(threshold=75.0, num_templates=5, template_size=(64, 64))
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=5.0
+        )
+
+        # Identical segments should have high similarity
+        assert result['similarity'] > 0.75
+        assert result['accepted'] == True
+        assert 'best_offset_seconds' in result['metadata']
+        assert result['metadata']['num_templates'] >= 2
+        assert 'template_size' in result['metadata']
+
+    def test_compare_different_videos(self, test_video_path):
+        """Test comparing different segments."""
+        algo = TemplateMatchingAlgorithm()
+        algo.configure(threshold=80.0, num_templates=4)
+
+        # Compare different positions
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=10.0,  # Different position
+            duration=3.0
+        )
+
+        # Result should be valid
+        assert 0.0 <= result['similarity'] <= 1.0
+        assert isinstance(result['accepted'], (bool, np.bool_))
+        assert 'metadata' in result
+
+    def test_extract_features_real_video(self, test_video_path):
+        """Test extracting templates from real video."""
+        algo = TemplateMatchingAlgorithm()
+        algo.configure(num_templates=5, template_size=(64, 64))
+
+        templates = algo.extract_features(test_video_path)
+
+        # Should return list of template images
+        assert isinstance(templates, list)
+        assert len(templates) >= 2
+        for template in templates:
+            assert isinstance(template, np.ndarray)
+            assert template.shape == (64, 64)  # Grayscale templates
+
+    def test_extract_templates_integration(self, test_video_path):
+        """Test _extract_templates with real video."""
+        algo = TemplateMatchingAlgorithm()
+        algo.configure(num_templates=5, template_size=(32, 32), resize=(320, 240))
+
+        templates = algo._extract_templates(test_video_path, duration=5.0)
+
+        assert isinstance(templates, list)
+        assert len(templates) >= 2
+        for template in templates:
+            assert template.shape == (32, 32)
+
+    def test_compare_window_integration(self, test_video_path):
+        """Test _compare_window with real video."""
+        algo = TemplateMatchingAlgorithm()
+        algo.configure(num_templates=3, template_size=(48, 48))
+
+        # Extract templates first
+        templates = algo._extract_templates(test_video_path, duration=3.0)
+
+        assert len(templates) >= 2
+
+        # Compare window
+        score = algo._compare_window(
+            long_video=test_video_path,
+            window_start=0.0,
+            duration=3.0,
+            templates=templates
+        )
+
+        assert isinstance(score, float)
+        assert 0.0 <= score <= 100.0
+
+    def test_compare_search_window(self, test_video_path):
+        """Test sliding window search with real video."""
+        algo = TemplateMatchingAlgorithm()
+        algo.configure(
+            threshold=80.0,
+            num_templates=4,
+            search_step=2.0,
+            max_windows=5
+        )
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Should test multiple windows
+        assert result['metadata']['windows_tested'] >= 1
+        assert 'best_offset_seconds' in result['metadata']
+        assert result['metadata']['best_offset_seconds'] >= 0.0
+
+    def test_compare_with_different_template_sizes(self, test_video_path):
+        """Test compare with different template size configurations."""
+        # Test with larger templates
+        algo1 = TemplateMatchingAlgorithm()
+        algo1.configure(num_templates=3, template_size=(80, 80))
+        result1 = algo1.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Test with smaller templates
+        algo2 = TemplateMatchingAlgorithm()
+        algo2.configure(num_templates=3, template_size=(32, 32))
+        result2 = algo2.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Both should succeed
+        assert 'similarity' in result1
+        assert 'similarity' in result2
+        assert result1['metadata']['template_size'] == (80, 80)
+        assert result2['metadata']['template_size'] == (32, 32)
+
+    def test_compare_with_different_methods(self, test_video_path):
+        """Test compare with different template matching methods."""
+        methods = ['TM_CCOEFF_NORMED', 'TM_CCORR_NORMED']
+
+        for method in methods:
+            algo = TemplateMatchingAlgorithm()
+            algo.configure(num_templates=3, method=method)
+
+            result = algo.compare(
+                short_video=test_video_path,
+                long_video=test_video_path,
+                start_time=0.0,
+                duration=3.0
+            )
+
+            assert 0.0 <= result['similarity'] <= 1.0
+            assert 'num_templates' in result['metadata']
+
+    def test_compare_insufficient_templates(self, test_video_path):
+        """Test handling of very short duration."""
+        algo = TemplateMatchingAlgorithm()
+        algo.configure(num_templates=20)  # Try to extract many templates
+
+        # Very short duration might not yield enough templates
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=0.5  # Very short
+        )
+
+        # Should still return valid result
+        assert 'similarity' in result
+        assert isinstance(result['accepted'], (bool, np.bool_))
+
+    def test_compare_early_termination(self, test_video_path):
+        """Test early termination when excellent match found."""
+        algo = TemplateMatchingAlgorithm()
+        algo.configure(
+            threshold=75.0,
+            num_templates=4,
+            search_step=1.0,
+            max_windows=50
+        )
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Should test windows and return valid result
+        assert result['metadata']['windows_tested'] >= 1
+        assert 0.0 <= result['similarity'] <= 1.0
+        assert isinstance(result['accepted'], (bool, np.bool_))
