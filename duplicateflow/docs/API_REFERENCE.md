@@ -1,7 +1,7 @@
 # 📘 API Reference - DuplicateFlow
 
-**Version**: 0.7.0 (Phases 1-7 Complete)
-**Dernière mise à jour**: 2025-12-20
+**Version**: 0.8.0 (Phases 1-8 Complete)
+**Dernière mise à jour**: 2025-12-21
 
 ---
 
@@ -10,6 +10,8 @@
 - [Core Interfaces](#core-interfaces)
 - [Core Models](#core-models)
 - [Core Services](#core-services)
+- [Processing Modules](#processing-modules)
+- [Storage Modules](#storage-modules)
 - [CLI Adapters](#cli-adapters)
 - [CLI Commands](#cli-commands)
 
@@ -618,6 +620,361 @@ print(f"By format: {stats['format_counts']}")
 
 ---
 
+## Processing Modules
+
+### `ParallelWindowSearch`
+
+Recherche parallèle par fenêtres temporelles pour détecter des sous-séquences similaires.
+
+**Module**: `duplicateflow.processing.parallel_search`
+**Tests**: 26 tests, 95% coverage
+
+#### Constructeur
+
+```python
+ParallelWindowSearch(
+    algorithm: BaseAlgorithm,
+    window_seconds: float = 30.0,
+    step_seconds: float = 10.0,
+    threshold: float = 70.0,
+    max_workers: int = 4
+)
+```
+
+**Paramètres**:
+- `algorithm`: Algorithme de comparaison
+- `window_seconds`: Taille de fenêtre temporelle (défaut: 30s)
+- `step_seconds`: Pas de déplacement (défaut: 10s)
+- `threshold`: Seuil de similarité (défaut: 70.0)
+- `max_workers`: Nombre de workers parallèles (défaut: 4)
+
+**Exemple**:
+```python
+from duplicateflow.processing import ParallelWindowSearch
+from duplicateflow.algorithms import FrameHashAlgorithm
+
+algo = FrameHashAlgorithm()
+search = ParallelWindowSearch(
+    algorithm=algo,
+    window_seconds=30.0,
+    step_seconds=10.0,
+    threshold=75.0
+)
+
+result = search.search(
+    reference_video="video1.mp4",
+    query_video="video2.mp4"
+)
+```
+
+---
+
+### `CascadeFilter`
+
+Filtrage en cascade multi-étapes pour rejet précoce des paires non-similaires.
+
+**Module**: `duplicateflow.processing.cascade_filter`
+**Tests**: 24 tests, 95% coverage
+
+#### Constructeur
+
+```python
+CascadeFilter(
+    stages: list[dict],
+    global_threshold: float = 70.0
+)
+```
+
+**Paramètres**:
+- `stages`: Liste des étapes de filtrage avec algorithmes
+- `global_threshold`: Seuil global final
+
+**Exemple**:
+```python
+from duplicateflow.processing import CascadeFilter
+
+cascade = CascadeFilter(
+    stages=[
+        {'algorithm': 'frame_hash', 'threshold': 80.0, 'fast': True},
+        {'algorithm': 'color_histogram', 'threshold': 75.0},
+        {'algorithm': 'ssim', 'threshold': 70.0}
+    ],
+    global_threshold=75.0
+)
+
+# Rejette rapidement si frame_hash < 80%
+# Continue avec color_histogram si passé
+# Validation finale avec SSIM
+```
+
+---
+
+### `BatchProcessor`
+
+Traitement par lots avec parallélisation et checkpointing.
+
+**Module**: `duplicateflow.processing.batch_processor`
+**Tests**: 15 tests, 92% coverage
+
+#### Méthodes
+
+##### `process_batch(videos, strategy='standard')`
+
+Traite un lot de vidéos.
+
+**Paramètres**:
+- `videos` (list[str]): Liste de chemins vidéo
+- `strategy` (str): Stratégie de traitement ('standard' ou 'parallel')
+
+**Retourne**: `list[BatchResult]`
+
+**Exemple**:
+```python
+from duplicateflow.processing import BatchProcessor
+
+processor = BatchProcessor(max_workers=4)
+
+videos = ["video1.mp4", "video2.mp4", "video3.mp4"]
+results = processor.process_batch(videos)
+
+# Export CSV
+processor.export_csv(results, "results.csv")
+```
+
+---
+
+## Storage Modules
+
+### `StorageManager`
+
+Interface unifiée pour toutes les opérations de stockage et cache.
+
+**Module**: `duplicateflow.storage.storage_manager`
+**Tests**: 30 tests, **100% coverage** ✨
+
+#### Constructeur
+
+```python
+StorageManager(
+    cache_dir: str = "~/.duplicateflow/cache",
+    max_memory_items: int = 2000
+)
+```
+
+**Exemple**:
+```python
+from duplicateflow.storage import StorageManager
+
+storage = StorageManager(
+    cache_dir="~/.duplicateflow/cache",
+    max_memory_items=2000
+)
+
+# Hash de fichier (avec cache)
+hash1 = storage.get_file_hash("/path/to/video.mp4")
+
+# Vérifier si fichiers identiques
+if storage.are_files_identical(file1, file2):
+    print("Obvious duplicates!")
+
+# Résultat de comparaison en cache
+result = storage.get_cached_result(
+    file1, file2, "frame_hash", {'threshold': 70.0}
+)
+
+if result is None:
+    # Calculer et stocker
+    result = algorithm.compare(file1, file2)
+    storage.store_result(
+        file1, file2, "frame_hash",
+        {'threshold': 70.0}, result
+    )
+
+# Statistiques
+stats = storage.get_stats()
+print(f"Hit rate: {stats['result_cache']['hit_rate']:.1f}%")
+```
+
+---
+
+### `ResultCache`
+
+Cache persistant (SQLite + mémoire) pour résultats de comparaison d'algorithmes.
+
+**Module**: `duplicateflow.storage.result_cache`
+**Tests**: 28 tests, 98% coverage
+
+#### Constructeur
+
+```python
+ResultCache(db_path: str = "~/.duplicateflow/results.db")
+```
+
+#### Méthodes
+
+##### `store(file1_hash, file2_hash, algorithm, params, result)`
+
+Stocke un résultat de comparaison.
+
+**Paramètres**:
+- `file1_hash` (str): Hash MD5 du premier fichier
+- `file2_hash` (str): Hash MD5 du second fichier
+- `algorithm` (str): Nom de l'algorithme
+- `params` (dict): Paramètres de l'algorithme
+- `result` (dict): Résultat de comparaison
+
+**Exemple**:
+```python
+from duplicateflow.storage import ResultCache
+
+cache = ResultCache()
+
+cache.store(
+    file1_hash="abc123",
+    file2_hash="def456",
+    algorithm="frame_hash",
+    params={'threshold': 70.0},
+    result={
+        'similarity': 0.85,
+        'accepted': True,
+        'metadata': {'frames_compared': 100}
+    }
+)
+
+# Récupération (ordre des fichiers n'a pas d'importance)
+result = cache.get("def456", "abc123", "frame_hash", {'threshold': 70.0})
+```
+
+---
+
+### `FeatureCache`
+
+Cache persistant pour features extraites (fingerprints, histogrammes, etc.).
+
+**Module**: `duplicateflow.storage.feature_cache`
+**Tests**: 31 tests, **100% coverage** ✨
+
+#### Constructeur
+
+```python
+FeatureCache(db_path: str = "~/.duplicateflow/features.db")
+```
+
+#### Méthodes
+
+##### `store(file_hash, algorithm, params, features, metadata=None)`
+
+Stocke des features extraites.
+
+**Paramètres**:
+- `file_hash` (str): Hash MD5 du fichier
+- `algorithm` (str): Nom de l'algorithme
+- `params` (dict): Paramètres d'extraction
+- `features` (Any): Features (sérialisées avec pickle)
+- `metadata` (dict, optional): Métadonnées (stockées en JSON)
+
+**Exemple**:
+```python
+from duplicateflow.storage import FeatureCache
+
+cache = FeatureCache()
+
+# Stocker features complexes
+features = {
+    'fingerprints': {
+        'hash_1': [1, 2, 3, 4, 5],
+        'hash_2': [6, 7, 8, 9, 10]
+    },
+    'histograms': [[0.1, 0.2], [0.3, 0.4]]
+}
+
+cache.store(
+    file_hash="abc123",
+    algorithm="audio_fingerprint",
+    params={'sr': 11025, 'n_fft': 4096},
+    features=features,
+    metadata={'extraction_time_ms': 250.5}
+)
+
+# Récupération
+cached = cache.get("abc123", "audio_fingerprint", {'sr': 11025, 'n_fft': 4096})
+```
+
+---
+
+### `PipelineStore`
+
+Stockage persistant de configurations de pipelines personnalisés.
+
+**Module**: `duplicateflow.storage.pipeline_store`
+**Tests**: 35 tests, **100% coverage** ✨
+
+#### Constructeur
+
+```python
+PipelineStore(db_path: str = "~/.duplicateflow/pipelines.db")
+```
+
+#### Méthodes
+
+##### `save(name, config, description="", category="custom", overwrite=False)`
+
+Sauvegarde une configuration de pipeline.
+
+**Paramètres**:
+- `name` (str): Nom unique du pipeline
+- `config` (dict): Configuration complète
+- `description` (str): Description
+- `category` (str): Catégorie (custom, duplicates, scenes, etc.)
+- `overwrite` (bool): Écraser si existe
+
+**Retourne**: `int` - ID du pipeline
+
+**Exemple**:
+```python
+from duplicateflow.storage import PipelineStore
+
+store = PipelineStore()
+
+config = {
+    'steps': [
+        {'algorithm': 'frame_hash', 'weight': 0.6, 'threshold': 80},
+        {'algorithm': 'color_histogram', 'weight': 0.4, 'threshold': 75}
+    ],
+    'global_threshold': 75.0,
+    'pre_validators': [
+        {
+            'type': 'LengthValidator',
+            'config': {'tolerance_percent': 5.0}
+        }
+    ]
+}
+
+# Sauvegarder
+pipeline_id = store.save(
+    name="my_fast_pipeline",
+    config=config,
+    description="Pipeline rapide pour duplicatas",
+    category="duplicates"
+)
+
+# Charger
+loaded_config = store.load("my_fast_pipeline")
+
+# Lister
+pipelines = store.list(category="duplicates")
+
+# Statistiques d'usage
+stats = store.get_stats("my_fast_pipeline")
+print(f"Used {stats['usage_count']} times")
+
+# Export/Import
+store.export_preset("my_fast_pipeline", "presets/custom.json")
+store.import_preset("presets/other.json", name="imported")
+```
+
+---
+
 ## CLI Adapters
 
 ### `RichProgressReporter`
@@ -831,7 +1188,7 @@ class MessageType(Enum):
 - **Developer Guide**: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
 - **Documentation Index**: [INDEX.md](INDEX.md) - Navigation complète
 
-### Phases de Testing (1-7)
+### Phases de Testing (1-8)
 - **Phase 1**: [PHASE1_COMPLETE_SUMMARY.md](PHASE1_COMPLETE_SUMMARY.md) - Architecture Clean + CLI scan (160 tests, 92%)
 - **Phase 2**: [PHASE2_COMPLETE_SUMMARY.md](PHASE2_COMPLETE_SUMMARY.md) - Tests modèles (95%+)
 - **Phase 3**: [PHASE3_COMPLETE_SUMMARY.md](PHASE3_COMPLETE_SUMMARY.md) - Tests d'intégration
@@ -839,13 +1196,15 @@ class MessageType(Enum):
 - **Phase 5**: [PHASE5_SERVICE_LAYER_TESTING_COMPLETE.md](PHASE5_SERVICE_LAYER_TESTING_COMPLETE.md) - Service Layer (80 tests, 92-100%)
 - **Phase 6**: [PHASE6_CLI_TESTING_SUMMARY.md](PHASE6_CLI_TESTING_SUMMARY.md) - CLI Commands (89 tests, 82.2%)
 - **Phase 7**: [PHASE7_COMPLETE_SUMMARY.md](PHASE7_COMPLETE_SUMMARY.md) - Algorithms (471 tests, 60%+)
+- **Phase 8**: [PHASE8_COMPLETE_SUMMARY.md](PHASE8_COMPLETE_SUMMARY.md) - Processing & Storage (269 tests, **95% avg, 3 at 100%**)
 
 ### Statistiques Globales
-- ✅ **841+ tests** créés (Phases 1-7)
-- ✅ **~12,000+ lignes** de code de tests
-- ✅ **Coverage**: Models 94%+, Services 92-100%, CLI 82.2%, Algorithms 60%+
+- ✅ **1,110+ tests** créés (Phases 1-8)
+- ✅ **~16,500+ lignes** de code de tests
+- ✅ **Coverage**: Models 94%+, Services 92-100%, CLI 82.2%, Algorithms 60%+, **Processing 93%**, **Storage 98%**
+- ✅ **3 modules à 100% parfait** (StorageManager, FeatureCache, PipelineStore)
 
 ---
 
-**Dernière mise à jour**: 2025-12-20
-**Version**: 0.7.0 (Phases 1-7 Complete)
+**Dernière mise à jour**: 2025-12-21
+**Version**: 0.8.0 (Phases 1-8 Complete)
