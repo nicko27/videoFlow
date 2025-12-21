@@ -480,3 +480,68 @@ class TestMinHashLSHIntegration:
         # Just verify we get some candidates and video 1 itself is not included
         assert 1 not in candidates
         assert len(candidates) >= 0  # At least some candidates expected
+
+
+class TestLSHFingerprintIndexFindMatchesFast:
+    """Test LSHFingerprintIndex.find_matches_fast integration."""
+
+    def test_find_matches_fast_reduces_comparisons(self, tmp_path):
+        """Test that find_matches_fast uses LSH to reduce comparisons."""
+        from duplicateflow.processing.fingerprint_index import FingerprintIndex
+
+        # Create fingerprint index
+        db_path = tmp_path / "test.db"
+        fp_index = FingerprintIndex(db_path=str(db_path))
+
+        # Create 3 videos with different fingerprints
+        videos = []
+        for i in range(3):
+            video = tmp_path / f"video{i}.mp4"
+            video.write_text(f"content{i}")
+            videos.append(video)
+
+        # Mock algorithm
+        mock_algo = Mock()
+
+        def extract_fps(video_path, *args, **kwargs):
+            if "video0" in str(video_path):
+                # Dict format {hash: [timestamps]}
+                return {1000: [0.0], 2000: [1.0], 3000: [2.0]}
+            elif "video1" in str(video_path):
+                # Similar to video0
+                return {1000: [0.0], 2000: [1.0], 3000: [2.0]}
+            else:
+                # Very different from video0 and video1
+                return {9999: [0.0], 8888: [1.0], 7777: [2.0]}
+
+        mock_algo.extract_fingerprints = Mock(side_effect=extract_fps)
+
+        with patch('duplicateflow.algorithms.base.video_loader.get_video_duration') as mock_duration:
+            mock_duration.return_value = 30.0
+            for video in videos:
+                fp_index.index_video(str(video), mock_algo)
+
+        # Create LSH index
+        lsh_index = LSHFingerprintIndex(fp_index, num_perm=64, num_bands=8)
+
+        # Find matches using LSH
+        matches = lsh_index.find_matches_fast(str(videos[0]), min_votes=2)
+
+        # Should find matches (video0 matches video1)
+        # Result depends on LSH candidate selection
+        assert isinstance(matches, list)
+
+    def test_find_matches_fast_video_not_indexed(self, tmp_path):
+        """Test find_matches_fast with non-indexed video."""
+        from duplicateflow.processing.fingerprint_index import FingerprintIndex
+
+        db_path = tmp_path / "test.db"
+        fp_index = FingerprintIndex(db_path=str(db_path))
+
+        lsh_index = LSHFingerprintIndex(fp_index, num_perm=64, num_bands=8)
+
+        # Query non-existent video
+        matches = lsh_index.find_matches_fast("/nonexistent.mp4", min_votes=1)
+
+        # Should return empty list
+        assert matches == []

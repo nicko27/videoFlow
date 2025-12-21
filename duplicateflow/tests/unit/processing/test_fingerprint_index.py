@@ -537,3 +537,136 @@ class TestFingerprintIndexExport:
             data = json.load(f)
 
         assert data == []
+
+
+class TestFingerprintIndexDirectory:
+    """Test index_directory batch indexing."""
+
+    @pytest.fixture
+    def video_directory(self, tmp_path):
+        """Create directory with test videos."""
+        video_dir = tmp_path / "videos"
+        video_dir.mkdir()
+
+        # Create some test video files
+        (video_dir / "video1.mp4").write_text("content1")
+        (video_dir / "video2.mkv").write_text("content2")
+        (video_dir / "video3.avi").write_text("content3")
+
+        # Create subdirectory with more videos
+        subdir = video_dir / "subdir"
+        subdir.mkdir()
+        (subdir / "video4.mp4").write_text("content4")
+        (subdir / "video5.mov").write_text("content5")
+
+        return video_dir
+
+    def test_index_directory_non_recursive(self, tmp_path, video_directory):
+        """Test indexing directory non-recursively."""
+        db_path = tmp_path / "test.db"
+        index = FingerprintIndex(db_path=str(db_path))
+
+        mock_algo = Mock()
+        # Return dict format: {hash: [timestamps]}
+        mock_algo.extract_fingerprints = Mock(return_value={1000: [0.0], 2000: [1.0]})
+
+        with patch('duplicateflow.algorithms.base.video_loader.get_video_duration') as mock_duration:
+            mock_duration.return_value = 30.0
+            index.index_directory(str(video_directory), mock_algo, recursive=False, workers=1)
+
+        # Should have indexed 3 videos (not subdirectory)
+        stats = index.get_stats()
+        assert stats['video_count'] == 3
+
+    def test_index_directory_recursive(self, tmp_path, video_directory):
+        """Test indexing directory recursively."""
+        db_path = tmp_path / "test.db"
+        index = FingerprintIndex(db_path=str(db_path))
+
+        mock_algo = Mock()
+        # Return dict format: {hash: [timestamps]}
+        mock_algo.extract_fingerprints = Mock(return_value={1000: [0.0]})
+
+        with patch('duplicateflow.algorithms.base.video_loader.get_video_duration') as mock_duration:
+            mock_duration.return_value = 30.0
+            index.index_directory(str(video_directory), mock_algo, recursive=True, workers=1)
+
+        # Should have indexed all 5 videos
+        stats = index.get_stats()
+        assert stats['video_count'] == 5
+
+    def test_index_directory_with_pattern(self, tmp_path, video_directory):
+        """Test indexing directory with pattern filter."""
+        db_path = tmp_path / "test.db"
+        index = FingerprintIndex(db_path=str(db_path))
+
+        mock_algo = Mock()
+        # Return dict format: {hash: [timestamps]}
+        mock_algo.extract_fingerprints = Mock(return_value={1000: [0.0]})
+
+        with patch('duplicateflow.algorithms.base.video_loader.get_video_duration') as mock_duration:
+            mock_duration.return_value = 30.0
+            index.index_directory(str(video_directory), mock_algo, pattern="video1", recursive=False, workers=1)
+
+        # Should only index video1.mp4
+        stats = index.get_stats()
+        assert stats['video_count'] == 1
+
+
+class TestFingerprintIndexFindAllMatches:
+    """Test find_all_matches N-to-N matching."""
+
+    @pytest.fixture
+    def index_with_videos(self, tmp_path):
+        """Create index with multiple videos."""
+        db_path = tmp_path / "test.db"
+        index = FingerprintIndex(db_path=str(db_path))
+
+        # Create 3 videos with overlapping fingerprints
+        videos = []
+        for i in range(3):
+            video = tmp_path / f"video{i}.mp4"
+            video.write_text(f"content{i}")
+            videos.append(video)
+
+        # Mock algorithm - video0 and video1 match, video2 is different
+        mock_algo = Mock()
+
+        def extract_fps(video_path, *args, **kwargs):
+            if "video0" in str(video_path) or "video1" in str(video_path):
+                # Same fingerprints - dict format {hash: [timestamps]}
+                return {1000: [0.0], 2000: [1.0], 3000: [2.0]}
+            else:
+                # Different fingerprints
+                return {9999: [0.0], 8888: [1.0]}
+
+        mock_algo.extract_fingerprints = Mock(side_effect=extract_fps)
+
+        with patch('duplicateflow.algorithms.base.video_loader.get_video_duration') as mock_duration:
+            mock_duration.return_value = 30.0
+            for video in videos:
+                index.index_video(str(video), mock_algo)
+
+        return index, videos
+
+    def test_find_all_matches_with_matches(self, index_with_videos):
+        """Test finding all N-to-N matches."""
+        index, videos = index_with_videos
+
+        all_matches = index.find_all_matches(min_votes=2)
+
+        # Should find match between video0 and video1
+        assert len(all_matches) >= 1
+
+        for match in all_matches:
+            assert hasattr(match, 'video1_path')
+            assert hasattr(match, 'video2_path')
+            assert match.votes >= 2
+
+    def test_find_all_matches_empty_index(self, tmp_path):
+        """Test find_all_matches on empty index."""
+        db_path = tmp_path / "test.db"
+        index = FingerprintIndex(db_path=str(db_path))
+
+        matches = index.find_all_matches(min_votes=1)
+        assert len(matches) == 0
