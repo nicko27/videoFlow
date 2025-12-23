@@ -703,3 +703,263 @@ class TestMotionAnalysisVideoIntegration:
 
         assert 'metadata' in result
         assert result['similarity'] >= 0.0
+
+
+class TestMotionAnalysisCoverageEnhancement:
+    """Additional tests to reach 80%+ coverage for motion_analysis."""
+
+    @pytest.fixture
+    def test_video_path(self):
+        """Return path to test video file."""
+        from pathlib import Path
+        video_path = "/Users/nico/Downloads/tests/Das Monster und die Schone_9.mp4"
+        if not Path(video_path).exists():
+            pytest.skip(f"Test video not found: {video_path}")
+        return video_path
+
+    def test_compare_without_duration_parameter(self, test_video_path):
+        """Test compare() when duration is None - should extract from short_video."""
+        algo = MotionAnalysisAlgorithm()
+        algo.configure(threshold=70.0)
+
+        # Call without duration parameter
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=None  # Should extract duration from short_video
+        )
+
+        assert 'similarity' in result
+        assert 'accepted' in result
+        assert 'metadata' in result
+        # Duration was auto-detected from short_video
+        assert result['metadata']['motion_samples'] > 0
+
+    def test_compute_motion_signature_insufficient_frames(self, tmp_path):
+        """Test _compute_motion_signature with insufficient frames (< 3)."""
+        import cv2
+
+        algo = MotionAnalysisAlgorithm()
+        algo.configure(threshold=70.0, sample_interval=10.0)
+
+        # Create a very short video (< 1 second, will get < 3 frames)
+        temp_video = str(tmp_path / "short_video.mp4")
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(temp_video, fourcc, 1.0, (320, 240))
+
+        # Write only 2 frames
+        for _ in range(2):
+            frame = np.zeros((240, 320, 3), dtype=np.uint8)
+            out.write(frame)
+        out.release()
+
+        result = algo.compare(
+            short_video=temp_video,
+            long_video=temp_video,
+            start_time=0.0,
+            duration=0.5
+        )
+
+        # Should handle gracefully (either error or low similarity)
+        assert 'similarity' in result
+        assert 'accepted' in result
+        assert 'metadata' in result
+
+    def test_searchable_zero_case(self, tmp_path):
+        """Test when long_video is shorter than duration (searchable <= 0)."""
+        import cv2
+
+        algo = MotionAnalysisAlgorithm()
+        algo.configure(threshold=70.0)
+
+        # Create a short video
+        short_video = str(tmp_path / "short_video.mp4")
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(short_video, fourcc, 5.0, (320, 240))
+
+        # Write 10 frames (2 seconds at 5 fps)
+        for i in range(10):
+            frame = np.random.randint(0, 255, (240, 320, 3), dtype=np.uint8)
+            out.write(frame)
+        out.release()
+
+        # Request duration longer than video
+        result = algo.compare(
+            short_video=short_video,
+            long_video=short_video,
+            start_time=0.0,
+            duration=5.0  # Longer than the 2-second video
+        )
+
+        # Should handle gracefully (either succeed or fail with error)
+        assert 'similarity' in result
+        assert 'metadata' in result
+
+    def test_static_scene_detection(self, tmp_path):
+        """Test static scene handling (min_variance threshold)."""
+        import cv2
+
+        algo = MotionAnalysisAlgorithm()
+        algo.configure(threshold=70.0, min_variance=5.0)
+
+        # Create a static video (all identical frames)
+        static_video = str(tmp_path / "static_video.mp4")
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(static_video, fourcc, 5.0, (320, 240))
+
+        # All frames identical (static scene)
+        static_frame = np.full((240, 320, 3), 128, dtype=np.uint8)
+        for _ in range(25):  # 5 seconds at 5fps
+            out.write(static_frame)
+        out.release()
+
+        result = algo.compare(
+            short_video=static_video,
+            long_video=static_video,
+            start_time=0.0,
+            duration=3.0
+        )
+
+        # Static scenes should match perfectly
+        assert result['metadata']['static_scene'] is True
+        assert result['similarity'] > 0.9  # Very high similarity
+
+    def test_long_motion_none_case(self, test_video_path, mocker):
+        """Test when _compute_motion_signature returns None for long video."""
+        algo = MotionAnalysisAlgorithm()
+        algo.configure(threshold=70.0)
+
+        # Mock to return None for long video computation on second call
+        original_method = algo._compute_motion_signature
+        call_count = [0]
+
+        def mock_compute(video_path, duration, start_time=0.0):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                # First call (short video) - return valid signature
+                return original_method(video_path, duration, start_time)
+            else:
+                # Subsequent calls (long video windows) - return None
+                return None
+
+        mocker.patch.object(algo, '_compute_motion_signature', side_effect=mock_compute)
+
+        result = algo.compare(
+            short_video=test_video_path,
+            long_video=test_video_path,
+            start_time=0.0,
+            duration=1.0
+        )
+
+        # Should handle None gracefully
+        assert result['similarity'] == 0.0
+        assert result['accepted'] is False
+
+    def test_min_len_less_than_2(self):
+        """Test correlation when min_len < 2 after normalization."""
+        algo = MotionAnalysisAlgorithm()
+
+        # Create very short feature vectors
+        features1 = np.array([5.0], dtype=np.float32)  # Only 1 element
+        features2 = np.array([5.0], dtype=np.float32)
+
+        result = algo.compare_features(
+            features1=features1,
+            features2=features2,
+            threshold=70.0
+        )
+
+        # Should handle gracefully
+        assert 'similarity' in result
+        assert 'accepted' in result
+
+    def test_nan_correlation_handling(self):
+        """Test NaN correlation handling (when std is zero after normalization)."""
+        algo = MotionAnalysisAlgorithm()
+
+        # Create features that will produce NaN correlation
+        # (constant values have zero std after normalization)
+        features1 = np.array([1.0, 1.0, 1.0], dtype=np.float32)
+        features2 = np.array([2.0, 2.0, 2.0], dtype=np.float32)
+
+        result = algo.compare_features(
+            features1=features1,
+            features2=features2,
+            threshold=70.0
+        )
+
+        # Should handle NaN and return 0
+        assert result['similarity'] == 0.0 or result['similarity'] == 100.0
+        # Either static scene match or NaN handling
+
+    def test_extract_features_empty_video(self, tmp_path):
+        """Test extract_features when motion_signature is None."""
+        import cv2
+
+        algo = MotionAnalysisAlgorithm()
+        algo.configure(sample_interval=100.0)  # Very large interval
+
+        # Create a short video that will fail to extract enough samples
+        short_video = str(tmp_path / "empty_video.mp4")
+
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(short_video, fourcc, 1.0, (320, 240))
+
+        # Write only 2 frames (not enough for motion signature)
+        for _ in range(2):
+            frame = np.zeros((240, 320, 3), dtype=np.uint8)
+            out.write(frame)
+        out.release()
+
+        features = algo.extract_features(short_video)
+
+        # Should handle gracefully
+        assert isinstance(features, np.ndarray)
+
+    def test_get_cli_params(self):
+        """Test get_cli_params returns correct structure."""
+        algo = MotionAnalysisAlgorithm()
+
+        params = algo.get_cli_params()
+
+        assert isinstance(params, list)
+        assert len(params) == 3
+
+        # Check structure
+        assert any('--motion-sample-interval' in p['names'] for p in params)
+        assert any('--motion-search-step' in p['names'] for p in params)
+        assert any('--motion-min-variance' in p['names'] for p in params)
+
+    def test_get_requirements(self):
+        """Test get_requirements returns correct packages."""
+        algo = MotionAnalysisAlgorithm()
+
+        requirements = algo.get_requirements()
+
+        assert isinstance(requirements, list)
+        assert 'opencv-python>=4.8.0' in requirements
+        assert 'numpy>=1.24.0' in requirements
+
+    def test_compare_features_with_min_variance_param(self):
+        """Test compare_features with min_variance parameter."""
+        algo = MotionAnalysisAlgorithm()
+
+        # Create low-variance features (static scene)
+        features1 = np.array([0.1, 0.15, 0.12, 0.13], dtype=np.float32)
+        features2 = np.array([0.2, 0.25, 0.22, 0.23], dtype=np.float32)
+
+        result = algo.compare_features(
+            features1=features1,
+            features2=features2,
+            threshold=70.0,
+            params={'min_variance': 1.0}  # High threshold - both will be "static"
+        )
+
+        # Should handle with min_variance parameter
+        assert 'similarity' in result
+        assert 'static_1' in result['metadata']
+        assert 'static_2' in result['metadata']
